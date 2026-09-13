@@ -4,6 +4,8 @@
 
 **The open-source, COD-first e-commerce platform for Algeria — built agentic-ready.**
 
+[![Telegram](https://img.shields.io/badge/Telegram-Join%20our%20group-2AABEE?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/codflow_dz)
+
 Cash on Delivery meets serverless infrastructure. Self-host your entire commerce stack on Cloudflare with zero transaction fees, connect to Algeria's delivery carriers, and optimize Meta ads for real deliveries instead of door refusals.
 
 ---
