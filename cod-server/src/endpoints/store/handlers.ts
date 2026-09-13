@@ -57,11 +57,14 @@ export async function getStoreLandingPage(c: Context<AppContext>) {
 
   // The page renders the store product exactly like the product page does —
   // same shape (variants, offers, inventory, review stats) so the theme's
-  // form + scripts work unmodified. A hidden/unavailable product still
-  // renders: the merchant published the link deliberately; the order engine
-  // guards sellability.
+  // form + scripts work unmodified. A store-hidden product (showInStore=false)
+  // still renders: the merchant published the link deliberately, and the
+  // landing page is its sales channel. The other gates (ACTIVE, visibility,
+  // not deleted) still apply, and the order engine guards sellability.
   const product = lp.product?.handle
-    ? await queries.getStoreProductByHandle(db, lp.product.handle)
+    ? await queries.getStoreProductByHandle(db, lp.product.handle, {
+        allowUnlisted: true,
+      })
     : null;
 
   // One render = one view. Atomic single-row UPDATE, deferred via waitUntil

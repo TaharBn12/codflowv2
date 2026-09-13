@@ -40,7 +40,8 @@
   "status": {
     "available": "Available",
     "out_of_stock": "Out of Stock",
-    "low_stock": "Low Stock"
+    "low_stock": "Low Stock",
+    "hidden_from_store": "Hidden from store"
   },
   "stock": {
     "in_stock": "In Stock",
@@ -141,6 +142,8 @@
     "threshold_label": "Alert Threshold",
     "threshold_hint": "Alert when stock drops to this level",
     "track_stock_hint": "Monitor inventory levels automatically",
+    "show_in_store_label": "Show in store",
+    "show_in_store_hint": "Hidden products don't appear in the storefront catalog or product page — their landing pages keep selling as normal.",
     "bulk_fill": "Bulk fill",
     "bulk_price_placeholder": "Price",
     "bulk_price_apply": "Set price",

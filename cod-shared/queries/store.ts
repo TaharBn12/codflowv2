@@ -198,19 +198,31 @@ export async function getStoreProducts(
   });
 }
 
-export async function getStoreProductByHandle(db: AppDb, handle: string) {
+/**
+ * Resolve a product by handle in its full store-product shape.
+ *
+ * The four catalog green lights apply by default (status=ACTIVE, visibility,
+ * showInStore, not soft-deleted). `allowUnlisted` drops ONLY the showInStore
+ * gate — landing pages link their product deliberately, so a store-hidden
+ * (unlisted) product still renders there; the other gates still apply.
+ */
+export async function getStoreProductByHandle(
+  db: AppDb,
+  handle: string,
+  opts?: { allowUnlisted?: boolean },
+) {
+  const conditions = [
+    eq(products.handle, handle),
+    eq(products.status, "ACTIVE"),
+    eq(products.visibility, true),
+    isNull(products.deletedAt),
+  ];
+  if (!opts?.allowUnlisted) conditions.push(eq(products.showInStore, true));
+
   const product = await db
     .select()
     .from(products)
-    .where(
-      and(
-        eq(products.handle, handle),
-        eq(products.showInStore, true),
-        eq(products.status, "ACTIVE"),
-        eq(products.visibility, true),
-        isNull(products.deletedAt),
-      ),
-    )
+    .where(and(...conditions))
     .get();
 
   if (!product) return null;

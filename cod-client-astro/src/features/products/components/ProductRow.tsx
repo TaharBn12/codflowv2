@@ -16,6 +16,11 @@ function ProductStatusBadge({ product }: { product: Product }) {
   return <Badge tone="critical">{t("status_options.archived")}</Badge>;
 }
 
+function HiddenFromStoreBadge() {
+  const t = useT("products");
+  return <Badge tone="neutral">{t("status.hidden_from_store")}</Badge>;
+}
+
 function StockValue({ product }: { product: Product }) {
   const t = useT("products");
   const total = product.totalInventory ?? product.inventory ?? 0;
@@ -93,7 +98,10 @@ export function ProductDesktopRow({ product, categoryMap, canManage, onDelete }:
         </span>
       </TableCell>
       <TableCell>
-        <ProductStatusBadge product={product} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <ProductStatusBadge product={product} />
+          {product.showInStore === false && <HiddenFromStoreBadge />}
+        </div>
       </TableCell>
       <TableCell className="text-sm font-semibold tabular-nums">
         {formatMoneyValue(product.price, locale)}
@@ -169,6 +177,7 @@ export function ProductMobileCard({ product, categoryMap, canManage, onDelete }:
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <ProductStatusBadge product={product} />
+            {product.showInStore === false && <HiddenFromStoreBadge />}
             {category && (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
                 {category.name}
