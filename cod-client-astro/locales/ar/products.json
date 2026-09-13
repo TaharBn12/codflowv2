@@ -40,7 +40,8 @@
   "status": {
     "available": "متاح",
     "out_of_stock": "غير متوفر",
-    "low_stock": "مخزون منخفض"
+    "low_stock": "مخزون منخفض",
+    "hidden_from_store": "مخفي من المتجر"
   },
   "stock": {
     "in_stock": "في المخزون",
@@ -141,6 +142,8 @@
     "threshold_label": "حد التنبيه",
     "threshold_hint": "تنبيه عند وصول المخزون لهذا الحد",
     "track_stock_hint": "مراقبة مستويات المخزون تلقائياً",
+    "show_in_store_label": "إظهار في المتجر",
+    "show_in_store_hint": "المنتجات المخفية لا تظهر في قائمة المتجر ولا في صفحتها — لكن صفحات الهبوط الخاصة بها تظل تعمل كالمعتاد.",
     "bulk_fill": "ملء جماعي",
     "bulk_price_placeholder": "السعر",
     "bulk_price_apply": "تطبيق السعر",

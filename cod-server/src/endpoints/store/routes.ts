@@ -145,7 +145,7 @@ const getStoreLandingPageRoute = defineRoute({
   tags: ["Store API"],
   summary: "Get published landing page",
   description:
-    "Get a published landing page by its public slug: the ordered image stack, spacing settings, and the linked product in its full store-product shape (variants, offers, inventory) so the storefront order form works unmodified. Draft/archived/unknown slugs return 404. Each successful GET increments the page's view counter (non-unique in v1).",
+    "Get a published landing page by its public slug: the ordered image stack, spacing settings, and the linked product in its full store-product shape (variants, offers, inventory) so the storefront order form works unmodified. Store-hidden products (`showInStore=false`) still render here — the landing page is their sales channel; the catalog list and the product's own page stay hidden. Draft/archived/unknown slugs return 404. Each successful GET increments the page's view counter (non-unique in v1).",
   operationId: "getStoreLandingPage",
   params: lpSlugParams,
   responses: {

@@ -81,6 +81,7 @@ export function ProductForm({ productId }: { productId?: string }) {
   const [costPrice, setCostPrice] = useState("");
   const [status, setStatus] = useState<ProductStatus>("ACTIVE");
   const [trackInventory, setTrackInventory] = useState(true);
+  const [showInStore, setShowInStore] = useState(true);
   const [inventory, setInventory] = useState("0");
   const [lowStockThreshold, setLowStockThreshold] = useState("5");
 
@@ -168,6 +169,7 @@ export function ProductForm({ productId }: { productId?: string }) {
         setCostPrice(product.costPrice ? String(product.costPrice) : "");
         setStatus(product.status);
         setTrackInventory(product.trackInventory);
+        setShowInStore(product.showInStore);
         setInventory(String(product.inventory));
         setLowStockThreshold(String(product.lowStockThreshold ?? 5));
         if (product.hasVariants) {
@@ -304,6 +306,7 @@ export function ProductForm({ productId }: { productId?: string }) {
         costPrice: costPrice ? Math.round(Number(costPrice)) : undefined,
         status,
         trackInventory,
+        showInStore,
         ...(editing
           ? {}
           : { inventory: hasVariants ? 0 : Number(inventory) || 0 }),
@@ -508,6 +511,8 @@ export function ProductForm({ productId }: { productId?: string }) {
           setLowStockThreshold={setLowStockThreshold}
           trackInventory={trackInventory}
           setTrackInventory={setTrackInventory}
+          showInStore={showInStore}
+          setShowInStore={setShowInStore}
           hasVariantsSwitch={hasVariantsSwitch}
           editing={editing}
           busy={busy}

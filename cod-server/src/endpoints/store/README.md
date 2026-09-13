@@ -26,6 +26,7 @@ Unlike other `api/*` endpoints, this module uses a dedicated authentication head
 - `GET /store/config`: Get public branding, theme, and SEO settings.
 - `GET /store/products`: Paginated product catalog. Only returns products that are `ACTIVE`, `visibility=true`, `showInStore=true`, and not soft-deleted — ordered featured-first, then newest.
 - `GET /store/products/:handle`: Detailed product info fetched by URL slug (handle). Includes variants, images, and approved review stats.
+- `GET /store/landing-pages/:slug`: Published landing page with its linked product in full store-product shape. Store-hidden products (`showInStore=false`) still render here — the landing page is their sales channel; only the catalog list and the product's own page stay hidden.
 - `GET /store/categories`: List all categories in display order.
 
 ### 2. Location & Shipping

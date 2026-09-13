@@ -40,7 +40,8 @@
   "status": {
     "available": "Disponible",
     "out_of_stock": "Rupture de stock",
-    "low_stock": "Stock faible"
+    "low_stock": "Stock faible",
+    "hidden_from_store": "Masqué de la boutique"
   },
   "stock": {
     "in_stock": "En stock",
@@ -141,6 +142,8 @@
     "threshold_label": "Seuil d'alerte",
     "threshold_hint": "Alerte lorsque le stock descend à ce niveau",
     "track_stock_hint": "Surveiller automatiquement les niveaux d'inventaire",
+    "show_in_store_label": "Afficher dans la boutique",
+    "show_in_store_hint": "Les produits masqués n'apparaissent ni dans le catalogue ni sur leur page — leurs pages de destination continuent de vendre normalement.",
     "bulk_fill": "Remplissage groupé",
     "bulk_price_placeholder": "Prix",
     "bulk_price_apply": "Appliquer le prix",

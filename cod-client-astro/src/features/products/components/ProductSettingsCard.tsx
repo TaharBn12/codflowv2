@@ -13,6 +13,8 @@ interface ProductSettingsCardProps {
   setLowStockThreshold: (val: string) => void;
   trackInventory: boolean;
   setTrackInventory: (val: boolean) => void;
+  showInStore: boolean;
+  setShowInStore: (val: boolean) => void;
   hasVariantsSwitch: boolean;
   editing: boolean;
   busy: boolean;
@@ -27,6 +29,8 @@ export function ProductSettingsCard({
   setLowStockThreshold,
   trackInventory,
   setTrackInventory,
+  showInStore,
+  setShowInStore,
   hasVariantsSwitch,
   editing,
   busy,
@@ -91,6 +95,27 @@ export function ProductSettingsCard({
             checked={trackInventory}
             onChange={(event) =>
               setTrackInventory(event.currentTarget.checked)
+            }
+            disabled={busy}
+            className="size-5 accent-primary"
+          />
+        </label>
+      </div>
+      <div className="mt-4">
+        <label className="flex cursor-pointer items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {t("form.show_in_store_label")}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t("form.show_in_store_hint")}
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={showInStore}
+            onChange={(event) =>
+              setShowInStore(event.currentTarget.checked)
             }
             disabled={busy}
             className="size-5 accent-primary"
