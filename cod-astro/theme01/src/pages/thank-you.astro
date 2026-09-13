@@ -131,3 +131,32 @@ const steps = [
 })();
   `} />
 )}
+
+<script
+  is:inline
+  define:vars={{ orderNumber, orderId }}
+>
+  // Mark the abandoned-checkout session as converted (fire-and-forget).
+  // The order POST redirects here (PRG), so the conversion signal fires on
+  // the thank-you page — sessionStorage survives the redirect. keepalive
+  // lets the request outlive the page if the user navigates on immediately.
+  (function () {
+    try {
+      var sessionId = sessionStorage.getItem("cod_session_id");
+      if (!sessionId) return;
+      sessionStorage.removeItem("cod_session_id");
+      fetch("/api/abandoned/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          orderId: orderId,
+          orderNumber: orderNumber,
+        }),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (e) {
+      // Non-critical — conversion tracking must never break the thank-you page
+    }
+  })();
+</script>
