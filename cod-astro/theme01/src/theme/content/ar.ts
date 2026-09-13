@@ -217,4 +217,11 @@ export const ar: StoreFrontContent = {
   navContact: "اتصل بنا",
   thankYouPageTitle: "تم استلام طلبك",
   defaultMetaDescription: "تسوق من {storeName} - أفضل المنتجات بأسعار مناسبة مع توصيل لجميع الولايات",
+
+  // ── 404 page ──────────────────────────────────────────────────────────────
+  notFoundTitle: "الصفحة غير موجودة",
+  notFoundSubtitle: "يبدو أن الرابط الذي فتحته غير صحيح أو أن الصفحة حُذفت — لا تقلق، متجرنا ما زال هنا",
+  notFoundCtaHome: "العودة للمتجر",
+  notFoundCtaProducts: "تصفح المنتجات",
+  notFoundPageTitle: "الصفحة غير موجودة",
 };

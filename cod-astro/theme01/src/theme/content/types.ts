@@ -229,4 +229,11 @@ export interface StoreFrontContent {
   navContact: string;
   thankYouPageTitle: string;
   defaultMetaDescription: string;
+
+  // ── 404 page ──────────────────────────────────────────────────────────────
+  notFoundTitle: string;
+  notFoundSubtitle: string;
+  notFoundCtaHome: string;
+  notFoundCtaProducts: string;
+  notFoundPageTitle: string;
 }

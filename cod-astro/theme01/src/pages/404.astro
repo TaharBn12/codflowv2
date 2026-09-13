@@ -1,0 +1,77 @@
+---
+// ── 404 PAGE ─────────────────────────────────────────────────────────────────
+// Astro renders this page automatically (with HTTP 404) for any URL that
+// matches no route. Full store shell — header, footer, mobile nav — so a
+// lost visitor can navigate straight back into the funnel.
+// All copy comes from the store's content pack (ar/en/fr); colors and radii
+// from the runtime theme tokens. RTL-safe: only non-directional icons.
+// ─────────────────────────────────────────────────────────────────────────────
+import StoreLayout from "@/theme/layouts/StoreLayout.astro";
+import { getStoreContext } from "@/theme/config/store";
+import { Icon } from "astro-icon/components";
+
+const { config, content } = await getStoreContext();
+---
+
+<StoreLayout
+  config={config}
+  content={content}
+  title={`${content.notFoundPageTitle} — ${config.name}`}
+  description={content.notFoundSubtitle}
+  noindex={true}
+>
+  <section
+    class="flex flex-col items-center justify-center text-center px-4 py-20 sm:py-24 min-h-[55vh] sm:min-h-[60vh]"
+  >
+    <!-- Icon badge — the "looking for something" cue -->
+    <div
+      class="w-20 h-20 rounded-full flex items-center justify-center mb-8"
+      style="background: var(--clr-surface); border: 1px solid var(--clr-border); box-shadow: var(--shadow-md);"
+    >
+      <Icon
+        name="heroicons:magnifying-glass"
+        class="w-9 h-9"
+        style="color: var(--clr-primary);"
+      />
+    </div>
+
+    <!-- The numeral — locale-neutral, decorative -->
+    <div
+      class="font-black leading-none tracking-tight text-[5.5rem] sm:text-[8rem] lg:text-[9rem] select-none"
+      style="color: var(--clr-primary);"
+      aria-hidden="true"
+    >
+      404
+    </div>
+
+    <!-- Headline + subtext -->
+    <h1
+      class="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight mt-4"
+      style="color: var(--clr-text);"
+    >
+      {content.notFoundTitle}
+    </h1>
+    <p
+      class="mt-4 max-w-md text-sm sm:text-base font-medium leading-relaxed"
+      style="color: var(--clr-text-2);"
+    >
+      {content.notFoundSubtitle}
+    </p>
+
+    <!-- Ways out: home (primary) + products (secondary) -->
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 w-full max-w-sm sm:max-w-none">
+      <a href="/" class="btn-primary group !w-full sm:!w-auto">
+        <Icon name="heroicons:home" class="w-5 h-5" />
+        {content.notFoundCtaHome}
+      </a>
+      <a
+        href="/products"
+        class="inline-flex items-center justify-center gap-2.5 px-8 h-14 font-black text-sm transition-all duration-300 active:scale-95 w-full sm:w-auto rounded-2xl"
+        style="background: var(--clr-surface); border: 2px solid var(--clr-border); color: var(--clr-text);"
+      >
+        <Icon name="heroicons:squares-2x2" class="w-5 h-5" style="color: var(--clr-primary);" />
+        {content.notFoundCtaProducts}
+      </a>
+    </div>
+  </section>
+</StoreLayout>
