@@ -242,21 +242,23 @@ export const getProductTools = (db: ReturnType<typeof getDb>) => ({
       }
 
       try {
-        // Duplicate SKU check before insert
-        if (parsed.data.sku) {
-          const { products } = await import("@/db/schema");
-          const { eq, isNull, and } = await import("drizzle-orm");
-          const existing = await db
-            .select()
-            .from(products)
-            .where(and(eq(products.sku, parsed.data.sku), isNull(products.deletedAt)))
-            .get();
-          if (existing) {
-            return {
-              success: false,
-              error: `A product with SKU "${parsed.data.sku}" already exists (ID: ${existing.id}). Use a different SKU.`,
-            };
-          }
+        // Identity conflict check before insert — spans soft-deleted rows too,
+        // because the database's unique indexes (handle, sku) do.
+        const conflict = await queries.findProductIdentityConflict(db, {
+          ...(parsed.data.handle !== undefined ? { handle: parsed.data.handle } : {}),
+          ...(parsed.data.sku !== undefined ? { sku: parsed.data.sku } : {}),
+        });
+        if (conflict) {
+          const suffix = conflict.deleted ? " (held by a deleted product)" : "";
+          return conflict.field === "sku"
+            ? {
+                success: false,
+                error: `A product with SKU "${parsed.data.sku}" already exists${suffix} (ID: ${conflict.existingId}). Use a different SKU.`,
+              }
+            : {
+                success: false,
+                error: `A product with handle "${parsed.data.handle}" already exists${suffix} (ID: ${conflict.existingId}). Use a different handle, or omit it to auto-generate one.`,
+              };
         }
 
         const product = await queries.createProduct(db, parsed.data);
@@ -266,9 +268,22 @@ export const getProductTools = (db: ReturnType<typeof getDb>) => ({
           message: `Product "${parsed.data.name}" created successfully`,
         };
       } catch (error: any) {
+        const msg = String(error?.message ?? error);
+        if (/UNIQUE constraint failed: products\.handle/i.test(msg)) {
+          return {
+            success: false,
+            error: `A product with handle "${parsed.data.handle}" already exists. Use a different handle, or omit it to auto-generate one.`,
+          };
+        }
+        if (/UNIQUE constraint failed: products\.sku/i.test(msg)) {
+          return {
+            success: false,
+            error: `A product with SKU "${parsed.data.sku}" already exists. Use a different SKU.`,
+          };
+        }
         return {
           success: false,
-          error: `Failed to create product: ${error.message}`,
+          error: `Failed to create product: ${msg}`,
         };
       }
     },
