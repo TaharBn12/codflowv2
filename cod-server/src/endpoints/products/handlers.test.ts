@@ -146,12 +146,12 @@ describe("Products Endpoint - Error Scenarios", () => {
 
   describe("POST /products", () => {
     it("should return 409 with DUPLICATE_SKU code when SKU already exists", async () => {
-      // Mock database query to return existing product with same SKU
-      mockDb.get.mockResolvedValue({
-        id: "prod_existing",
-        name: "Existing Product",
-        sku: "GALAXY-A54",
-        deleted_at: null,
+      // Identity conflicts are checked in the query layer (spans soft-deleted
+      // rows too, mirroring the DB's unique indexes).
+      vi.mocked(queries.findProductIdentityConflict).mockResolvedValue({
+        field: "sku",
+        existingId: "prod_existing",
+        deleted: false,
       });
 
       const res = await app.request("/products", {
@@ -180,8 +180,8 @@ describe("Products Endpoint - Error Scenarios", () => {
     });
 
     it("should return 201 when product is created successfully", async () => {
-      // Mock no existing product with same SKU
-      mockDb.get.mockResolvedValue(null);
+      // No identity conflict — handle and SKU are free.
+      vi.mocked(queries.findProductIdentityConflict).mockResolvedValue(null);
       
       // Mock successful creation
       vi.mocked(queries.createProduct).mockResolvedValue({

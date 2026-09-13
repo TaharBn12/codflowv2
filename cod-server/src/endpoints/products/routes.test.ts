@@ -265,6 +265,13 @@ describe("Products routes (OpenAPIHono)", () => {
     });
 
     it("returns 409 for a duplicate SKU", async () => {
+      // Identity conflicts are checked in the (mocked) query layer — the DB
+      // unique indexes span soft-deleted rows, so the checker sees them too.
+      vi.mocked(queries.findProductIdentityConflict).mockResolvedValue({
+        field: "sku",
+        existingId: "existing_1",
+        deleted: false,
+      });
       mockDb = dbSelectReturning(productRow({ id: "existing_1", sku: "TEE-BASIC" }));
 
       const res = await app.request("/api/products", {

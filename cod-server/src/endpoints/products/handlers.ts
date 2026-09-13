@@ -32,36 +32,69 @@ export async function getProduct(c: Context<AppContext>) {
   return c.json({ success: true, data: product }, 200);
 }
 
+function isProductUniqueViolation(err: unknown): "handle" | "sku" | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/UNIQUE constraint failed: products\.handle/i.test(msg)) return "handle";
+  if (/UNIQUE constraint failed: products\.sku/i.test(msg)) return "sku";
+  return null;
+}
+
 export async function createProduct(c: Context<AppContext>) {
   const db = getDb(c.env.DB);
   const jsonData: any = (c.req as any).valid?.("json");
   const validated = jsonData ?? validation.createProductSchema.parse(await c.req.json());
-  
-  // Check for duplicate SKU if provided
-  if (validated.sku) {
-    const { products } = await import("@/db/schema");
-    const { eq, isNull, and } = await import("drizzle-orm");
-    const existingProduct = await db.select().from(products)
-      .where(and(eq(products.sku, validated.sku), isNull(products.deletedAt)))
-      .get();
-    if (existingProduct) {
+
+  // Identity pre-check — spans soft-deleted rows too, because the database's
+  // unique indexes do: a deleted product still holds its handle/SKU and would
+  // otherwise crash the insert with a raw constraint violation (500).
+  const conflict = await queries.findProductIdentityConflict(db, {
+    ...(validated.handle !== undefined ? { handle: validated.handle } : {}),
+    ...(validated.sku !== undefined ? { sku: validated.sku } : {}),
+  });
+  if (conflict) {
+    if (conflict.field === "sku") {
+      throw new ConflictError(
+        `Product with SKU "${validated.sku}" already exists${conflict.deleted ? " (it belongs to a deleted product)" : ""}`,
+        ERROR_CODES.DUPLICATE_SKU,
+        { sku: validated.sku, existingProductId: conflict.existingId }
+      );
+    }
+    throw new ConflictError(
+      `Product with handle "${validated.handle}" already exists${conflict.deleted ? " (it belongs to a deleted product)" : ""} — pick a different handle or leave it empty to auto-generate one`,
+      ERROR_CODES.DUPLICATE_ENTITY,
+      { handle: validated.handle, existingProductId: conflict.existingId }
+    );
+  }
+
+  try {
+    const product = await queries.createProduct(db, validated);
+    if (!product) {
+      throw new SystemError("Failed to create product");
+    }
+    const actor = c.get("user");
+    await logActivity(db, actor, ACTIONS.PRODUCT_CREATED, {
+      type: "product", id: product.id, label: validated.name,
+    });
+    return c.json({ success: true, data: product }, 201);
+  } catch (err) {
+    // Race: a concurrent writer took the handle/SKU between check and insert.
+    const field = isProductUniqueViolation(err);
+    if (field === "sku") {
       throw new ConflictError(
         `Product with SKU "${validated.sku}" already exists`,
         ERROR_CODES.DUPLICATE_SKU,
-        { sku: validated.sku, existingProductId: existingProduct.id }
+        { sku: validated.sku }
       );
     }
+    if (field === "handle") {
+      throw new ConflictError(
+        `Product with handle "${validated.handle}" already exists — pick a different handle or leave it empty to auto-generate one`,
+        ERROR_CODES.DUPLICATE_ENTITY,
+        { handle: validated.handle }
+      );
+    }
+    throw err;
   }
-  
-  const product = await queries.createProduct(db, validated);
-  if (!product) {
-    throw new SystemError("Failed to create product");
-  }
-  const actor = c.get("user");
-  await logActivity(db, actor, ACTIONS.PRODUCT_CREATED, {
-    type: "product", id: product.id, label: validated.name,
-  });
-  return c.json({ success: true, data: product }, 201);
 }
 
 export async function updateProduct(c: Context<AppContext>) {
@@ -69,6 +102,30 @@ export async function updateProduct(c: Context<AppContext>) {
   const productId = c.req.param("id")!;
   const jsonData: any = (c.req as any).valid?.("json");
   const validated = jsonData ?? validation.updateProductSchema.parse(await c.req.json());
+
+  // Renaming onto another product's handle/SKU — including a soft-deleted
+  // product's, since the unique indexes span deleted rows.
+  if (validated.handle !== undefined || validated.sku !== undefined) {
+    const conflict = await queries.findProductIdentityConflict(db, {
+      ...(validated.handle !== undefined ? { handle: validated.handle } : {}),
+      ...(validated.sku !== undefined ? { sku: validated.sku } : {}),
+    });
+    if (conflict && conflict.existingId !== productId) {
+      if (conflict.field === "sku") {
+        throw new ConflictError(
+          `Product with SKU "${validated.sku}" already exists${conflict.deleted ? " (it belongs to a deleted product)" : ""}`,
+          ERROR_CODES.DUPLICATE_SKU,
+          { sku: validated.sku, existingProductId: conflict.existingId }
+        );
+      }
+      throw new ConflictError(
+        `Product with handle "${validated.handle}" already exists${conflict.deleted ? " (it belongs to a deleted product)" : ""}`,
+        ERROR_CODES.DUPLICATE_ENTITY,
+        { handle: validated.handle, existingProductId: conflict.existingId }
+      );
+    }
+  }
+
   const product = await queries.updateProduct(db, productId, validated);
   if (!product) {
     throw new NotFoundError("Product", productId);

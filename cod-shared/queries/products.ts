@@ -299,8 +299,49 @@ export async function updateProduct(db: AppDb, productId: string, data: UpdatePr
 }
 
 export async function deleteProduct(db: AppDb, productId: string) {
-  await db.update(products).set({ deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }).where(eq(products.id, productId));
+  // Hard delete. Callers guarantee no orderProducts reference the product
+  // (delete is refused with PRODUCT_HAS_ORDERS otherwise), so removing the
+  // row outright is safe and frees the unique handle/sku for reuse — a
+  // soft-deleted row would keep blocking recreation at the DB's unique
+  // indexes (they span soft-deleted rows). Children are removed first:
+  // the D1 foreign keys have no ON DELETE cascade.
+  await db.delete(productVariants).where(eq(productVariants.productId, productId));
+  await db.delete(productImages).where(eq(productImages.productId, productId));
+  await db.delete(products).where(eq(products.id, productId));
   return { success: true };
+}
+
+/**
+ * Identity conflict finder for create/update: does ANY product — including
+ * soft-deleted ones — already hold this handle or SKU? The database's unique
+ * indexes span soft-deleted rows, so a friendly pre-check that only looked at
+ * live products would pass and the insert would still crash with a raw
+ * constraint violation (500).
+ */
+export async function findProductIdentityConflict(
+  db: AppDb,
+  identity: { handle?: string; sku?: string },
+): Promise<{ field: "handle" | "sku"; existingId: string; deleted: boolean } | null> {
+  const conditions = [];
+  if (identity.handle !== undefined) conditions.push(eq(products.handle, identity.handle));
+  if (identity.sku !== undefined) conditions.push(eq(products.sku, identity.sku));
+  if (conditions.length === 0) return null;
+
+  const row = await db
+    .select({
+      id: products.id,
+      handle: products.handle,
+      sku: products.sku,
+      deletedAt: products.deletedAt,
+    })
+    .from(products)
+    .where(or(...conditions))
+    .get();
+  if (!row) return null;
+
+  const field =
+    identity.handle !== undefined && row.handle === identity.handle ? "handle" : "sku";
+  return { field, existingId: row.id, deleted: row.deletedAt !== null };
 }
 
 export async function getProductImages(db: AppDb, productId: string) {
