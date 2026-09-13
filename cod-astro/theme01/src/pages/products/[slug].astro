@@ -18,19 +18,18 @@ const { slug } = Astro.params;
 // This allows layout/head/navigation to render immediately while product streams in
 const { config, content, isRTL } = await getStoreContext();
 
-// Action result (must be checked before rendering)
+// Action result (must be checked before rendering).
+// Order success → single PRG redirect to the thank-you page. The browser
+// follows the POST response directly (303), so the form page never re-renders
+// — no reload flash, no client-side redirect. The abandonment-conversion
+// signal fires on the thank-you page (sessionStorage survives the redirect).
 const result = Astro.getActionResult(actions.placeOrder);
-// If order succeeded, pass data to client — the inline script below posts the
-// abandonment-conversion signal (bounded keepalive fetch) then redirects to
-// /thank-you. This avoids losing the conversion signal on a hard server
-// redirect.
-const orderSuccess = result?.data?.orderNumber
-  ? {
-      orderNumber: result.data.orderNumber,
-      total: result.data.total,
-      orderId: result.data.orderId ?? "",
-    }
-  : null;
+if (result?.data?.orderNumber) {
+  return Astro.redirect(
+    `/thank-you?order=${encodeURIComponent(result.data.orderNumber)}&total=${result.data.total}&oid=${encodeURIComponent(result.data.orderId ?? "")}`,
+    303,
+  );
+}
 const fieldErrors  = isInputError(result?.error) ? result.error.fields : {};
 const serverError  = result?.error && !isInputError(result.error) ? result.error.message : null;
 ---
@@ -59,45 +58,3 @@ const serverError  = result?.error && !isInputError(result.error) ? result.error
 <script src="../../theme/scripts/otp-step.ts"></script>
 <script src="../../theme/scripts/turnstile-field.ts"></script>
 <script src="../../theme/scripts/track-abandonment.ts"></script>
-{orderSuccess && (
-  <script
-    is:inline
-    define:vars={{ orderNumber: orderSuccess.orderNumber, total: orderSuccess.total, orderId: orderSuccess.orderId }}
-  >
-    (async () => {
-      // Mark the abandoned-checkout session as converted (fire-and-forget).
-      // Posts directly — the deferred tracking module may not have defined
-      // its global yet when this inline script runs. Bounded wait so a
-      // stalled network can never delay the thank-you page by more than 2.5s.
-      try {
-        var sessionId = sessionStorage.getItem("cod_session_id");
-        if (sessionId) {
-          await Promise.race([
-            fetch("/api/abandoned/convert", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                sessionId: sessionId,
-                orderId: orderId,
-                orderNumber: orderNumber,
-              }),
-              keepalive: true,
-            }).catch(function () {}),
-            new Promise(function (resolve) { setTimeout(resolve, 2500); }),
-          ]);
-          sessionStorage.removeItem("cod_session_id");
-        }
-      } catch (e) {
-        // Non-critical — conversion tracking must never block the redirect
-      }
-      window.location.replace(
-        "/thank-you?order=" +
-          encodeURIComponent(orderNumber) +
-          "&total=" +
-          total +
-          "&oid=" +
-          encodeURIComponent(orderId)
-      );
-    })();
-  </script>
-)}
