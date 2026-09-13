@@ -217,4 +217,11 @@ export const en: StoreFrontContent = {
   navContact: "Contact",
   thankYouPageTitle: "Order Received",
   defaultMetaDescription: "Shop from {storeName} - Best products at great prices with delivery nationwide",
+
+  // ── 404 page ──────────────────────────────────────────────────────────────
+  notFoundTitle: "Page not found",
+  notFoundSubtitle: "The link you opened seems incorrect or the page was removed — don't worry, our store is still here",
+  notFoundCtaHome: "Back to store",
+  notFoundCtaProducts: "Browse products",
+  notFoundPageTitle: "Page not found",
 };

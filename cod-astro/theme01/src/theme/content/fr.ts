@@ -217,4 +217,11 @@ export const fr: StoreFrontContent = {
   navContact: "Contactez-nous",
   thankYouPageTitle: "Commande reçue",
   defaultMetaDescription: "Achetez chez {storeName} - Les meilleurs produits à des prix abordables avec livraison dans toutes les wilayas",
+
+  // ── 404 page ──────────────────────────────────────────────────────────────
+  notFoundTitle: "Page introuvable",
+  notFoundSubtitle: "Le lien que vous avez ouvert semble incorrect ou la page a été supprimée — ne vous inquiétez pas, notre boutique est toujours là",
+  notFoundCtaHome: "Retour à la boutique",
+  notFoundCtaProducts: "Parcourir les produits",
+  notFoundPageTitle: "Page introuvable",
 };
