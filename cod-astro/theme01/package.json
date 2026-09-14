@@ -17,10 +17,10 @@
     "validate": "npm run validate:all && npm run build"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.2.3",
+    "@astrojs/cloudflare": "^14.3.1",
     "@iconify-json/heroicons": "^1.2.3",
     "@playform/compress": "^0.2.5",
-    "astro": "^7.2.4",
+    "astro": "^7.3.2",
     "astro-icon": "^1.1.5"
   },
   "devDependencies": {
