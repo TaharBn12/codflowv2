@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   server:
-    name: cod-server (typecheck + test)
+    name: cod-server (typecheck + test + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,9 +26,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck --workspace codflow-server
       - run: npm test --workspace codflow-server
+      - run: cp wrangler.toml.example wrangler.toml
+        working-directory: cod-server
+      - run: npm run build:ci --workspace codflow-server
 
   dashboard:
-    name: cod-client-astro (typecheck + test)
+    name: cod-client-astro (typecheck + test + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -40,9 +43,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck --workspace codflow-client-astro
       - run: npm test --workspace codflow-client-astro
+      - run: npm run build --workspace codflow-client-astro
+        env:
+          PUBLIC_API_URL: http://localhost:8787
 
   theme01:
-    name: theme01 (astro check + test)
+    name: theme01 (astro check + test + validate + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -55,4 +61,8 @@ jobs:
       - run: npx astro check
         working-directory: cod-astro/theme01
       - run: npm test
+        working-directory: cod-astro/theme01
+      - run: npm run validate:all
+        working-directory: cod-astro/theme01
+      - run: npm run build
         working-directory: cod-astro/theme01
