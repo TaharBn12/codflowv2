@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -11,6 +11,7 @@ import {
   Loader2,
   Monitor,
   Pencil,
+  RefreshCw,
   RotateCcw,
   Smartphone,
   UploadCloud,
@@ -175,10 +176,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
   });
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("mobile");
   const [previewZoom, setPreviewZoom] = useState(85);
-  // Defer the expensive creative stack repaint so range/color controls stay
-  // responsive even when a landing page contains many large images.
-  const previewDesign = useDeferredValue(design);
-  const previewGap = useDeferredValue(imageGap);
+  const [previewRevision, setPreviewRevision] = useState(0);
 
   // Slug editing: committed value (autosaved) + in-flight draft while editing
   const [slugDraft, setSlugDraft] = useState<string | null>(null);
@@ -236,6 +234,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
       });
       setLp(updated.data);
       setName(updated.data.name);
+      setPreviewRevision((revision) => revision + 1);
       setSaveState("saved");
       notify.success(t("studio.saved"));
     } catch (cause) {
@@ -727,7 +726,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
         </div>
       </aside>
 
-      {/* CENTER — responsive live preview, isolated from autosave network state */}
+      {/* CENTER — the real deployed landing page, not a simulated canvas */}
       <section className="relative flex min-h-[520px] min-w-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_center,hsl(var(--muted))_1px,transparent_1px)] [background-size:20px_20px]">
         <div className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur">
           <div className="flex rounded-lg border border-border bg-background p-0.5">
@@ -744,61 +743,45 @@ function Gated({ landingPageId }: { landingPageId: string }) {
               className="w-20 accent-primary" />
             {previewZoom}%
           </label>
+          <button type="button" onClick={() => setPreviewRevision((revision) => revision + 1)}
+            className="grid size-8 place-items-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+            title={t("studio.refresh_preview")}><RefreshCw size={14} /></button>
+          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-700">
+            {t("studio.real_page_preview")}
+          </span>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-6">
-          <div
-            className={`mx-auto shrink-0 overflow-hidden bg-white shadow-2xl transition-[width,border-radius] duration-300 ${previewDevice === "mobile" ? "rounded-[2rem] border-[7px] border-slate-800" : "rounded-lg border border-border"}`}
-            style={{
-              width: previewDevice === "mobile" ? 390 : 900,
-              maxWidth: previewDevice === "mobile" ? "100%" : "none",
-              transform: `scale(${previewZoom / 100})`,
-              transformOrigin: "top center",
-              backgroundColor: previewDesign.backgroundColor,
-              minHeight: 520,
-              marginBottom: `${Math.max(0, (previewZoom - 100) * 5)}px`,
-            }}
-          >
-            {previewDevice === "mobile" && (
-              <div className="flex h-6 items-center justify-center bg-slate-800">
-                <span className="h-1.5 w-16 rounded-full bg-white/30" />
-              </div>
-            )}
-            {previewDesign.showImages && (lp.images.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-xs text-slate-500">
-                {t("studio.no_images")}
-              </div>
-            ) : (
-              <div className="mx-auto" style={{ paddingInline: previewDesign.sidePadding, maxWidth: previewDesign.contentMaxWidth || undefined }}>
-                {lp.images.map((image, index) => (
-                  <img key={image.id} src={image.src} alt={image.altText ?? ""}
-                    loading={index === 0 ? "eager" : "lazy"} className="block w-full"
-                    style={index === 0 ? undefined : { marginTop: previewGap }} />
-                ))}
-              </div>
-            ))}
-            {previewDesign.showOrderForm && (
-              <div className="mx-auto p-4" style={{ maxWidth: previewDesign.contentMaxWidth || 576 }}>
-                <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-                  <span className="block text-sm font-bold text-slate-800">{lp.product?.name ?? ""}</span>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <span className="h-9 rounded-lg bg-slate-100" />
-                    <span className="h-9 rounded-lg bg-slate-100" />
-                    <span className="col-span-2 h-9 rounded-lg bg-slate-100" />
-                  </div>
-                  <span className="mt-3 block h-10 text-xs font-bold leading-10 shadow-sm"
-                    style={{ backgroundColor: previewDesign.buttonColor, color: previewDesign.buttonTextColor, borderRadius: previewDesign.buttonRadius }}>
-                    {t("studio.order_button_preview")}
-                  </span>
+          {isPublished ? (
+            <div
+              className={`mx-auto overflow-hidden bg-white shadow-2xl transition-[width,border-radius] duration-300 ${previewDevice === "mobile" ? "rounded-[2rem] border-[7px] border-slate-800" : "rounded-lg border border-border"}`}
+              style={{
+                width: previewDevice === "mobile" ? 390 : 1100,
+                height: previewDevice === "mobile" ? 760 : 800,
+                maxWidth: previewDevice === "mobile" ? "100%" : "none",
+                transform: `scale(${previewZoom / 100})`,
+                transformOrigin: "top center",
+              }}
+            >
+              {previewDevice === "mobile" && (
+                <div className="flex h-6 items-center justify-center bg-slate-800">
+                  <span className="h-1.5 w-16 rounded-full bg-white/30" />
                 </div>
-              </div>
-            )}
-            {previewDesign.showStickyCta && previewDesign.showOrderForm && (
-              <div className="sticky bottom-3 mx-auto mb-3 w-[min(24rem,calc(100%-2rem))] h-11 text-center text-xs font-bold leading-[2.75rem] shadow-lg"
-                style={{ backgroundColor: previewDesign.buttonColor, color: previewDesign.buttonTextColor, borderRadius: previewDesign.buttonRadius }}>
-                {t("studio.order_button_preview")}
-              </div>
-            )}
-          </div>
+              )}
+              <iframe
+                key={previewRevision}
+                src={`${publicUrl}${publicUrl.includes("?") ? "&" : "?"}studioPreview=${previewRevision}`}
+                title={t("studio.real_page_preview")}
+                className="h-full w-full border-0 bg-white"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+              />
+            </div>
+          ) : (
+            <div className="mx-auto flex min-h-96 max-w-lg flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
+              <Monitor size={32} className="text-muted-foreground/50" />
+              <h2 className="mt-4 text-base font-bold">{t("studio.preview_requires_publish")}</h2>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">{t("studio.preview_requires_publish_hint")}</p>
+            </div>
+          )}
         </div>
       </section>
 

@@ -104,6 +104,10 @@
     "reset_design": "Reset design",
     "unsaved": "Unsaved changes",
     "save_all": "Save all",
-    "save_before_publish": "Save all changes before publishing"
+    "save_before_publish": "Save all changes before publishing",
+    "refresh_preview": "Refresh real page",
+    "real_page_preview": "Real page",
+    "preview_requires_publish": "Publish the page to preview the customer experience",
+    "preview_requires_publish_hint": "Once published, the exact storefront page—including its real order form and styling—appears here. Edits remain local until Save all, then the preview refreshes."
   }
 }

@@ -104,6 +104,10 @@
     "reset_design": "Réinitialiser le design",
     "unsaved": "Modifications non enregistrées",
     "save_all": "Tout enregistrer",
-    "save_before_publish": "Enregistrez toutes les modifications avant de publier"
+    "save_before_publish": "Enregistrez toutes les modifications avant de publier",
+    "refresh_preview": "Actualiser la page réelle",
+    "real_page_preview": "Page réelle",
+    "preview_requires_publish": "Publiez la page pour voir l’expérience client",
+    "preview_requires_publish_hint": "Après publication, la page boutique exacte, avec son véritable formulaire et son style, apparaît ici. Les modifications restent locales jusqu’à Tout enregistrer."
   }
 }
