@@ -252,10 +252,6 @@ export const SCOPE_CATEGORIES = {
     label: "Abandoned Orders",
     scopes: [SCOPES.ABANDONED_ORDERS_READ, SCOPES.ABANDONED_ORDERS_MANAGE],
   },
-  landingPages: {
-    label: "Landing Pages",
-    scopes: [SCOPES.LANDING_PAGES_READ, SCOPES.LANDING_PAGES_MANAGE],
-  },
   mcp: {
     label: "AI Agents (MCP)",
     scopes: [SCOPES.MCP_VIEW],

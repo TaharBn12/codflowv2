@@ -41,12 +41,8 @@ describe("TOOL_SCHEMAS derivation", () => {
 });
 
 describe("TOOL_META (client-specific tool-descriptor extensions)", () => {
-  it("declares openai/fileParams and toolInvocation status text for the upload tool", () => {
-    expect(TOOL_META["uploadLandingPageImage"]).toEqual({
-      "openai/fileParams": ["image"],
-      "openai/toolInvocation/invoking": "Starting background image upload…",
-      "openai/toolInvocation/invoked": "Upload job created — poll status until complete",
-    });
+  it("does not advertise metadata for removed landing-page tools", () => {
+    expect(TOOL_META["uploadLandingPageImage"]).toBeUndefined();
   });
 
   it("toolInvocation status text stays within the documented 64-char limit", () => {

@@ -3,7 +3,6 @@ import {
   FolderOpen,
   Gift,
   Layers,
-  Megaphone,
   LayoutDashboard,
   Package,
   PackageX,
@@ -127,13 +126,6 @@ export function useNavSections(): NavSection[] {
     {
       label: tN("sidebar.inventory"),
       items: [
-        {
-          kind: "leaf",
-          href: "/landing-pages",
-          label: tN("sidebar.landing_pages"),
-          icon: Megaphone,
-          scope: "landing_pages:read",
-        },
         {
           kind: "group",
           id: "products",
