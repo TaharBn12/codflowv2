@@ -87,6 +87,20 @@
     "buttonRadius": "استدارة زوايا الزر",
     "backgroundColor": "خلفية الصفحة",
     "buttonColor": "لون الزر",
-    "buttonTextColor": "لون نص الزر"
+    "buttonTextColor": "لون نص الزر",
+    "mobile_preview": "معاينة الهاتف",
+    "desktop_preview": "معاينة الكمبيوتر",
+    "order_button_preview": "اطلب الآن",
+    "instant_preview_hint": "تظهر التغييرات فورًا ويتم الحفظ بهدوء في الخلفية.",
+    "elements_section": "عناصر الصفحة",
+    "layout_section": "التخطيط والمسافات",
+    "colors_section": "الألوان",
+    "button_section": "زر الطلب",
+    "page_health": "قائمة جاهزية الصفحة",
+    "health_images": "تمت إضافة صور التسويق",
+    "health_product": "المنتج مرتبط",
+    "health_seo": "تمت إضافة عنوان SEO",
+    "health_published": "الصفحة منشورة",
+    "reset_design": "إعادة التصميم الافتراضي"
   }
 }

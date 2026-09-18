@@ -87,6 +87,20 @@
     "buttonRadius": "Arrondi du bouton",
     "backgroundColor": "Arrière-plan",
     "buttonColor": "Couleur du bouton",
-    "buttonTextColor": "Texte du bouton"
+    "buttonTextColor": "Texte du bouton",
+    "mobile_preview": "Aperçu mobile",
+    "desktop_preview": "Aperçu ordinateur",
+    "order_button_preview": "Commander",
+    "instant_preview_hint": "L’aperçu est instantané et l’enregistrement se fait en arrière-plan.",
+    "elements_section": "Éléments de la page",
+    "layout_section": "Disposition et espacement",
+    "colors_section": "Couleurs",
+    "button_section": "Bouton de commande",
+    "page_health": "Liste de contrôle",
+    "health_images": "Images marketing ajoutées",
+    "health_product": "Produit connecté",
+    "health_seo": "Titre SEO ajouté",
+    "health_published": "Page publiée",
+    "reset_design": "Réinitialiser le design"
   }
 }

@@ -87,6 +87,20 @@
     "buttonRadius": "Button corner radius",
     "backgroundColor": "Page background",
     "buttonColor": "Button color",
-    "buttonTextColor": "Button text"
+    "buttonTextColor": "Button text",
+    "mobile_preview": "Mobile preview",
+    "desktop_preview": "Desktop preview",
+    "order_button_preview": "Order now",
+    "instant_preview_hint": "Changes preview instantly and save quietly in the background.",
+    "elements_section": "Page elements",
+    "layout_section": "Layout and spacing",
+    "colors_section": "Colors",
+    "button_section": "Order button",
+    "page_health": "Page checklist",
+    "health_images": "Marketing images added",
+    "health_product": "Product connected",
+    "health_seo": "SEO title added",
+    "health_published": "Page published",
+    "reset_design": "Reset design"
   }
 }
