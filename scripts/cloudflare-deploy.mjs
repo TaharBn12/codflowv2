@@ -96,6 +96,9 @@ const CFG = {
   storeUrl: flag("--store-url") ?? "",
   r2KeyId: process.env.R2_ACCESS_KEY_ID ?? "",
   r2Secret: process.env.R2_SECRET_ACCESS_KEY ?? "",
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramChatId: process.env.TELEGRAM_APPROVAL_CHAT_ID ?? "",
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
   accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? process.env.COD_ACCOUNT_ID ?? "",
 };
 const NAMES = {
@@ -668,6 +671,22 @@ async function main() {
       secretPut(NAMES.serverWorker, "R2_SECRET_ACCESS_KEY", CFG.r2Secret, SERVER_DIR);
     } else {
       warn("R2 API token not provided — presigned uploads stay disabled until Step 3b (see summary).");
+    }
+    const telegramValues = [CFG.telegramBotToken, CFG.telegramChatId, CFG.telegramWebhookSecret];
+    if (telegramValues.every(Boolean)) {
+      secretPut(NAMES.serverWorker, "TELEGRAM_BOT_TOKEN", CFG.telegramBotToken, SERVER_DIR);
+      secretPut(NAMES.serverWorker, "TELEGRAM_APPROVAL_CHAT_ID", CFG.telegramChatId, SERVER_DIR);
+      secretPut(NAMES.serverWorker, "TELEGRAM_WEBHOOK_SECRET", CFG.telegramWebhookSecret, SERVER_DIR);
+      const response = await fetch(`https://api.telegram.org/bot${CFG.telegramBotToken}/setWebhook`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: `${serverUrl}/webhooks/telegram`, secret_token: CFG.telegramWebhookSecret, allowed_updates: ["callback_query"] }),
+      });
+      if (!response.ok) fail(`Telegram setWebhook failed (${response.status})`);
+      ok("Telegram approval webhook configured");
+    } else if (telegramValues.some(Boolean)) {
+      warn("Telegram approvals need all three secrets: BOT_TOKEN, APPROVAL_CHAT_ID, WEBHOOK_SECRET.");
+    } else {
+      info("Telegram approval secrets not supplied — approvals remain optional/direct.");
     }
   } else {
     info("--deploy-only: skipping server secret puts — existing values stay.");

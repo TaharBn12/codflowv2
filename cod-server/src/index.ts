@@ -1,6 +1,6 @@
 /**
  * COD Flow Server - Cloudflare Worker
- * 
+ *
  * Main entry point for the backend API.
  */
 
@@ -14,6 +14,7 @@ import { errorHandler } from "@/middleware/error";
 // Import routes
 import storeRoutes from "@/endpoints/store/routes";
 import webhooksRouter from "@/endpoints/webhooks/routes";
+import telegramApprovalsRoutes from "@/endpoints/telegram-approvals/routes";
 import ordersRoutes from "@/endpoints/orders/routes";
 import usersRoutes from "@/endpoints/users/routes";
 import customersRoutes from "@/endpoints/customers/routes";
@@ -47,7 +48,11 @@ import { sweepAbandonedOrders } from "@/cron/sweep-abandoned-orders";
 // MCP remote server (remote Model Context Protocol endpoint for Claude / AI agents).
 // The OAuthProvider owns OAuth (discovery, client registration, tokens, revocation)
 // and the `/mcp` protected route; the Hono app below is its defaultHandler.
-import { OAuthProvider, type OAuthProviderOptions, type TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
+import {
+  OAuthProvider,
+  type OAuthProviderOptions,
+  type TokenExchangeCallbackOptions,
+} from "@cloudflare/workers-oauth-provider";
 import { createCodMcpHandler } from "@/mcp/server-factory";
 import { authorizeGet, authorizePost } from "@/mcp/authorize";
 import { recordMcpLastUsed } from "@/mcp/last-used";
@@ -72,7 +77,10 @@ app.onError(errorHandler);
 // origin. Public URLs are https://<MEDIA_DOMAIN>/<key>, while API traffic keeps
 // using WORKER_URL. Host-gating prevents this catch-all from affecting the API.
 app.use("*", async (c, next) => {
-  if (c.env.MEDIA_DOMAIN && new URL(c.req.url).hostname === c.env.MEDIA_DOMAIN) {
+  if (
+    c.env.MEDIA_DOMAIN &&
+    new URL(c.req.url).hostname === c.env.MEDIA_DOMAIN
+  ) {
     return serveMediaImage(c);
   }
   await next();
@@ -88,6 +96,7 @@ registerSpecEndpoint(app);
 // Webhook receivers — public, no auth, signature-verified internally
 // MUST be mounted BEFORE app.use("/api/*", authMiddleware)
 app.route("/webhooks", webhooksRouter);
+app.route("/webhooks/telegram", telegramApprovalsRoutes);
 
 // Store API — separate auth (must be before /api/* authMiddleware)
 app.use("/store/*", storeAuthMiddleware);
@@ -106,7 +115,7 @@ app.get("/", (c) => {
     service: "COD Flow API",
     version: "1.0.0",
     status: "healthy",
-    environment: c.env.ENVIRONMENT
+    environment: c.env.ENVIRONMENT,
   });
 });
 
@@ -169,7 +178,8 @@ function oauthProviderOptions(env: Env): OAuthProviderOptions<Env> {
   return {
     apiRoute: "/mcp",
     apiHandler: {
-      fetch: (request, requestEnv, ctx) => createCodMcpHandler(requestEnv)(request, requestEnv, ctx),
+      fetch: (request, requestEnv, ctx) =>
+        createCodMcpHandler(requestEnv)(request, requestEnv, ctx),
     },
     defaultHandler: {
       fetch: (request, requestEnv, ctx) => app.fetch(request, requestEnv, ctx),
@@ -205,9 +215,11 @@ export default {
   async scheduled(
     _event: ScheduledEvent,
     env: Env,
-    ctx: ExecutionContext
+    ctx: ExecutionContext,
   ): Promise<void> {
     ctx.waitUntil(sweepAbandonedOrders(env));
-    ctx.waitUntil(getOAuthProvider(env).purgeExpiredData(env, { batchSize: 50 }));
+    ctx.waitUntil(
+      getOAuthProvider(env).purgeExpiredData(env, { batchSize: 50 }),
+    );
   },
 };

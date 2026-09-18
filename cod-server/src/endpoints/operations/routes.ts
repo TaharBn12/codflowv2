@@ -12,6 +12,11 @@ import {
 import type { AppContext } from "@/types";
 import { z } from "zod";
 import { hasPermission } from "../../../../cod-shared/rbac/utils";
+import {
+  configureTelegramWebhook,
+  requestCommissionPayoutApproval,
+  telegramConfigured,
+} from "@/endpoints/telegram-approvals/service";
 
 const routes = new OpenAPIHono<AppContext>();
 const activeOrderStatuses = ["new", "confirmed", "unreachable"] as const;
@@ -305,25 +310,44 @@ routes.post("/orders/bulk-assign", async (c) => {
     .where(inArray(orders.id, parsed.data.orderIds))
     .all();
   const now = new Date().toISOString();
-  const statements: any[] = selected.map((order) =>
-    db
-      .insert(orderConfirmationAssignments)
-      .values({
-        orderId: order.id,
-        assigneeId: assignee.id,
-        assignedBy: c.get("user").id,
-        assignedAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: orderConfirmationAssignments.orderId,
-        set: {
+  const statements: any[] = selected.length
+    ? [
+        db
+          .update(operationTasks)
+          .set({ status: "cancelled", updatedAt: now })
+          .where(
+            and(
+              inArray(
+                operationTasks.orderId,
+                selected.map((order) => order.id),
+              ),
+              inArray(operationTasks.status, ["open", "in_progress"]),
+              eq(operationTasks.type, "confirmation"),
+            ),
+          ),
+      ]
+    : [];
+  statements.push(
+    ...selected.map((order) =>
+      db
+        .insert(orderConfirmationAssignments)
+        .values({
+          orderId: order.id,
           assigneeId: assignee.id,
           assignedBy: c.get("user").id,
           assignedAt: now,
           updatedAt: now,
-        },
-      }),
+        })
+        .onConflictDoUpdate({
+          target: orderConfirmationAssignments.orderId,
+          set: {
+            assigneeId: assignee.id,
+            assignedBy: c.get("user").id,
+            assignedAt: now,
+            updatedAt: now,
+          },
+        }),
+    ),
   );
   for (const order of selected) {
     statements.push(
@@ -348,6 +372,112 @@ routes.post("/orders/bulk-assign", async (c) => {
     success: true,
     data: { assigned: selected.length, assignee },
   });
+});
+
+routes.get("/commissions", async (c) => {
+  const db = getDb(c.env.DB);
+  const actor = c.get("user");
+  const rows = await db
+    .select({
+      id: staffCommissions.id,
+      orderId: staffCommissions.orderId,
+      orderNumber: orders.orderNumber,
+      userId: staffCommissions.userId,
+      userName: users.name,
+      amount: staffCommissions.amount,
+      status: staffCommissions.status,
+      earnedAt: staffCommissions.earnedAt,
+      paidAt: staffCommissions.paidAt,
+    })
+    .from(staffCommissions)
+    .innerJoin(users, eq(staffCommissions.userId, users.id))
+    .innerJoin(orders, eq(staffCommissions.orderId, orders.id))
+    .where(
+      actor.role === "admin"
+        ? undefined
+        : eq(staffCommissions.userId, actor.id),
+    )
+    .orderBy(desc(staffCommissions.earnedAt))
+    .limit(250)
+    .all();
+  return c.json({ success: true, data: rows, count: rows.length });
+});
+
+routes.post("/commissions/mark-paid", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z
+    .object({ ids: z.array(z.string().min(1)).min(1).max(250) })
+    .safeParse(await c.req.json());
+  if (!parsed.success)
+    return c.json(
+      {
+        success: false,
+        error: parsed.error.flatten(),
+        code: "VALIDATION_FAILED",
+      },
+      400,
+    );
+  const db = getDb(c.env.DB);
+  const eligible = await db
+    .select({ id: staffCommissions.id, amount: staffCommissions.amount })
+    .from(staffCommissions)
+    .where(
+      and(
+        inArray(staffCommissions.id, parsed.data.ids),
+        eq(staffCommissions.status, "earned"),
+      ),
+    )
+    .all();
+  if (telegramConfigured(c.env)) {
+    const approval = await requestCommissionPayoutApproval(
+      c.env,
+      c.get("user"),
+      eligible.map((row) => row.id),
+      eligible.reduce((sum, row) => sum + row.amount, 0),
+    );
+    return c.json(
+      {
+        success: true,
+        data: { approvalId: approval.id, status: "pending" },
+        message: "Approval sent to Telegram",
+      },
+      202,
+    );
+  }
+  const now = new Date().toISOString();
+  const result = await db
+    .update(staffCommissions)
+    .set({ status: "paid", paidAt: now, updatedAt: now })
+    .where(
+      and(
+        inArray(
+          staffCommissions.id,
+          eligible.map((row) => row.id),
+        ),
+        eq(staffCommissions.status, "earned"),
+      ),
+    )
+    .returning({ id: staffCommissions.id })
+    .all();
+  return c.json({ success: true, data: { paid: result.length } });
+});
+
+routes.get("/telegram/status", (c) =>
+  c.json({ success: true, data: { configured: telegramConfigured(c.env) } }),
+);
+routes.post("/telegram/setup", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  if (!telegramConfigured(c.env))
+    return c.json(
+      {
+        success: false,
+        code: "TELEGRAM_NOT_CONFIGURED",
+        error: "Configure Telegram Worker secrets first",
+      },
+      503,
+    );
+  const webhookUrl = await configureTelegramWebhook(c.env);
+  return c.json({ success: true, data: { webhookUrl } });
 });
 
 const agentSettingsSchema = z.object({

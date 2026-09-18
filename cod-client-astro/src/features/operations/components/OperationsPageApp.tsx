@@ -8,7 +8,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { DashboardChrome } from "@/components/layout/chrome";
-import { Alert, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, Card, EmptyState, PageHeader, Select } from "@/components/ui";
 import {
   RequireAuth,
   useIdentity,
@@ -17,10 +17,16 @@ import { useT } from "@/i18n/react";
 import { notify } from "@/lib/notify";
 import {
   getAgentPerformance,
+  listOperationAgents,
+  listStaffCommissions,
+  markStaffCommissionsPaid,
+  saveOperationAgentSettings,
   getOperationsSummary,
   listOperationTasks,
   updateOperationTask,
   type AgentPerformance,
+  type OperationAgent,
+  type StaffCommission,
   type OperationsSummary,
   type OperationTask,
 } from "../api";
@@ -34,6 +40,10 @@ function Gated() {
   const [summary, setSummary] = useState<OperationsSummary | null>(null);
   const [tasks, setTasks] = useState<OperationTask[]>([]);
   const [performance, setPerformance] = useState<AgentPerformance[]>([]);
+  const [agents, setAgents] = useState<OperationAgent[]>([]);
+  const [savingAgent, setSavingAgent] = useState<string | null>(null);
+  const [commissions, setCommissions] = useState<StaffCommission[]>([]);
+  const [paying, setPaying] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,14 +51,24 @@ function Gated() {
     setLoading(true);
     setError(null);
     try {
-      const [nextSummary, nextTasks, nextPerformance] = await Promise.all([
+      const [
+        nextSummary,
+        nextTasks,
+        nextPerformance,
+        nextAgents,
+        nextCommissions,
+      ] = await Promise.all([
         getOperationsSummary(),
         listOperationTasks(),
         isAdmin ? getAgentPerformance() : Promise.resolve([]),
+        isAdmin ? listOperationAgents() : Promise.resolve([]),
+        listStaffCommissions(),
       ]);
       setSummary(nextSummary);
       setTasks(nextTasks);
       setPerformance(nextPerformance);
+      setAgents(nextAgents);
+      setCommissions(nextCommissions);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -70,6 +90,40 @@ function Gated() {
       await load();
     } catch (cause) {
       notify.error(cause instanceof Error ? cause.message : String(cause));
+    }
+  }
+
+  async function payEarnedCommissions() {
+    const ids = commissions
+      .filter((row) => row.status === "earned")
+      .map((row) => row.id);
+    if (!ids.length) return;
+    setPaying(true);
+    try {
+      const result = await markStaffCommissionsPaid(ids);
+      notify.success(
+        result.data.status === "pending"
+          ? t("approval_sent")
+          : t("commissions_paid"),
+      );
+      await load();
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  async function saveAgent(agent: OperationAgent) {
+    setSavingAgent(agent.id);
+    try {
+      await saveOperationAgentSettings(agent);
+      notify.success(t("agent_settings_saved"));
+      await load();
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSavingAgent(null);
     }
   }
 
@@ -258,6 +312,149 @@ function Gated() {
           )}
         </Card>
       </div>
+
+      {isAdmin && commissions.some((row) => row.status === "earned") && (
+        <Card className="mt-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold">{t("commission_payout")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {commissions.filter((row) => row.status === "earned").length}{" "}
+              {t("earned_entries")} ·{" "}
+              {money.format(
+                commissions
+                  .filter((row) => row.status === "earned")
+                  .reduce((sum, row) => sum + Number(row.amount), 0),
+              )}{" "}
+              DA
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={paying}
+            onClick={() => void payEarnedCommissions()}
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            {paying ? t("saving") : t("mark_all_paid")}
+          </button>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="mt-6 overflow-hidden">
+          <div className="border-b border-border p-5">
+            <h2 className="font-semibold">{t("agent_settings")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("agent_settings_hint")}
+            </p>
+          </div>
+          <div className="divide-y divide-border">
+            {agents.map((agent) => (
+              <div
+                key={agent.id}
+                className="grid gap-4 p-4 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end"
+              >
+                <div>
+                  <p className="font-medium">{agent.name}</p>
+                  <p className="text-xs text-muted-foreground">{agent.email}</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(agent.autoAssignEnabled)}
+                    onChange={(event) =>
+                      setAgents((rows) =>
+                        rows.map((row) =>
+                          row.id === agent.id
+                            ? {
+                                ...row,
+                                autoAssignEnabled: event.target.checked,
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                  {t("auto_assign")}
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  {t("max_open")}
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={agent.maxOpenOrders}
+                    onChange={(event) =>
+                      setAgents((rows) =>
+                        rows.map((row) =>
+                          row.id === agent.id
+                            ? {
+                                ...row,
+                                maxOpenOrders: Number(event.target.value),
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                    className="mt-1 block h-9 w-24 rounded-md border border-input bg-background px-2 text-foreground"
+                  />
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  {t("commission")}
+                  <div className="mt-1 flex">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={agent.commissionValue}
+                      onChange={(event) =>
+                        setAgents((rows) =>
+                          rows.map((row) =>
+                            row.id === agent.id
+                              ? {
+                                  ...row,
+                                  commissionValue: Number(event.target.value),
+                                }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="h-9 w-24 rounded-s-md border border-input bg-background px-2 text-foreground"
+                    />
+                    <Select
+                      value={agent.commissionType}
+                      onChange={(event) =>
+                        setAgents((rows) =>
+                          rows.map((row) =>
+                            row.id === agent.id
+                              ? {
+                                  ...row,
+                                  commissionType: event.target
+                                    .value as OperationAgent["commissionType"],
+                                }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="h-9 rounded-e-md border border-s-0 border-input bg-background px-2 text-foreground"
+                    >
+                      <option value="fixed">DA</option>
+                      <option value="percentage">%</option>
+                    </Select>
+                  </div>
+                </label>
+                <button
+                  type="button"
+                  disabled={savingAgent === agent.id}
+                  onClick={() => void saveAgent(agent)}
+                  className="h-9 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  {savingAgent === agent.id ? t("saving") : t("save")}
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </DashboardChrome>
   );
 }

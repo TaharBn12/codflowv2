@@ -1,9 +1,6 @@
 import { MapPin, PackageOpen, Star } from "lucide-react";
 import { useLocale } from "@/i18n/react";
-import {
-  TableCell,
-  TableRow,
-} from "@/components/ui";
+import { TableCell, TableRow } from "@/components/ui";
 import { formatMoney, orderTotal } from "@/features/orders/model";
 import type {
   DeliveryCompany,
@@ -20,12 +17,32 @@ interface RowProps {
   companies: DeliveryCompany[];
   onChanged: () => void | Promise<void>;
   onError: (message: string) => void;
+  selected?: boolean;
+  onSelected?: (selected: boolean) => void;
 }
 
-export function OrderDesktopRow({ order, drivers, companies, onChanged, onError }: RowProps) {
+export function OrderDesktopRow({
+  order,
+  drivers,
+  companies,
+  onChanged,
+  onError,
+  selected,
+  onSelected,
+}: RowProps) {
   const locale = useLocale();
   return (
     <TableRow className="border-b border-border last:border-0 transition-colors hover:bg-muted/40">
+      {onSelected && (
+        <TableCell>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onSelected(event.target.checked)}
+            aria-label={`Select ${order.orderNumber}`}
+          />
+        </TableCell>
+      )}
       <TableCell>
         <a
           href={`/orders/${order.id}`}
@@ -77,12 +94,29 @@ export function OrderDesktopRow({ order, drivers, companies, onChanged, onError 
   );
 }
 
-export function OrderMobileCard({ order, drivers, companies, onChanged, onError }: RowProps) {
+export function OrderMobileCard({
+  order,
+  drivers,
+  companies,
+  onChanged,
+  onError,
+  selected,
+  onSelected,
+}: RowProps) {
   const locale = useLocale();
   return (
     <article className="p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        {onSelected && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onSelected(event.target.checked)}
+            aria-label={`Select ${order.orderNumber}`}
+            className="mt-1"
+          />
+        )}
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <a
               href={`/orders/${order.id}`}

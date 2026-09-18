@@ -68,3 +68,79 @@ export async function getAgentPerformance() {
     await apiFetch<Envelope<AgentPerformance[]>>("/api/operations/performance")
   ).data;
 }
+
+export type OperationAgent = {
+  id: string;
+  name: string;
+  email: string;
+  status: "active" | "inactive";
+  autoAssignEnabled: boolean | number;
+  maxOpenOrders: number;
+  commissionType: "fixed" | "percentage";
+  commissionValue: number;
+};
+
+export async function listOperationAgents() {
+  return (await apiFetch<Envelope<OperationAgent[]>>("/api/operations/agents"))
+    .data;
+}
+
+export async function saveOperationAgentSettings(agent: OperationAgent) {
+  return apiFetch(
+    `/api/operations/agents/${encodeURIComponent(agent.id)}/settings`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        autoAssignEnabled: Boolean(agent.autoAssignEnabled),
+        maxOpenOrders: Number(agent.maxOpenOrders),
+        commissionType: agent.commissionType,
+        commissionValue: Number(agent.commissionValue),
+      }),
+    },
+  );
+}
+
+export async function bulkAssignConfirmationOrders(
+  orderIds: string[],
+  assigneeId: string,
+) {
+  return apiFetch<{ success: true; data: { assigned: number } }>(
+    "/api/operations/orders/bulk-assign",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ orderIds, assigneeId }),
+    },
+  );
+}
+
+export type StaffCommission = {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  status: "earned" | "paid" | "reversed";
+  earnedAt: string;
+  paidAt: string | null;
+};
+
+export async function listStaffCommissions() {
+  return (
+    await apiFetch<Envelope<StaffCommission[]>>("/api/operations/commissions")
+  ).data;
+}
+
+export async function markStaffCommissionsPaid(ids: string[]) {
+  return apiFetch<{
+    success: true;
+    data: { paid?: number; approvalId?: string; status?: "pending" };
+    message?: string;
+  }>("/api/operations/commissions/mark-paid", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+}

@@ -1,4 +1,12 @@
-import { sqliteTable, text, integer, real, uniqueIndex, index, primaryKey } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  uniqueIndex,
+  index,
+  primaryKey,
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 const authNow = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
@@ -7,7 +15,9 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  emailVerified: integer("email_verified", { mode: "boolean" })
+    .notNull()
+    .default(false),
   image: text("image"),
   role: text("role", { enum: ["admin", "staff", "confirmer", "driver"] })
     .notNull()
@@ -16,8 +26,12 @@ export const users = sqliteTable("users", {
     .notNull()
     .default("active"),
   apiKey: text("api_key").unique(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(authNow)
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .default(authNow)
+    .notNull(),
   /** UI language preference for emails: "ar" | "en" */
   language: text("language").notNull().default("en"),
 });
@@ -72,18 +86,24 @@ export const customerGroups = sqliteTable("customer_groups", {
  * Junction table linking customers to groups.
  * A customer can belong to multiple groups.
  */
-export const customerGroupMembers = sqliteTable("customer_group_members", {
-  id: text("id").primaryKey(),
-  customerId: text("customer_id")
-    .notNull()
-    .references(() => customers.id, { onDelete: "cascade" }),
-  groupId: text("group_id")
-    .notNull()
-    .references(() => customerGroups.id, { onDelete: "cascade" }),
-  assignedAt: text("assigned_at").notNull(),
-}, (t) => ({
-  customerGroupUnique: uniqueIndex("customer_group_members_customer_group_unique").on(t.customerId, t.groupId),
-}));
+export const customerGroupMembers = sqliteTable(
+  "customer_group_members",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => customerGroups.id, { onDelete: "cascade" }),
+    assignedAt: text("assigned_at").notNull(),
+  },
+  (t) => ({
+    customerGroupUnique: uniqueIndex(
+      "customer_group_members_customer_group_unique",
+    ).on(t.customerId, t.groupId),
+  }),
+);
 
 /**
  * Named labels for customers (e.g. "vip", "returner", "wholesale").
@@ -103,18 +123,24 @@ export const customerTags = sqliteTable("customer_tags", {
  * Junction table linking customers to tags.
  * A customer can have multiple tags.
  */
-export const customerTagAssignments = sqliteTable("customer_tag_assignments", {
-  id: text("id").primaryKey(),
-  customerId: text("customer_id")
-    .notNull()
-    .references(() => customers.id, { onDelete: "cascade" }),
-  tagId: text("tag_id")
-    .notNull()
-    .references(() => customerTags.id, { onDelete: "cascade" }),
-  assignedAt: text("assigned_at").notNull(),
-}, (t) => ({
-  customerTagUnique: uniqueIndex("customer_tag_assignments_customer_tag_unique").on(t.customerId, t.tagId),
-}));
+export const customerTagAssignments = sqliteTable(
+  "customer_tag_assignments",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => customerTags.id, { onDelete: "cascade" }),
+    assignedAt: text("assigned_at").notNull(),
+  },
+  (t) => ({
+    customerTagUnique: uniqueIndex(
+      "customer_tag_assignments_customer_tag_unique",
+    ).on(t.customerId, t.tagId),
+  }),
+);
 
 // ─── Algeria Reference Data ───────────────────────────────────────────────────
 
@@ -125,7 +151,7 @@ export const customerTagAssignments = sqliteTable("customer_tag_assignments", {
  */
 export const wilayas = sqliteTable("wilayas", {
   id: integer("id").primaryKey(), // Official wilaya number 1-58
-  name: text("name").notNull(),   // "Alger"
+  name: text("name").notNull(), // "Alger"
   nameAr: text("name_ar").notNull(), // "الجزائر"
 });
 
@@ -151,26 +177,34 @@ export const communes = sqliteTable("communes", {
  * spellings; these rows carry the carrier's exact string for our wilaya IDs.
  * Carriers absent here keep the reference-table name.
  */
-export const carrierWilayas = sqliteTable("carrier_wilayas", {
-  carrierCode: text("carrier_code").notNull(),
-  wilayaId: integer("wilaya_id")
-    .notNull()
-    .references(() => wilayas.id),
-  carrierName: text("carrier_name").notNull(),
-}, (t) => ({
-  pk: primaryKey({ columns: [t.carrierCode, t.wilayaId] }),
-}));
+export const carrierWilayas = sqliteTable(
+  "carrier_wilayas",
+  {
+    carrierCode: text("carrier_code").notNull(),
+    wilayaId: integer("wilaya_id")
+      .notNull()
+      .references(() => wilayas.id),
+    carrierName: text("carrier_name").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.carrierCode, t.wilayaId] }),
+  }),
+);
 
 /** Same contract as carrier_wilayas, one level down. */
-export const carrierCommunes = sqliteTable("carrier_communes", {
-  carrierCode: text("carrier_code").notNull(),
-  communeId: text("commune_id")
-    .notNull()
-    .references(() => communes.id),
-  carrierName: text("carrier_name").notNull(),
-}, (t) => ({
-  pk: primaryKey({ columns: [t.carrierCode, t.communeId] }),
-}));
+export const carrierCommunes = sqliteTable(
+  "carrier_communes",
+  {
+    carrierCode: text("carrier_code").notNull(),
+    communeId: text("commune_id")
+      .notNull()
+      .references(() => communes.id),
+    carrierName: text("carrier_name").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.carrierCode, t.communeId] }),
+  }),
+);
 
 // ─── Shipping Profiles ────────────────────────────────────────────────────────
 
@@ -186,7 +220,9 @@ export const shippingProfiles = sqliteTable("shipping_profiles", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   /** When true, rates from this profile are auto-applied on order creation. */
-  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  isDefault: integer("is_default", { mode: "boolean" })
+    .notNull()
+    .default(false),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -216,9 +252,13 @@ export const shippingRules = sqliteTable("shipping_rules", {
   homePrice: real("home_price").notNull().default(0),
   stopDeskPrice: real("stop_desk_price").notNull().default(0),
   /** Whether home delivery is offered to this wilaya under this profile. */
-  homeEnabled: integer("home_enabled", { mode: "boolean" }).notNull().default(true),
+  homeEnabled: integer("home_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   /** Whether stop-desk pickup is offered to this wilaya under this profile. */
-  stopDeskEnabled: integer("stop_desk_enabled", { mode: "boolean" }).notNull().default(false),
+  stopDeskEnabled: integer("stop_desk_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: text("created_at").notNull(),
 });
 
@@ -234,25 +274,32 @@ export const shippingRules = sqliteTable("shipping_rules", {
  *   effective.homePrice       = commune.homePrice       ?? wilayaRule.homePrice
  *   effective.stopDeskPrice   = commune.stopDeskPrice   ?? wilayaRule.stopDeskPrice
  */
-export const shippingRuleCommunes = sqliteTable("shipping_rule_communes", {
-  id: text("id").primaryKey(),
-  ruleId: text("rule_id")
-    .notNull()
-    .references(() => shippingRules.id, { onDelete: "cascade" }),
-  communeId: text("commune_id")
-    .notNull()
-    .references(() => communes.id, { onDelete: "cascade" }),
-  /** null = inherit from wilaya rule. */
-  homeEnabled: integer("home_enabled", { mode: "boolean" }),
-  /** null = inherit from wilaya rule. */
-  stopDeskEnabled: integer("stop_desk_enabled", { mode: "boolean" }),
-  /** null = inherit price from wilaya rule. */
-  homePrice: real("home_price"),
-  /** null = inherit price from wilaya rule. */
-  stopDeskPrice: real("stop_desk_price"),
-}, (t) => ({
-  ruleCommuneUnique: uniqueIndex("shipping_rule_communes_unique").on(t.ruleId, t.communeId),
-}));
+export const shippingRuleCommunes = sqliteTable(
+  "shipping_rule_communes",
+  {
+    id: text("id").primaryKey(),
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => shippingRules.id, { onDelete: "cascade" }),
+    communeId: text("commune_id")
+      .notNull()
+      .references(() => communes.id, { onDelete: "cascade" }),
+    /** null = inherit from wilaya rule. */
+    homeEnabled: integer("home_enabled", { mode: "boolean" }),
+    /** null = inherit from wilaya rule. */
+    stopDeskEnabled: integer("stop_desk_enabled", { mode: "boolean" }),
+    /** null = inherit price from wilaya rule. */
+    homePrice: real("home_price"),
+    /** null = inherit price from wilaya rule. */
+    stopDeskPrice: real("stop_desk_price"),
+  },
+  (t) => ({
+    ruleCommuneUnique: uniqueIndex("shipping_rule_communes_unique").on(
+      t.ruleId,
+      t.communeId,
+    ),
+  }),
+);
 
 // ─── Drivers ─────────────────────────────────────────────────────────────────
 
@@ -294,21 +341,27 @@ export const drivers = sqliteTable("drivers", {
  * Sparse: no row = the store doesn't pay this driver for deliveries in that wilaya
  * (assignment still works with driverFee = 0; admin should fill the row).
  */
-export const driverCompensations = sqliteTable("driver_compensations", {
-  id: text("id").primaryKey(),
-  driverId: text("driver_id")
-    .notNull()
-    .references(() => drivers.id, { onDelete: "cascade" }),
-  wilayaId: integer("wilaya_id")
-    .notNull()
-    .references(() => wilayas.id),
-  /** What the store pays this driver per delivery in this wilaya. */
-  feePerDelivery: real("fee_per_delivery").notNull().default(0),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-}, (t) => ({
-  driverWilayaUnique: uniqueIndex("driver_compensations_driver_wilaya_unique").on(t.driverId, t.wilayaId),
-}));
+export const driverCompensations = sqliteTable(
+  "driver_compensations",
+  {
+    id: text("id").primaryKey(),
+    driverId: text("driver_id")
+      .notNull()
+      .references(() => drivers.id, { onDelete: "cascade" }),
+    wilayaId: integer("wilaya_id")
+      .notNull()
+      .references(() => wilayas.id),
+    /** What the store pays this driver per delivery in this wilaya. */
+    feePerDelivery: real("fee_per_delivery").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    driverWilayaUnique: uniqueIndex(
+      "driver_compensations_driver_wilaya_unique",
+    ).on(t.driverId, t.wilayaId),
+  }),
+);
 
 // ─── Driver Payments ─────────────────────────────────────────────────────────
 
@@ -351,8 +404,8 @@ export const driverPayments = sqliteTable("driver_payments", {
  */
 export const deliveryCompanies = sqliteTable("delivery_companies", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),       // "Yalidine"
-  nameAr: text("name_ar").notNull(),  // "ياليدين"
+  name: text("name").notNull(), // "Yalidine"
+  nameAr: text("name_ar").notNull(), // "ياليدين"
   /** Short unique code used in API calls and display. e.g. "yalidine" */
   code: text("code").notNull().unique(),
   website: text("website"),
@@ -401,7 +454,9 @@ export const deliveryCompanies = sqliteTable("delivery_companies", {
    * If false, the team must manually validate via POST /orders/:id/validate-shipment.
    * Set false for Packers (ecotrack) — team controls when parcel enters courier flow.
    */
-  autoValidate: integer("auto_validate", { mode: "boolean" }).notNull().default(true),
+  autoValidate: integer("auto_validate", { mode: "boolean" })
+    .notNull()
+    .default(true),
 
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
@@ -440,7 +495,9 @@ export const orders = sqliteTable("orders", {
       "returned",
       "cancelled",
     ],
-  }).notNull().default("new"),
+  })
+    .notNull()
+    .default("new"),
   orderType: text("order_type", { enum: ["online", "offline"] })
     .notNull()
     .default("online"),
@@ -451,7 +508,9 @@ export const orders = sqliteTable("orders", {
    * later picks how to fulfil (driver vs company). Writes to driver/company
    * assignment endpoints flip this automatically.
    */
-  deliveryMethod: text("delivery_method", { enum: ["unassigned", "driver", "company"] })
+  deliveryMethod: text("delivery_method", {
+    enum: ["unassigned", "driver", "company"],
+  })
     .notNull()
     .default("unassigned"),
   driverId: text("driver_id").references(() => drivers.id),
@@ -529,42 +588,159 @@ export const orders = sqliteTable("orders", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const orderConfirmationAssignments = sqliteTable("order_confirmation_assignments", {
-  orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
-  assigneeId: text("assignee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  assignedBy: text("assigned_by").references(() => users.id, { onDelete: "set null" }),
-  assignedAt: text("assigned_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-}, (t) => ({ assigneeIdx: index("order_confirmation_assignee_idx").on(t.assigneeId, t.assignedAt) }));
+export const adminApprovalRequests = sqliteTable(
+  "admin_approval_requests",
+  {
+    id: text("id").primaryKey(),
+    action: text("action").notNull(),
+    title: text("title").notNull(),
+    payload: text("payload").notNull(),
+    status: text("status", {
+      enum: ["pending", "approved", "rejected", "expired", "failed"],
+    })
+      .notNull()
+      .default("pending"),
+    requestedBy: text("requested_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestedByName: text("requested_by_name").notNull(),
+    decidedByTelegramId: text("decided_by_telegram_id"),
+    decisionNote: text("decision_note"),
+    telegramMessageId: text("telegram_message_id"),
+    expiresAt: text("expires_at").notNull(),
+    decidedAt: text("decided_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    statusExpiryIdx: index("admin_approvals_status_expiry_idx").on(
+      t.status,
+      t.expiresAt,
+    ),
+  }),
+);
+
+export const orderConfirmationAssignments = sqliteTable(
+  "order_confirmation_assignments",
+  {
+    orderId: text("order_id")
+      .primaryKey()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    assigneeId: text("assignee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    assignedBy: text("assigned_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    assignedAt: text("assigned_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    assigneeIdx: index("order_confirmation_assignee_idx").on(
+      t.assigneeId,
+      t.assignedAt,
+    ),
+  }),
+);
 
 export const operationAgentSettings = sqliteTable("operation_agent_settings", {
-  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
-  autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   maxOpenOrders: integer("max_open_orders").notNull().default(25),
-  commissionType: text("commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
+  commissionType: text("commission_type", { enum: ["fixed", "percentage"] })
+    .notNull()
+    .default("fixed"),
   commissionValue: real("commission_value").notNull().default(0),
   updatedAt: text("updated_at").notNull(),
 });
 
-export const operationTasks = sqliteTable("operation_tasks", {
-  id: text("id").primaryKey(), title: text("title").notNull(), description: text("description"),
-  type: text("type", { enum: ["confirmation", "callback", "address_review", "shipment_follow_up", "follow_up"] }).notNull().default("follow_up"),
-  status: text("status", { enum: ["open", "in_progress", "completed", "cancelled"] }).notNull().default("open"),
-  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"),
-  orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
-  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
-  assigneeId: text("assignee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
-  dueAt: text("due_at"), completedAt: text("completed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
-}, (t) => ({ assigneeStatusDueIdx: index("operation_tasks_assignee_status_due_idx").on(t.assigneeId, t.status, t.dueAt), orderIdx: index("operation_tasks_order_idx").on(t.orderId) }));
+export const operationTasks = sqliteTable(
+  "operation_tasks",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    description: text("description"),
+    type: text("type", {
+      enum: [
+        "confirmation",
+        "callback",
+        "address_review",
+        "shipment_follow_up",
+        "follow_up",
+      ],
+    })
+      .notNull()
+      .default("follow_up"),
+    status: text("status", {
+      enum: ["open", "in_progress", "completed", "cancelled"],
+    })
+      .notNull()
+      .default("open"),
+    priority: text("priority", { enum: ["low", "normal", "high", "urgent"] })
+      .notNull()
+      .default("normal"),
+    orderId: text("order_id").references(() => orders.id, {
+      onDelete: "cascade",
+    }),
+    customerId: text("customer_id").references(() => customers.id, {
+      onDelete: "set null",
+    }),
+    assigneeId: text("assignee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    dueAt: text("due_at"),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    assigneeStatusDueIdx: index("operation_tasks_assignee_status_due_idx").on(
+      t.assigneeId,
+      t.status,
+      t.dueAt,
+    ),
+    orderIdx: index("operation_tasks_order_idx").on(t.orderId),
+  }),
+);
 
-export const staffCommissions = sqliteTable("staff_commissions", {
-  id: text("id").primaryKey(), orderId: text("order_id").notNull().unique().references(() => orders.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), amount: real("amount").notNull(),
-  rateType: text("rate_type", { enum: ["fixed", "percentage"] }).notNull(), rateValue: real("rate_value").notNull(),
-  status: text("status", { enum: ["earned", "paid", "reversed"] }).notNull().default("earned"),
-  earnedAt: text("earned_at").notNull(), paidAt: text("paid_at"), reversedAt: text("reversed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
-}, (t) => ({ userStatusIdx: index("staff_commissions_user_status_idx").on(t.userId, t.status, t.earnedAt) }));
+export const staffCommissions = sqliteTable(
+  "staff_commissions",
+  {
+    id: text("id").primaryKey(),
+    orderId: text("order_id")
+      .notNull()
+      .unique()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: real("amount").notNull(),
+    rateType: text("rate_type", { enum: ["fixed", "percentage"] }).notNull(),
+    rateValue: real("rate_value").notNull(),
+    status: text("status", { enum: ["earned", "paid", "reversed"] })
+      .notNull()
+      .default("earned"),
+    earnedAt: text("earned_at").notNull(),
+    paidAt: text("paid_at"),
+    reversedAt: text("reversed_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    userStatusIdx: index("staff_commissions_user_status_idx").on(
+      t.userId,
+      t.status,
+      t.earnedAt,
+    ),
+  }),
+);
 
 export const orderAssignments = sqliteTable("order_assignments", {
   id: text("id").primaryKey(),
@@ -572,7 +748,9 @@ export const orderAssignments = sqliteTable("order_assignments", {
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
 
-  assigneeType: text("assignee_type", { enum: ["driver", "company"] }).notNull(),
+  assigneeType: text("assignee_type", {
+    enum: ["driver", "company"],
+  }).notNull(),
   assigneeId: text("assignee_id").notNull(),
   assigneeName: text("assignee_name").notNull(),
 
@@ -585,7 +763,14 @@ export const orderAssignments = sqliteTable("order_assignments", {
   pickupAt: text("pickup_at"),
   deliveredAt: text("delivered_at"),
   status: text("status", {
-    enum: ["assigned", "accepted", "picked_up", "delivered", "returned", "cancelled"],
+    enum: [
+      "assigned",
+      "accepted",
+      "picked_up",
+      "delivered",
+      "returned",
+      "cancelled",
+    ],
   })
     .notNull()
     .default("assigned"),
@@ -641,8 +826,12 @@ export const products = sqliteTable("products", {
   price: integer("price").notNull(), // base price in DZD (whole number)
   compareAtPrice: integer("compare_at_price"),
   costPrice: integer("cost_price"),
-  type: text("type", { enum: ["PHYSICAL", "DIGITAL"] }).notNull().default("PHYSICAL"),
-  hasVariants: integer("has_variants", { mode: "boolean" }).notNull().default(false),
+  type: text("type", { enum: ["PHYSICAL", "DIGITAL"] })
+    .notNull()
+    .default("PHYSICAL"),
+  hasVariants: integer("has_variants", { mode: "boolean" })
+    .notNull()
+    .default(false),
   variantOptions: text("variant_options"), // JSON: [{name: string, values: [{value: string, hexColor?: string}]}]
   sku: text("sku").unique(), // only for simple products (hasVariants=false)
   inventory: integer("inventory").notNull().default(0), // only for simple products
@@ -654,15 +843,27 @@ export const products = sqliteTable("products", {
    *     from any variant, and stock alerts/overview hide the whole product.
    * Variant rows do not have their own toggle; the parent flag governs them.
    */
-  trackInventory: integer("track_inventory", { mode: "boolean" }).notNull().default(true),
+  trackInventory: integer("track_inventory", { mode: "boolean" })
+    .notNull()
+    .default(true),
   /** Alert when inventory drops to or below this number (0 = disabled). */
   lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
-  categoryId: text("category_id").references(() => productCategories.id, { onDelete: "set null" }),
+  categoryId: text("category_id").references(() => productCategories.id, {
+    onDelete: "set null",
+  }),
   tags: text("tags"), // JSON string[]
-  visibility: integer("visibility", { mode: "boolean" }).notNull().default(true),
-  status: text("status", { enum: ["DRAFT", "ACTIVE", "ARCHIVED"] }).notNull().default("ACTIVE"),
-  showInStore: integer("show_in_store", { mode: "boolean" }).notNull().default(true),
-  storeFeatured: integer("store_featured", { mode: "boolean" }).notNull().default(false),
+  visibility: integer("visibility", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  status: text("status", { enum: ["DRAFT", "ACTIVE", "ARCHIVED"] })
+    .notNull()
+    .default("ACTIVE"),
+  showInStore: integer("show_in_store", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  storeFeatured: integer("store_featured", { mode: "boolean" })
+    .notNull()
+    .default(false),
   deletedAt: text("deleted_at"),
   publishedAt: text("published_at"),
   /**
@@ -670,15 +871,19 @@ export const products = sqliteTable("products", {
    * When set: orders of this product use this profile for deliveryFee resolution.
    * When null: store default profile (isDefault=true) is used.
    */
-  shippingProfileId: text("shipping_profile_id")
-    .references(() => shippingProfiles.id, { onDelete: "set null" }),
+  shippingProfileId: text("shipping_profile_id").references(
+    () => shippingProfiles.id,
+    { onDelete: "set null" },
+  ),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
 
 export const productVariants = sqliteTable("product_variants", {
   id: text("id").primaryKey(),
-  productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
   variations: text("variations").notNull(), // JSON: {"Color": "Red", "Size": "M"}
   currency: text("currency").notNull().default("DZD"),
   price: integer("price").notNull(), // price in DZD
@@ -690,7 +895,9 @@ export const productVariants = sqliteTable("product_variants", {
   lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
   weightKg: real("weight_kg"),
   imageId: text("image_id"), // reference to productImages.id
-  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  isDefault: integer("is_default", { mode: "boolean" })
+    .notNull()
+    .default(false),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   position: integer("position").notNull().default(1),
   createdAt: text("created_at").notNull(),
@@ -699,7 +906,9 @@ export const productVariants = sqliteTable("product_variants", {
 
 export const productImages = sqliteTable("product_images", {
   id: text("id").primaryKey(),
-  productId: text("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
   src: text("src").notNull(), // original URL
   r2Key: text("r2_key"),
   srcSm: text("src_sm"),
@@ -738,7 +947,9 @@ export const orderProducts = sqliteTable("order_products", {
    *   partially_returned  — customer kept some, returned some (0 < returnedQuantity < quantity)
    *   returned            — customer refused the whole line (returnedQuantity = quantity)
    */
-  status: text("status", { enum: ["fulfilled", "partially_returned", "returned"] })
+  status: text("status", {
+    enum: ["fulfilled", "partially_returned", "returned"],
+  })
     .notNull()
     .default("fulfilled"),
   /** Units the customer refused at the door. 0 when status = fulfilled. */
@@ -763,24 +974,30 @@ export const orderProducts = sqliteTable("order_products", {
  *   Yalidine         → center_id as string (e.g. "42")
  *   ZR Express       → territory UUID
  */
-export const companyStopDesks = sqliteTable("company_stop_desks", {
-  id:        text("id").primaryKey(),
-  companyId: text("company_id")
-               .notNull()
-               .references(() => deliveryCompanies.id, { onDelete: "cascade" }),
-  code:      text("code").notNull(),
-  name:      text("name").notNull(),
-  commune:   text("commune"),
-  wilayaId:  integer("wilaya_id").references(() => wilayas.id),
-  address:   text("address"),
-  phones:    text("phones"),   // JSON: string[]
-  /** Admin-controlled: false = hidden from dispatch dialog. Never reset by sync. */
-  active:    integer("active", { mode: "boolean" }).notNull().default(true),
-  syncedAt:  text("synced_at").notNull(),
-}, (t) => ({
-  companyCodeUnique: uniqueIndex("company_stop_desks_company_code_unique")
-                       .on(t.companyId, t.code),
-}));
+export const companyStopDesks = sqliteTable(
+  "company_stop_desks",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => deliveryCompanies.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    commune: text("commune"),
+    wilayaId: integer("wilaya_id").references(() => wilayas.id),
+    address: text("address"),
+    phones: text("phones"), // JSON: string[]
+    /** Admin-controlled: false = hidden from dispatch dialog. Never reset by sync. */
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    syncedAt: text("synced_at").notNull(),
+  },
+  (t) => ({
+    companyCodeUnique: uniqueIndex("company_stop_desks_company_code_unique").on(
+      t.companyId,
+      t.code,
+    ),
+  }),
+);
 
 /**
  * Tracks shipments created via third-party delivery company APIs.
@@ -865,7 +1082,9 @@ export const stores = sqliteTable("stores", {
 
   // ── Locale ────────────────────────────────────────────────────────────────
   /** Store UI language: "ar" | "en" */
-  lang: text("lang", { enum: ["ar", "en"] }).notNull().default("ar"),
+  lang: text("lang", { enum: ["ar", "en"] })
+    .notNull()
+    .default("ar"),
   currency: text("currency").notNull().default("DZD"),
   currencySymbol: text("currency_symbol").notNull().default("دج"),
 
@@ -886,9 +1105,13 @@ export const stores = sqliteTable("stores", {
   /** Top announcement bar text (null = hidden) */
   announcementBar: text("announcement_bar"),
   /** When false, reviews are hidden on the storefront and submission is disabled. */
-  reviewsEnabled: integer("reviews_enabled", { mode: "boolean" }).notNull().default(true),
+  reviewsEnabled: integer("reviews_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
 
-  status: text("status", { enum: ["active", "inactive"] }).notNull().default("active"),
+  status: text("status", { enum: ["active", "inactive"] })
+    .notNull()
+    .default("active"),
   /** Plaintext storefront API key — written on every provision so the merchant can view it in settings. */
   storeApiKey: text("store_api_key"),
   createdAt: text("created_at").notNull(),
@@ -918,34 +1141,38 @@ export const storeApiKeys = sqliteTable("store_api_keys", {
  * Requires a valid order_id from the same store — identity comes from the order.
  * Moderated by the merchant: pending → approved | rejected.
  */
-export const reviews = sqliteTable("reviews", {
-  id: text("id").primaryKey(),
-  storeId: text("store_id")
-    .notNull()
-    .references(() => stores.id, { onDelete: "cascade" }),
-  productId: text("product_id")
-    .notNull()
-    .references(() => products.id, { onDelete: "cascade" }),
-  orderId: text("order_id")
-    .notNull()
-    .references(() => orders.id, { onDelete: "cascade" }),
-  /** Denormalised order number for display (e.g. "ORD-0042"). */
-  orderNumber: text("order_number").notNull(),
-  /** Denormalised customer name from the order at submission time. */
-  customerName: text("customer_name").notNull(),
-  /** Star rating 1–5. Enforced at application layer and DB CHECK. */
-  rating: integer("rating").notNull(),
-  title: text("title"),
-  body: text("body").notNull(),
-  status: text("status", { enum: ["pending", "approved", "rejected"] })
-    .notNull()
-    .default("pending"),
-  helpfulCount: integer("helpful_count").notNull().default(0),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-}, (t) => ({
-  orderUnique: uniqueIndex("reviews_order_unique").on(t.orderId),
-}));
+export const reviews = sqliteTable(
+  "reviews",
+  {
+    id: text("id").primaryKey(),
+    storeId: text("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    /** Denormalised order number for display (e.g. "ORD-0042"). */
+    orderNumber: text("order_number").notNull(),
+    /** Denormalised customer name from the order at submission time. */
+    customerName: text("customer_name").notNull(),
+    /** Star rating 1–5. Enforced at application layer and DB CHECK. */
+    rating: integer("rating").notNull(),
+    title: text("title"),
+    body: text("body").notNull(),
+    status: text("status", { enum: ["pending", "approved", "rejected"] })
+      .notNull()
+      .default("pending"),
+    helpfulCount: integer("helpful_count").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    orderUnique: uniqueIndex("reviews_order_unique").on(t.orderId),
+  }),
+);
 
 // ─── Activity Logs ────────────────────────────────────────────────────────────
 
@@ -959,7 +1186,9 @@ export const activityLogs = sqliteTable("activity_logs", {
   actorId: text("actor_id").notNull(),
   /** Denormalised name — preserved even if user is later deleted. */
   actorName: text("actor_name").notNull(),
-  actorRole: text("actor_role", { enum: ["admin", "staff", "confirmer", "driver"] }).notNull(),
+  actorRole: text("actor_role", {
+    enum: ["admin", "staff", "confirmer", "driver"],
+  }).notNull(),
   /** Dot-notation action: "order.created", "user.role_changed", etc. */
   action: text("action").notNull(),
   /** Entity category: "order", "customer", "driver", "product", "user". */
@@ -993,7 +1222,9 @@ export const stockMovements = sqliteTable("stock_movements", {
     .notNull()
     .references(() => products.id, { onDelete: "cascade" }),
   /** NULL for simple products (hasVariants = false). */
-  variantId: text("variant_id").references(() => productVariants.id, { onDelete: "cascade" }),
+  variantId: text("variant_id").references(() => productVariants.id, {
+    onDelete: "cascade",
+  }),
   type: text("type", {
     enum: [
       "PURCHASE",
@@ -1022,7 +1253,6 @@ export const stockMovements = sqliteTable("stock_movements", {
   createdAt: text("created_at").notNull(),
 });
 
-
 // ─── Webhook Events ───────────────────────────────────────────────────────────
 
 /**
@@ -1035,35 +1265,42 @@ export const stockMovements = sqliteTable("stock_movements", {
  *   unmapped — state/status name not found in any mapping; admin must add it
  *   error    — exception during processing; still returned 200 to provider
  */
-export const webhookEvents = sqliteTable("webhook_events", {
-  id: text("id").primaryKey(),
-  /** 'zr_express' | 'yalidine' */
-  provider: text("provider").notNull(),
-  /** svix-id header (ZR) or event_id field (Yalidine) — idempotency key */
-  eventId: text("event_id").notNull(),
-  companyId: text("company_id")
-    .notNull()
-    .references(() => deliveryCompanies.id),
-  /** null if order not found by tracking/reference */
-  orderId: text("order_id").references(() => orders.id),
-  /** raw tracking number from the provider payload */
-  tracking: text("tracking"),
-  /** 'parcel.state.updated' / 'parcel_status_updated' / etc. */
-  eventType: text("event_type").notNull(),
-  /** full JSON body for debugging and future reprocessing */
-  rawPayload: text("raw_payload").notNull(),
-  /** 'ok' | 'ignored' | 'unmapped' | 'error' */
-  result: text("result").notNull().default("pending"),
-  /** the status we set on the order (when result='ok') */
-  newStatus: text("new_status"),
-  /** Yalidine reason field / ZR situation name */
-  reason: text("reason"),
-  errorMsg: text("error_msg"),
-  processedAt: text("processed_at"),
-  createdAt: text("created_at").notNull(),
-}, (t) => ({
-  providerEventUnique: uniqueIndex("webhook_events_provider_event_unique").on(t.provider, t.eventId),
-}));
+export const webhookEvents = sqliteTable(
+  "webhook_events",
+  {
+    id: text("id").primaryKey(),
+    /** 'zr_express' | 'yalidine' */
+    provider: text("provider").notNull(),
+    /** svix-id header (ZR) or event_id field (Yalidine) — idempotency key */
+    eventId: text("event_id").notNull(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => deliveryCompanies.id),
+    /** null if order not found by tracking/reference */
+    orderId: text("order_id").references(() => orders.id),
+    /** raw tracking number from the provider payload */
+    tracking: text("tracking"),
+    /** 'parcel.state.updated' / 'parcel_status_updated' / etc. */
+    eventType: text("event_type").notNull(),
+    /** full JSON body for debugging and future reprocessing */
+    rawPayload: text("raw_payload").notNull(),
+    /** 'ok' | 'ignored' | 'unmapped' | 'error' */
+    result: text("result").notNull().default("pending"),
+    /** the status we set on the order (when result='ok') */
+    newStatus: text("new_status"),
+    /** Yalidine reason field / ZR situation name */
+    reason: text("reason"),
+    errorMsg: text("error_msg"),
+    processedAt: text("processed_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => ({
+    providerEventUnique: uniqueIndex("webhook_events_provider_event_unique").on(
+      t.provider,
+      t.eventId,
+    ),
+  }),
+);
 
 // ─── Offers ───────────────────────────────────────────────────────────────────
 
@@ -1099,8 +1336,10 @@ export const offers = sqliteTable("offers", {
    * Optional: restrict trigger to a specific variant.
    * null = any variant (or simple product) of triggerProduct triggers the offer.
    */
-  triggerVariantId: text("trigger_variant_id")
-    .references(() => productVariants.id, { onDelete: "set null" }),
+  triggerVariantId: text("trigger_variant_id").references(
+    () => productVariants.id,
+    { onDelete: "set null" },
+  ),
   /** Minimum quantity the customer must order to trigger the offer. */
   triggerQuantity: integer("trigger_quantity").notNull().default(2),
 
@@ -1109,16 +1348,19 @@ export const offers = sqliteTable("offers", {
    * Product given as reward.
    * NULL when discountType = 'free_shipping' (no product reward — shipping is free instead).
    */
-  rewardProductId: text("reward_product_id")
-    .references(() => products.id, { onDelete: "cascade" }),
+  rewardProductId: text("reward_product_id").references(() => products.id, {
+    onDelete: "cascade",
+  }),
   /**
    * Optional: specific variant to give as reward.
    * null + rewardProductId === triggerProductId → same variantId the customer ordered.
    * null + rewardProductId !== triggerProductId → default/first active variant.
    * Set explicitly when rewardProduct has variants and differs from triggerProduct.
    */
-  rewardVariantId: text("reward_variant_id")
-    .references(() => productVariants.id, { onDelete: "set null" }),
+  rewardVariantId: text("reward_variant_id").references(
+    () => productVariants.id,
+    { onDelete: "set null" },
+  ),
   /** Quantity of reward items to add for free. 0 when discountType = 'free_shipping'. */
   rewardQuantity: integer("reward_quantity").notNull().default(1),
 
@@ -1127,7 +1369,9 @@ export const offers = sqliteTable("offers", {
    * "free"          = reward items at pricePerUnit = 0 (Buy X Get Y free product).
    * "free_shipping" = delivery fee overridden to 0 (no reward product inserted).
    */
-  discountType: text("discount_type", { enum: ["free", "free_shipping"] }).notNull().default("free"),
+  discountType: text("discount_type", { enum: ["free", "free_shipping"] })
+    .notNull()
+    .default("free"),
 
   // ── Schedule ─────────────────────────────────────────────────────────────────
   /** ISO 8601 datetime. null = active immediately. */
@@ -1174,9 +1418,15 @@ export const landingPages = sqliteTable("landing_pages", {
   contentMaxWidth: integer("content_max_width").notNull().default(0),
 
   // ── Visibility and presentation controls ─────────────────────────────────
-  showImages: integer("show_images", { mode: "boolean" }).notNull().default(true),
-  showOrderForm: integer("show_order_form", { mode: "boolean" }).notNull().default(true),
-  showStickyCta: integer("show_sticky_cta", { mode: "boolean" }).notNull().default(true),
+  showImages: integer("show_images", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  showOrderForm: integer("show_order_form", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  showStickyCta: integer("show_sticky_cta", { mode: "boolean" })
+    .notNull()
+    .default(true),
   backgroundColor: text("background_color").notNull().default("#ffffff"),
   buttonColor: text("button_color").notNull().default("#7c3aed"),
   buttonTextColor: text("button_text_color").notNull().default("#ffffff"),
@@ -1209,7 +1459,9 @@ export const landingPageImages = sqliteTable("landing_page_images", {
   r2Key: text("r2_key").notNull(),
   src: text("src").notNull(),
   altText: text("alt_text"),
-  source: text("source", { enum: ["upload", "ai"] }).notNull().default("upload"),
+  source: text("source", { enum: ["upload", "ai"] })
+    .notNull()
+    .default("upload"),
   position: integer("position").notNull().default(1),
   width: integer("width"),
   height: integer("height"),
@@ -1223,13 +1475,13 @@ export const landingPageImages = sqliteTable("landing_page_images", {
  * read by the dashboard at request time through its D1 binding.
  */
 export const dashboardBrand = sqliteTable("dashboard_brand", {
-  id:           text("id").primaryKey().default("default"),
-  brandName:    text("brand_name").notNull().default("Dashboard"),
-  logoUrl:      text("logo_url"),
+  id: text("id").primaryKey().default("default"),
+  brandName: text("brand_name").notNull().default("Dashboard"),
+  logoUrl: text("logo_url"),
   primaryColor: text("primary_color").notNull().default("#7c3aed"),
-  metaTitle:    text("meta_title"),
-  faviconUrl:   text("favicon_url"),
-  updatedAt:    text("updated_at").notNull(),
+  metaTitle: text("meta_title"),
+  faviconUrl: text("favicon_url"),
+  updatedAt: text("updated_at").notNull(),
 });
 
 // ─── Meta Pixel / CAPI ───────────────────────────────────────────────────────
@@ -1252,7 +1504,11 @@ export const storePixelConfig = sqliteTable("store_pixel_config", {
   /** Meta test event code — used during integration testing only. Set to null in production. */
   testEventCode: text("test_event_code"),
   /** Which CAPI event the merchant optimizes for — chosen explicitly in the dashboard, never defaulted by the UI. */
-  conversionEvent: text("conversion_event", { enum: ["Lead", "Purchase", "Purchase_Confirmed", "Purchase_Delivered"] }).notNull().default("Purchase"),
+  conversionEvent: text("conversion_event", {
+    enum: ["Lead", "Purchase", "Purchase_Confirmed", "Purchase_Delivered"],
+  })
+    .notNull()
+    .default("Purchase"),
   /** When true, CAPI events carry test_event_code to Meta's test stream instead of production measurement. */
   testMode: integer("test_mode", { mode: "boolean" }).notNull().default(false),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
@@ -1275,7 +1531,9 @@ export const storeOtpConfig = sqliteTable("store_otp_config", {
     .references(() => stores.id, { onDelete: "cascade" }),
   apiKey: text("api_key").notNull(),
   /** WhatsApp message language for OTP sends: en | fr | ar. */
-  language: text("language", { enum: ["en", "fr", "ar"] }).notNull().default("ar"),
+  language: text("language", { enum: ["en", "fr", "ar"] })
+    .notNull()
+    .default("ar"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -1348,69 +1606,107 @@ export const capiEventLog = sqliteTable(
   },
   (t) => ({
     orderIdx: index("idx_capi_event_log_order").on(t.orderId),
-    claimUnique: uniqueIndex("idx_capi_event_log_claim").on(t.orderId, t.stage, t.eventName),
-  })
+    claimUnique: uniqueIndex("idx_capi_event_log_claim").on(
+      t.orderId,
+      t.stage,
+      t.eventName,
+    ),
+  }),
 );
 
 // ─── better-auth tables ──────────────────────────────────────────────────────
 // Declared so the dashboard's auth code can reference them via Drizzle. The D1
 // schema itself is created by cod-server migrations (0000_complete.sql).
 
-export const sessions = sqliteTable("sessions", {
-  id:        text("id").primaryKey(),
-  userId:    text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  token:     text("token").notNull().unique(),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-}, (t) => ({
-  userIdIdx: index("sessions_user_id_idx").on(t.userId),
-}));
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+  },
+  (t) => ({
+    userIdIdx: index("sessions_user_id_idx").on(t.userId),
+  }),
+);
 
-export const accounts = sqliteTable("accounts", {
-  id:                    text("id").primaryKey(),
-  userId:                text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  accountId:             text("account_id").notNull(),
-  providerId:            text("provider_id").notNull(),
-  issuer:                text("issuer"),
-  accessToken:           text("access_token"),
-  refreshToken:          text("refresh_token"),
-  idToken:               text("id_token"),
-  accessTokenExpiresAt:  integer("access_token_expires_at",  { mode: "timestamp_ms" }),
-  refreshTokenExpiresAt: integer("refresh_token_expires_at", { mode: "timestamp_ms" }),
-  scope:                 text("scope"),
-  password:              text("password"),
-  createdAt:             integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  updatedAt:             integer("updated_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-}, (t) => ({
-  userIdIdx: index("accounts_user_id_idx").on(t.userId),
-}));
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    issuer: text("issuer"),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: integer("access_token_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+  },
+  (t) => ({
+    userIdIdx: index("accounts_user_id_idx").on(t.userId),
+  }),
+);
 
-export const verifications = sqliteTable("verifications", {
-  id:         text("id").primaryKey(),
-  identifier: text("identifier").notNull(),
-  value:      text("value").notNull(),
-  expiresAt:  integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  createdAt:  integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  updatedAt:  integer("updated_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-}, (t) => ({
-  identifierIdx: index("verifications_identifier_idx").on(t.identifier),
-}));
+export const verifications = sqliteTable(
+  "verifications",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+  },
+  (t) => ({
+    identifierIdx: index("verifications_identifier_idx").on(t.identifier),
+  }),
+);
 
 // ─── better-auth jwt() plugin ─────────────────────────────────────────────────
 // RSA keypair storage for signing OAuth access tokens. The public half is
 // exposed via /api/auth/jwks so cod-server can verify tokens offline.
 // Added by the MCP rollout (MCP-5).
 export const jwkss = sqliteTable("jwkss", {
-  id:         text("id").primaryKey(),
-  publicKey:  text("public_key").notNull(),
+  id: text("id").primaryKey(),
+  publicKey: text("public_key").notNull(),
   privateKey: text("private_key").notNull(),
-  createdAt:  integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  expiresAt:  integer("expires_at", { mode: "timestamp_ms" }),
-  alg:        text("alg"),
-  crv:        text("crv"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .default(authNow)
+    .notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+  alg: text("alg"),
+  crv: text("crv"),
 });
 
 // ─── @better-auth/oauth-provider (LEGACY — no longer written) ────────────────
@@ -1427,88 +1723,135 @@ export const jwkss = sqliteTable("jwkss", {
 // `plural` mode is ON globally so Better Auth maps `oauthClient` → `oauthClients`
 // in queries — table names below must match.
 
-export const oauthClients = sqliteTable("oauthClients", {
-  id:                      text("id").primaryKey(),
-  clientId:                text("client_id").notNull().unique(),
-  clientSecret:            text("client_secret"),
-  disabled:                integer("disabled", { mode: "boolean" }).default(false),
-  skipConsent:             integer("skip_consent", { mode: "boolean" }),
-  enableEndSession:        integer("enable_end_session", { mode: "boolean" }),
-  subjectType:             text("subject_type"),
-  scopes:                  text("scopes"),                   // JSON string[]
-  userId:                  text("user_id").references(() => users.id, { onDelete: "cascade" }),
-  name:                    text("name"),
-  uri:                     text("uri"),
-  icon:                    text("icon"),
-  contacts:                text("contacts"),                 // JSON string[]
-  tos:                     text("tos"),
-  policy:                  text("policy"),
-  softwareId:              text("software_id"),
-  softwareVersion:         text("software_version"),
-  softwareStatement:       text("software_statement"),
-  redirectUris:            text("redirect_uris").notNull(),  // JSON string[]
-  postLogoutRedirectUris:  text("post_logout_redirect_uris"),// JSON string[]
-  tokenEndpointAuthMethod: text("token_endpoint_auth_method"),
-  grantTypes:              text("grant_types"),              // JSON string[]
-  responseTypes:           text("response_types"),           // JSON string[]
-  type:                    text("type"),
-  public:                  integer("public", { mode: "boolean" }),
-  clientIdIssuedAt:        integer("client_id_issued_at",     { mode: "timestamp_ms" }),
-  clientSecretExpiresAt:   integer("client_secret_expires_at",{ mode: "timestamp_ms" }),
-  requirePkce:             integer("require_pkce", { mode: "boolean" }),
-  referenceId:             text("reference_id"),
-  metadata:                text("metadata"),                 // JSON
-  createdAt:               integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  updatedAt:               integer("updated_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-}, (t) => ({
-  userIdIdx: index("oauthClients_user_id_idx").on(t.userId),
-}));
+export const oauthClients = sqliteTable(
+  "oauthClients",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id").notNull().unique(),
+    clientSecret: text("client_secret"),
+    disabled: integer("disabled", { mode: "boolean" }).default(false),
+    skipConsent: integer("skip_consent", { mode: "boolean" }),
+    enableEndSession: integer("enable_end_session", { mode: "boolean" }),
+    subjectType: text("subject_type"),
+    scopes: text("scopes"), // JSON string[]
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    name: text("name"),
+    uri: text("uri"),
+    icon: text("icon"),
+    contacts: text("contacts"), // JSON string[]
+    tos: text("tos"),
+    policy: text("policy"),
+    softwareId: text("software_id"),
+    softwareVersion: text("software_version"),
+    softwareStatement: text("software_statement"),
+    redirectUris: text("redirect_uris").notNull(), // JSON string[]
+    postLogoutRedirectUris: text("post_logout_redirect_uris"), // JSON string[]
+    tokenEndpointAuthMethod: text("token_endpoint_auth_method"),
+    grantTypes: text("grant_types"), // JSON string[]
+    responseTypes: text("response_types"), // JSON string[]
+    type: text("type"),
+    public: integer("public", { mode: "boolean" }),
+    clientIdIssuedAt: integer("client_id_issued_at", { mode: "timestamp_ms" }),
+    clientSecretExpiresAt: integer("client_secret_expires_at", {
+      mode: "timestamp_ms",
+    }),
+    requirePkce: integer("require_pkce", { mode: "boolean" }),
+    referenceId: text("reference_id"),
+    metadata: text("metadata"), // JSON
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+  },
+  (t) => ({
+    userIdIdx: index("oauthClients_user_id_idx").on(t.userId),
+  }),
+);
 
-export const oauthRefreshTokens = sqliteTable("oauthRefreshTokens", {
-  id:          text("id").primaryKey(),
-  token:       text("token").notNull(),
-  clientId:    text("client_id").notNull().references(() => oauthClients.clientId),
-  sessionId:   text("session_id").references(() => sessions.id, { onDelete: "set null" }),
-  userId:      text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  referenceId: text("reference_id"),
-  expiresAt:   integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  createdAt:   integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  revoked:     integer("revoked",    { mode: "timestamp_ms" }),
-  authTime:    integer("auth_time",  { mode: "timestamp_ms" }),
-  scopes:      text("scopes").notNull(),                     // JSON string[]
-}, (t) => ({
-  tokenIdx:    index("oauthRefreshTokens_token_idx").on(t.token),
-  userIdIdx:   index("oauthRefreshTokens_user_id_idx").on(t.userId),
-  clientIdIdx: index("oauthRefreshTokens_client_id_idx").on(t.clientId),
-}));
+export const oauthRefreshTokens = sqliteTable(
+  "oauthRefreshTokens",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.clientId),
+    sessionId: text("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    revoked: integer("revoked", { mode: "timestamp_ms" }),
+    authTime: integer("auth_time", { mode: "timestamp_ms" }),
+    scopes: text("scopes").notNull(), // JSON string[]
+  },
+  (t) => ({
+    tokenIdx: index("oauthRefreshTokens_token_idx").on(t.token),
+    userIdIdx: index("oauthRefreshTokens_user_id_idx").on(t.userId),
+    clientIdIdx: index("oauthRefreshTokens_client_id_idx").on(t.clientId),
+  }),
+);
 
-export const oauthAccessTokens = sqliteTable("oauthAccessTokens", {
-  id:          text("id").primaryKey(),
-  token:       text("token").unique(),
-  clientId:    text("client_id").notNull().references(() => oauthClients.clientId),
-  sessionId:   text("session_id").references(() => sessions.id, { onDelete: "set null" }),
-  userId:      text("user_id").references(() => users.id, { onDelete: "cascade" }),
-  referenceId: text("reference_id"),
-  refreshId:   text("refresh_id").references(() => oauthRefreshTokens.id, { onDelete: "set null" }),
-  expiresAt:   integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  createdAt:   integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  scopes:      text("scopes").notNull(),                     // JSON string[]
-}, (t) => ({
-  userIdIdx:   index("oauthAccessTokens_user_id_idx").on(t.userId),
-  clientIdIdx: index("oauthAccessTokens_client_id_idx").on(t.clientId),
-}));
+export const oauthAccessTokens = sqliteTable(
+  "oauthAccessTokens",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").unique(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.clientId),
+    sessionId: text("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    refreshId: text("refresh_id").references(() => oauthRefreshTokens.id, {
+      onDelete: "set null",
+    }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    scopes: text("scopes").notNull(), // JSON string[]
+  },
+  (t) => ({
+    userIdIdx: index("oauthAccessTokens_user_id_idx").on(t.userId),
+    clientIdIdx: index("oauthAccessTokens_client_id_idx").on(t.clientId),
+  }),
+);
 
-export const oauthConsents = sqliteTable("oauthConsents", {
-  id:          text("id").primaryKey(),
-  clientId:    text("client_id").notNull().references(() => oauthClients.clientId),
-  userId:      text("user_id").references(() => users.id, { onDelete: "cascade" }),
-  referenceId: text("reference_id"),
-  scopes:      text("scopes").notNull(),                     // JSON string[]
-  createdAt:   integer("created_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-  updatedAt:   integer("updated_at", { mode: "timestamp_ms" }).default(authNow).notNull(),
-}, (t) => ({
-  userClientIdx: index("oauthConsents_user_client_idx").on(t.userId, t.clientId),
-}));
+export const oauthConsents = sqliteTable(
+  "oauthConsents",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.clientId),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    scopes: text("scopes").notNull(), // JSON string[]
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(authNow)
+      .notNull(),
+  },
+  (t) => ({
+    userClientIdx: index("oauthConsents_user_client_idx").on(
+      t.userId,
+      t.clientId,
+    ),
+  }),
+);
 
 // ─── Abandoned Orders ────────────────────────────────────────────────────────
 // Recorded when a visitor fills name + phone in the storefront but never places an order.
@@ -1517,45 +1860,51 @@ export const oauthConsents = sqliteTable("oauthConsents", {
 //   abandoned → 30+ min old with no order (Cron Trigger flips this)
 //   converted → visitor placed an order (markConverted called synchronously)
 //   contacted → merchant manually marked outreach done
-export const abandonedOrders = sqliteTable("abandoned_orders", {
-  id:                    text("id").primaryKey(),
-  sessionId:             text("session_id").notNull().unique(),
+export const abandonedOrders = sqliteTable(
+  "abandoned_orders",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull().unique(),
 
-  customerName:          text("customer_name").notNull(),
-  phone:                 text("phone").notNull(),
+    customerName: text("customer_name").notNull(),
+    phone: text("phone").notNull(),
 
-  wilayaId:              integer("wilaya_id").references(() => wilayas.id),
-  communeId:             text("commune_id").references(() => communes.id),
-  wilayaName:            text("wilaya_name"),
-  communeName:           text("commune_name"),
+    wilayaId: integer("wilaya_id").references(() => wilayas.id),
+    communeId: text("commune_id").references(() => communes.id),
+    wilayaName: text("wilaya_name"),
+    communeName: text("commune_name"),
 
-  productId:             text("product_id"),
-  productName:           text("product_name"),
-  variantId:             text("variant_id"),
-  variantLabel:          text("variant_label"),
-  price:                 real("price"),
+    productId: text("product_id"),
+    productName: text("product_name"),
+    variantId: text("variant_id"),
+    variantLabel: text("variant_label"),
+    price: real("price"),
 
-  deliveryType: text("delivery_type", { enum: ["home", "stop_desk"] }),
+    deliveryType: text("delivery_type", { enum: ["home", "stop_desk"] }),
 
-  fbc:                   text("fbc"),
-  fbp:                   text("fbp"),
-  ipAddress:             text("ip_address"),
-  userAgent:             text("user_agent"),
+    fbc: text("fbc"),
+    fbp: text("fbp"),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
 
-  status: text("status", {
-    enum: ["pending", "abandoned", "contacted", "converted"],
-  }).notNull().default("pending"),
+    status: text("status", {
+      enum: ["pending", "abandoned", "contacted", "converted"],
+    })
+      .notNull()
+      .default("pending"),
 
-  convertedOrderId:      text("converted_order_id"),
-  convertedOrderNumber:  text("converted_order_number"),
+    convertedOrderId: text("converted_order_id"),
+    convertedOrderNumber: text("converted_order_number"),
 
-  recoveryAttempts:      integer("recovery_attempts").notNull().default(0),
-  lastRecoveryAt:        text("last_recovery_at"),
+    recoveryAttempts: integer("recovery_attempts").notNull().default(0),
+    lastRecoveryAt: text("last_recovery_at"),
 
-  createdAt:             text("created_at").notNull(),
-  updatedAt:             text("updated_at").notNull(),
-}, (t) => ({
-  statusIdx:    index("abandoned_orders_status_idx").on(t.status),
-  phoneIdx:     index("abandoned_orders_phone_idx").on(t.phone),
-  createdAtIdx: index("abandoned_orders_created_at_idx").on(t.createdAt),
-}));
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => ({
+    statusIdx: index("abandoned_orders_status_idx").on(t.status),
+    phoneIdx: index("abandoned_orders_phone_idx").on(t.phone),
+    createdAtIdx: index("abandoned_orders_created_at_idx").on(t.createdAt),
+  }),
+);

@@ -2,6 +2,12 @@ import { useDeferredValue, useEffect, useState } from "react";
 import { AlertCircle, Filter, PackageOpen, X } from "lucide-react";
 import { canScope, useIdentity } from "@/features/auth/components/RequireAuth";
 import { useT } from "@/i18n/react";
+import {
+  bulkAssignConfirmationOrders,
+  listOperationAgents,
+  type OperationAgent,
+} from "@/features/operations/api";
+import { notify } from "@/lib/notify";
 import { ApiError } from "@/lib/api";
 import {
   listDeliveryCompanies,
@@ -36,7 +42,10 @@ import {
   TableHead,
   SortHeader,
 } from "@/components/ui";
-import { OrderDesktopRow, OrderMobileCard } from "@/features/orders/components/OrderRow";
+import {
+  OrderDesktopRow,
+  OrderMobileCard,
+} from "@/features/orders/components/OrderRow";
 
 const EMPTY_FILTERS: OrderFilters = {
   query: "",
@@ -104,11 +113,16 @@ function FilterSelect({
 export function OrdersList() {
   const t = useT("orders");
   const common = useT("common");
+  const operations = useT("operations");
   const auth = useT("auth");
   const identity = useIdentity();
   const [orders, setOrders] = useState<OrderListItem[] | null>(null);
   const [companies, setCompanies] = useState<DeliveryCompany[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [agents, setAgents] = useState<OperationAgent[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAgentId, setBulkAgentId] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | Error | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [filters, setFilters] = useState<OrderFilters>(() => ({
@@ -135,6 +149,7 @@ export function OrdersList() {
       setOrders(orderResponse.data ?? []);
       setCompanies(companyResponse);
       setDrivers(driverResponse);
+      if (identity?.role === "admin") setAgents(await listOperationAgents());
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause : new Error(String(cause)));
     }
@@ -209,6 +224,34 @@ export function OrdersList() {
     onChanged: load,
     onError: setActionError,
   };
+  function selectionProps(orderId: string) {
+    if (identity?.role !== "admin") return {};
+    return {
+      selected: selectedIds.has(orderId),
+      onSelected: (selected: boolean) =>
+        setSelectedIds((current) => {
+          const next = new Set(current);
+          selected ? next.add(orderId) : next.delete(orderId);
+          return next;
+        }),
+    };
+  }
+
+  async function bulkAssign() {
+    if (!bulkAgentId || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      await bulkAssignConfirmationOrders([...selectedIds], bulkAgentId);
+      notify.success(operations("bulk_assigned"));
+      setSelectedIds(new Set());
+      setBulkAgentId("");
+      await load();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -224,6 +267,42 @@ export function OrdersList() {
             <X size={16} />
           </button>
         </Alert>
+      )}
+      {identity?.role === "admin" && selectedIds.size > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center">
+          <span className="text-sm font-semibold">
+            {selectedIds.size} {operations("selected_orders")}
+          </span>
+          <Select
+            value={bulkAgentId}
+            onChange={(event) => setBulkAgentId(event.target.value)}
+            className="h-10 min-w-52 rounded-lg border border-input bg-background px-3 text-sm"
+          >
+            <option value="">{operations("select_agent")}</option>
+            {agents
+              .filter((agent) => agent.status === "active")
+              .map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+          </Select>
+          <button
+            type="button"
+            disabled={!bulkAgentId || bulkBusy}
+            onClick={() => void bulkAssign()}
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {operations("assign")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="h-10 px-3 text-sm font-semibold text-muted-foreground"
+          >
+            {common("cancel")}
+          </button>
+        </div>
       )}
       <Card flush>
         <div className="space-y-3 border-b border-border p-3">
@@ -314,7 +393,12 @@ export function OrdersList() {
           <>
             <div className="divide-y divide-border md:hidden">
               {visibleOrders.map((order) => (
-                <OrderMobileCard key={order.id} order={order} {...rowProps} />
+                <OrderMobileCard
+                  key={order.id}
+                  order={order}
+                  {...rowProps}
+                  {...selectionProps(order.id)}
+                />
               ))}
             </div>
 
@@ -322,6 +406,31 @@ export function OrdersList() {
               <Table className="min-w-[940px]">
                 <TableHeader>
                   <TableRow className="text-xs font-semibold text-muted-foreground">
+                    {identity?.role === "admin" && (
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          checked={
+                            visibleOrders.length > 0 &&
+                            visibleOrders.every((order) =>
+                              selectedIds.has(order.id),
+                            )
+                          }
+                          onChange={(event) =>
+                            setSelectedIds((current) => {
+                              const next = new Set(current);
+                              visibleOrders.forEach((order) =>
+                                event.target.checked
+                                  ? next.add(order.id)
+                                  : next.delete(order.id),
+                              );
+                              return next;
+                            })
+                          }
+                          aria-label="Select visible orders"
+                        />
+                      </TableHead>
+                    )}
                     <SortHeader
                       label={t("table.order_number")}
                       sortKey="orderNumber"
@@ -371,7 +480,12 @@ export function OrdersList() {
                 </TableHeader>
                 <TableBody>
                   {visibleOrders.map((order) => (
-                    <OrderDesktopRow key={order.id} order={order} {...rowProps} />
+                    <OrderDesktopRow
+                      key={order.id}
+                      order={order}
+                      {...rowProps}
+                      {...selectionProps(order.id)}
+                    />
                   ))}
                 </TableBody>
               </Table>

@@ -79,4 +79,10 @@ export interface Env {
    * Durable background upload of MCP-agent images into the landing page stack.
    */
   LP_IMAGE_UPLOAD_WORKFLOW: Workflow;
+  /** Telegram BotFather token, stored as a Wrangler secret. */
+  TELEGRAM_BOT_TOKEN?: string;
+  /** Private admin chat or group ID allowed to approve operations. */
+  TELEGRAM_APPROVAL_CHAT_ID?: string;
+  /** Secret Telegram sends in the webhook header to prevent forged decisions. */
+  TELEGRAM_WEBHOOK_SECRET?: string;
 }
