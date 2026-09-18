@@ -29,20 +29,24 @@ on:
         required: false
         type: boolean
       server_url:
-        description: "API public URL (e.g. https://api.yourdomain.com) — optional; defaults to workers.dev"
-        required: false
+        description: "API public URL; Wrangler binds its DNS + TLS during deploy"
+        default: "https://api.codfly.dpdns.org"
+        required: true
         type: string
       dashboard_url:
-        description: "Dashboard public URL (e.g. https://admin.yourdomain.com) — optional"
-        required: false
+        description: "Dashboard public URL; Wrangler binds its DNS + TLS during deploy"
+        default: "https://dashboard.codfly.dpdns.org"
+        required: true
         type: string
       store_url:
-        description: "Storefront public URL (e.g. https://yourdomain.com) — optional"
-        required: false
+        description: "Storefront public URL; Wrangler binds its DNS + TLS during deploy"
+        default: "https://codfly.dpdns.org"
+        required: true
         type: string
       media_domain:
-        description: "R2 media custom domain host only (e.g. media.yourdomain.com) — optional"
-        required: false
+        description: "R2 custom domain host; the deploy attempts to bind DNS + TLS automatically"
+        default: "media.codfly.dpdns.org"
+        required: true
         type: string
 
 permissions:

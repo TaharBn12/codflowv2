@@ -237,6 +237,26 @@ function replaceInlineVar(text, key, value) {
   re.lastIndex = 0;
   return text.replace(re, `$1${value}$2`);
 }
+function customHostname(url) {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") fail(`Custom deployment URL must use https: ${url}`);
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      fail(`Custom deployment URL must be an origin without a path: ${url}`);
+    }
+    if (parsed.hostname === "localhost" || parsed.hostname.endsWith(".workers.dev")) return "";
+    return parsed.hostname;
+  } catch (err) {
+    if (err instanceof TypeError) fail(`Invalid deployment URL: ${url}`);
+    throw err;
+  }
+}
+function addTomlCustomDomain(text, url) {
+  const hostname = customHostname(url);
+  if (!hostname) return text;
+  return `${text.trimEnd()}\n\n# Managed by cloudflare-deploy.mjs. Wrangler creates DNS + TLS with the Worker.\nroutes = [{ pattern = "${hostname}", custom_domain = true }]\n`;
+}
 function genServerToml(tpl, v) {
   let t = tpl;
   t = replaceTomlVar(t, "name", v.serverWorker);
@@ -260,7 +280,7 @@ function genServerToml(tpl, v) {
     if (/STOREFRONT_URL/.test(t)) t = replaceInlineVar(t, "STOREFRONT_URL", v.storeUrl);
     if (/^STOREFRONT_URL\s*=/m.test(t)) t = replaceTomlVar(t, "STOREFRONT_URL", v.storeUrl);
   }
-  return t;
+  return addTomlCustomDomain(t, v.serverUrl);
 }
 function genDashToml(tpl, v) {
   let t = tpl;
@@ -271,11 +291,15 @@ function genDashToml(tpl, v) {
   t = replaceTomlVar(t, "PUBLIC_APP_URL", v.dashUrl);
   t = replaceTomlVar(t, "PUBLIC_API_URL", v.serverUrl);
   t = replaceTomlVar(t, "PUBLIC_TRUSTED_ORIGINS", v.trustedOrigins);
-  return t;
+  return addTomlCustomDomain(t, v.dashUrl);
 }
-function genThemeWrangler(tpl, workerName) {
+function genThemeWrangler(tpl, workerName, storeUrl = "") {
   if (!tpl.includes('"codflow-os-theme01"')) fail("Template drift: theme01 worker name not found.");
-  return tpl.split('"codflow-os-theme01"').join(`"${workerName}"`);
+  const config = JSON.parse(tpl.replace(/^\s*\/\/.*$/gm, ""));
+  config.name = workerName;
+  const hostname = customHostname(storeUrl);
+  if (hostname) config.routes = [{ pattern: hostname, custom_domain: true }];
+  return `${JSON.stringify(config, null, 2)}\n`;
 }
 const HARD_PLACEHOLDER_RES = [
   /00000000-0000/, /00000000000000000000000000000000/, /<your-/,
@@ -350,6 +374,36 @@ async function waitFor(label, fn, { tries = 24, delayMs = 5000 } = {}) {
   }
   fail(`${label} never became ready.`);
 }
+async function configureR2CustomDomain(hostname) {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  if (!hostname || !token) return false;
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  try {
+    const zonesRes = await fetch("https://api.cloudflare.com/client/v4/zones?per_page=50", { headers });
+    const zonesJson = await zonesRes.json();
+    const zone = zonesJson?.result
+      ?.filter((z) => hostname === z.name || hostname.endsWith(`.${z.name}`))
+      .sort((a, b) => b.name.length - a.name.length)[0];
+    if (!zone) {
+      warn(`R2 custom domain ${hostname} not connected automatically: its Cloudflare zone is not visible to this API token.`);
+      return false;
+    }
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${CFG.accountId}/r2/buckets/${encodeURIComponent(NAMES.bucket)}/domains/custom/${encodeURIComponent(hostname)}`;
+    const res = await fetch(endpoint, {
+      method: "PUT", headers, body: JSON.stringify({ enabled: true, zoneId: zone.id }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.success) {
+      warn(`R2 custom domain ${hostname} could not be connected automatically: ${json?.errors?.map((e) => e.message).join("; ") || `HTTP ${res.status}`}`);
+      return false;
+    }
+    ok(`R2 custom domain ${hostname} connected to '${NAMES.bucket}' (DNS + TLS managed by Cloudflare)`);
+    return true;
+  } catch (err) {
+    warn(`R2 custom domain ${hostname} setup failed without stopping the Worker deploy: ${err.message}`);
+    return false;
+  }
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 async function main() {
@@ -385,7 +439,7 @@ async function main() {
     const themeTpl = readFileSync(join(THEME_DIR, "wrangler.jsonc"), "utf8");
     const s = genServerToml(serverTpl, fake);
     const d = genDashToml(dashTpl, fake);
-    const th = genThemeWrangler(themeTpl, NAMES.themeWorker);
+    const th = genThemeWrangler(themeTpl, NAMES.themeWorker, fake.storeUrl);
     for (const [label, text] of [["server", s], ["dashboard", d]]) {
       const hard = HARD_PLACEHOLDER_RES.filter((re) => re.test(text));
       if (hard.length) fail(`dry-run: ${label} placeholders remain: ${hard.join(" ")}`);
@@ -436,6 +490,7 @@ async function main() {
   ensureBucket(!CFG.deployOnly);
   const kvRateId = ensureKv(NAMES.kvRate, !CFG.deployOnly);
   const kvOAuthId = ensureKv(NAMES.kvOAuth, !CFG.deployOnly);
+  if (CFG.mediaDomain) await configureR2CustomDomain(CFG.mediaDomain);
 
   // ── Secrets (generate once, reuse on re-runs) ────────────────────────────
   let secrets = { BETTER_AUTH_SECRET: "", MCP_LOGIN_TICKET_SECRET: "", STORE_API_KEY: "" };
@@ -479,7 +534,7 @@ async function main() {
   let serverToml = genServerToml(serverTpl, urls0);
   let dashToml = genDashToml(dashTpl, urls0);
   const themeTpl = readFileSync(join(THEME_DIR, "wrangler.jsonc"), "utf8");
-  const themeWrangler = genThemeWrangler(themeTpl, NAMES.themeWorker);
+  const themeWrangler = genThemeWrangler(themeTpl, NAMES.themeWorker, CFG.storeUrl);
   writeFileSync(join(SERVER_DIR, "wrangler.toml"), serverToml);
   writeFileSync(join(DASH_DIR, "wrangler.toml"), dashToml);
   writeFileSync(join(THEME_DIR, "wrangler.jsonc"), themeWrangler);
