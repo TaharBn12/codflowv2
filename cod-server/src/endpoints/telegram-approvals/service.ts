@@ -1,23 +1,60 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { adminApprovalRequests, staffCommissions } from "@/db/schema";
+import {
+  adminApprovalRequests,
+  staffCommissions,
+  telegramApprovalConfig,
+} from "@/db/schema";
 import type { Env, AuthUser } from "@/types";
 
-export function telegramConfigured(env: Env) {
-  return Boolean(
+export type ResolvedTelegramConfig = {
+  botToken: string;
+  chatId: string;
+  webhookSecret: string;
+  source: "environment" | "dashboard";
+};
+
+export async function resolveTelegramConfig(
+  env: Env,
+): Promise<ResolvedTelegramConfig | null> {
+  // Dashboard settings override Worker secrets; environment values remain a
+  // zero-downtime fallback until dashboard settings are saved.
+  const row = await getDb(env.DB)
+    .select()
+    .from(telegramApprovalConfig)
+    .where(eq(telegramApprovalConfig.id, "default"))
+    .get();
+  if (row) {
+    if (!row.enabled || !row.botToken || !row.chatId || !row.webhookSecret) return null;
+    return {
+      botToken: row.botToken,
+      chatId: row.chatId,
+      webhookSecret: row.webhookSecret,
+      source: "dashboard",
+    };
+  }
+  if (
     env.TELEGRAM_BOT_TOKEN &&
     env.TELEGRAM_APPROVAL_CHAT_ID &&
-    env.TELEGRAM_WEBHOOK_SECRET,
-  );
+    env.TELEGRAM_WEBHOOK_SECRET
+  ) {
+    return {
+      botToken: env.TELEGRAM_BOT_TOKEN,
+      chatId: env.TELEGRAM_APPROVAL_CHAT_ID,
+      webhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
+      source: "environment",
+    };
+  }
+  return null;
 }
 
 async function telegram(
-  env: Env,
+  config: ResolvedTelegramConfig,
   method: string,
   body: Record<string, unknown>,
 ) {
   const response = await fetch(
-    `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`,
+    `https://api.telegram.org/bot${config.botToken}/${method}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -40,6 +77,8 @@ export async function requestCommissionPayoutApproval(
   commissionIds: string[],
   amount: number,
 ) {
+  const config = await resolveTelegramConfig(env);
+  if (!config) throw new Error("Telegram approvals are not configured");
   const db = getDb(env.DB);
   const now = new Date().toISOString();
   const request = {
@@ -50,33 +89,45 @@ export async function requestCommissionPayoutApproval(
     status: "pending" as const,
     requestedBy: actor.id,
     requestedByName: actor.name,
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
     createdAt: now,
     updatedAt: now,
   };
   await db.insert(adminApprovalRequests).values(request);
-  const sent = await telegram(env, "sendMessage", {
-    chat_id: env.TELEGRAM_APPROVAL_CHAT_ID,
-    text: `🔐 طلب موافقة إدارية\n\nالعملية: دفع عمولات الموظفين\nالعدد: ${commissionIds.length}\nالمبلغ: ${amount.toFixed(2)} دج\nطلبها: ${actor.name}\nصالحة لمدة 24 ساعة`,
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: "✅ موافقة",
-            callback_data: `approval:approve:${request.id}`,
-          },
-          { text: "❌ رفض", callback_data: `approval:reject:${request.id}` },
+  try {
+    const sent = await telegram(config, "sendMessage", {
+      chat_id: config.chatId,
+      text: `🔐 طلب موافقة إدارية\n\nالعملية: دفع عمولات الموظفين\nالعدد: ${commissionIds.length}\nالمبلغ: ${amount.toFixed(2)} دج\nطلبها: ${actor.name}\nصالحة لمدة 24 ساعة`,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "✅ موافقة",
+              callback_data: `approval:approve:${request.id}`,
+            },
+            { text: "❌ رفض", callback_data: `approval:reject:${request.id}` },
+          ],
         ],
-      ],
-    },
-  });
-  const messageId = sent.result?.message_id;
-  if (messageId)
+      },
+    });
+    const messageId = sent.result?.message_id;
+    if (messageId)
+      await db
+        .update(adminApprovalRequests)
+        .set({ telegramMessageId: String(messageId) })
+        .where(eq(adminApprovalRequests.id, request.id));
+    return request;
+  } catch (cause) {
     await db
       .update(adminApprovalRequests)
-      .set({ telegramMessageId: String(messageId) })
+      .set({
+        status: "failed",
+        decisionNote: cause instanceof Error ? cause.message : String(cause),
+        updatedAt: new Date().toISOString(),
+      })
       .where(eq(adminApprovalRequests.id, request.id));
-  return request;
+    throw cause;
+  }
 }
 
 export async function decideApproval(
@@ -154,7 +205,9 @@ export async function answerTelegramCallback(
   callbackId: string,
   text: string,
 ) {
-  return telegram(env, "answerCallbackQuery", {
+  const config = await resolveTelegramConfig(env);
+  if (!config) return;
+  return telegram(config, "answerCallbackQuery", {
     callback_query_id: callbackId,
     text,
     show_alert: true,
@@ -162,14 +215,15 @@ export async function answerTelegramCallback(
 }
 
 export async function configureTelegramWebhook(env: Env) {
-  if (!telegramConfigured(env))
-    throw new Error("Telegram approval secrets are not configured");
+  const config = await resolveTelegramConfig(env);
+  if (!config) throw new Error("Telegram approval settings are incomplete");
   const origin = new URL(env.WORKER_SELF_URL).origin;
-  await telegram(env, "setWebhook", {
-    url: `${origin}/webhooks/telegram`,
-    secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+  const webhookUrl = `${origin}/webhooks/telegram`;
+  await telegram(config, "setWebhook", {
+    url: webhookUrl,
+    secret_token: config.webhookSecret,
     allowed_updates: ["callback_query"],
     drop_pending_updates: false,
   });
-  return `${origin}/webhooks/telegram`;
+  return webhookUrl;
 }

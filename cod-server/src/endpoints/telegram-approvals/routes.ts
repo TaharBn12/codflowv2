@@ -3,24 +3,22 @@ import type { AppContext } from "@/types";
 import {
   answerTelegramCallback,
   decideApproval,
-  telegramConfigured,
+  resolveTelegramConfig,
 } from "./service";
 
 const routes = new Hono<AppContext>();
 routes.post("/", async (c) => {
+  const config = await resolveTelegramConfig(c.env);
   if (
-    !telegramConfigured(c.env) ||
-    c.req.header("X-Telegram-Bot-Api-Secret-Token") !==
-      c.env.TELEGRAM_WEBHOOK_SECRET
-  ) {
+    !config ||
+    c.req.header("X-Telegram-Bot-Api-Secret-Token") !== config.webhookSecret
+  )
     return c.json({ ok: false }, 403);
-  }
   const update = await c.req.json<any>();
   const callback = update.callback_query;
   if (
     !callback?.id ||
-    String(callback.message?.chat?.id) !==
-      String(c.env.TELEGRAM_APPROVAL_CHAT_ID)
+    String(callback.message?.chat?.id) !== String(config.chatId)
   )
     return c.json({ ok: true });
   const match = /^approval:(approve|reject):([0-9a-f-]+)$/.exec(

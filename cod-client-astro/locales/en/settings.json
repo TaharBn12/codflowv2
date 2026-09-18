@@ -133,7 +133,18 @@
     "error_load": "Could not load store settings",
     "domain_label": "Storefront domain",
     "domain_placeholder": "store.example.com",
-    "domain_hint": "Your storefront's custom domain. Landing page share URLs are built from it. Leave empty to use the deployment's default storefront URL."
+    "domain_hint": "Your storefront's custom domain. Landing page share URLs are built from it. Leave empty to use the deployment's default storefront URL.",
+    "telegram_title": "Telegram approvals",
+    "telegram_subtitle": "Configure the bot used for secure administrative approvals",
+    "telegram_enabled": "Enable Telegram approvals",
+    "telegram_enabled_hint": "Send sensitive actions to administrators for approval",
+    "telegram_token": "Bot token",
+    "telegram_token_hint": "Stored securely on the server and never returned to the browser",
+    "telegram_token_placeholder": "Paste the token from BotFather",
+    "telegram_stored": "Stored token",
+    "telegram_chat_id": "Approver chat ID",
+    "telegram_chat_hint": "Only callbacks from this Telegram chat are accepted",
+    "telegram_environment": "Environment secrets are currently taking precedence over dashboard settings."
   },
   "shipping": {
     "title": "Shipping Rates",

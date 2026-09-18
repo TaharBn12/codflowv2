@@ -37,6 +37,8 @@ export type AgentPerformance = {
   failedOrders: number;
   earnedCommission: number;
   paidCommission: number;
+  confirmationCommission: number;
+  followUpCommission: number;
 };
 
 type Envelope<T> = { success: true; data: T };
@@ -78,6 +80,8 @@ export type OperationAgent = {
   maxOpenOrders: number;
   commissionType: "fixed" | "percentage";
   commissionValue: number;
+  confirmationCommissionType: "fixed" | "percentage";
+  confirmationCommissionValue: number;
 };
 
 export async function listOperationAgents() {
@@ -96,6 +100,8 @@ export async function saveOperationAgentSettings(agent: OperationAgent) {
         maxOpenOrders: Number(agent.maxOpenOrders),
         commissionType: agent.commissionType,
         commissionValue: Number(agent.commissionValue),
+        confirmationCommissionType: agent.confirmationCommissionType,
+        confirmationCommissionValue: Number(agent.confirmationCommissionValue),
       }),
     },
   );
@@ -122,7 +128,8 @@ export type StaffCommission = {
   userId: string;
   userName: string;
   amount: number;
-  status: "earned" | "paid" | "reversed";
+  category: "confirmation" | "follow_up";
+  status: "pending" | "earned" | "paid" | "reversed";
   earnedAt: string;
   paidAt: string | null;
 };
@@ -143,4 +150,19 @@ export async function markStaffCommissionsPaid(ids: string[]) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ids }),
   });
+}
+
+export async function autoAssignNewOrders(orderIds?: string[]) {
+  return apiFetch<{
+    success: true;
+    data: { assigned: number; remaining: number };
+  }>("/api/operations/orders/auto-assign", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(orderIds?.length ? { orderIds } : {}),
+  });
+}
+
+export async function getCommissionReport(period: "daily" | "monthly") {
+  return (await apiFetch<Envelope<Array<{ period: string; userId: string; userName: string; category: "confirmation" | "follow_up"; status: StaffCommission["status"]; amount: number; count: number }>>>(`/api/operations/commissions/report?period=${period}`)).data;
 }

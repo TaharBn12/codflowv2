@@ -560,6 +560,8 @@ export const operationAgentSettings = sqliteTable("operation_agent_settings", {
   maxOpenOrders: integer("max_open_orders").notNull().default(25),
   commissionType: text("commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
   commissionValue: real("commission_value").notNull().default(0),
+  confirmationCommissionType: text("confirmation_commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
+  confirmationCommissionValue: real("confirmation_commission_value").notNull().default(0),
   updatedAt: text("updated_at").notNull(),
 });
 
@@ -575,13 +577,27 @@ export const operationTasks = sqliteTable("operation_tasks", {
   dueAt: text("due_at"), completedAt: text("completed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
 }, (t) => ({ assigneeStatusDueIdx: index("operation_tasks_assignee_status_due_idx").on(t.assigneeId, t.status, t.dueAt), orderIdx: index("operation_tasks_order_idx").on(t.orderId) }));
 
-export const staffCommissions = sqliteTable("staff_commissions", {
-  id: text("id").primaryKey(), orderId: text("order_id").notNull().unique().references(() => orders.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), amount: real("amount").notNull(),
-  rateType: text("rate_type", { enum: ["fixed", "percentage"] }).notNull(), rateValue: real("rate_value").notNull(),
-  status: text("status", { enum: ["earned", "paid", "reversed"] }).notNull().default("earned"),
-  earnedAt: text("earned_at").notNull(), paidAt: text("paid_at"), reversedAt: text("reversed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
-}, (t) => ({ userStatusIdx: index("staff_commissions_user_status_idx").on(t.userId, t.status, t.earnedAt) }));
+export const staffCommissions = sqliteTable("staff_commission_events", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  category: text("category", { enum: ["confirmation", "follow_up"] }).notNull(),
+  amount: real("amount").notNull(),
+  rateType: text("rate_type", { enum: ["fixed", "percentage"] }).notNull(),
+  rateValue: real("rate_value").notNull(),
+  status: text("status", { enum: ["pending", "earned", "paid", "reversed"] }).notNull().default("pending"),
+  earnedAt: text("earned_at"), paidAt: text("paid_at"), reversedAt: text("reversed_at"),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({
+  orderCategoryIdx: uniqueIndex("staff_commission_events_order_category_idx").on(t.orderId, t.category),
+  userStatusIdx: index("staff_commission_events_user_status_idx").on(t.userId, t.status, t.createdAt),
+}));
+
+export const telegramApprovalConfig = sqliteTable("telegram_approval_config", {
+  id: text("id").primaryKey().default("default"),
+  botToken: text("bot_token").notNull(), chatId: text("chat_id").notNull(), webhookSecret: text("webhook_secret").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+});
 
 export const orderAssignments = sqliteTable("order_assignments", {
   id: text("id").primaryKey(),

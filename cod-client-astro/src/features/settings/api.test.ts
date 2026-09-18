@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const seam = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ apiFetch: seam.apiFetch }));
 
-import { getMyStore, getPixelConfig, getEmailConfig, saveEmailConfig, savePixelConfig, testEmailConnection, updateMyStore, getTurnstileConfig, saveTurnstileConfig } from "./api";
+import { getMyStore, getPixelConfig, getEmailConfig, saveEmailConfig, savePixelConfig, testEmailConnection, updateMyStore, getTurnstileConfig, saveTurnstileConfig, getTelegramConfig, saveTelegramConfig } from "./api";
 
 describe("settings API adapters", () => {
   beforeEach(() => {
@@ -68,6 +68,17 @@ describe("settings API adapters", () => {
       method: "POST",
       body: JSON.stringify({ apiKey: "sk_live_new", fromEmail: "noreply@acme.com", fromName: "Acme", enabled: true }),
     }));
+  });
+
+  it("reads and saves only masked Telegram configuration responses", async () => {
+    const config = { configured: true, source: "dashboard" as const, chatId: "-1001", enabled: true, botTokenMasked: "••••secret" };
+    seam.apiFetch.mockResolvedValue({ success: true, data: config });
+    await expect(getTelegramConfig()).resolves.toEqual(config);
+    expect(seam.apiFetch).toHaveBeenCalledWith("/api/operations/telegram/config");
+    await expect(saveTelegramConfig({ botToken: "raw-input", chatId: "-1001", enabled: true })).resolves.toEqual(config);
+    expect(seam.apiFetch).toHaveBeenCalledWith("/api/operations/telegram/config", expect.objectContaining({ method: "PUT", body: JSON.stringify({ botToken: "raw-input", chatId: "-1001", enabled: true }) }));
+    expect(config).not.toHaveProperty("botToken");
+    expect(config).not.toHaveProperty("webhookSecret");
   });
 
   it("tests the email connection, sending the key only when present", async () => {

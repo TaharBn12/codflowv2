@@ -1,8 +1,15 @@
 import { useDeferredValue, useEffect, useState } from "react";
-import { AlertCircle, Filter, PackageOpen, X } from "lucide-react";
+import {
+  AlertCircle,
+  Filter,
+  PackageOpen,
+  WandSparkles,
+  X,
+} from "lucide-react";
 import { canScope, useIdentity } from "@/features/auth/components/RequireAuth";
 import { useT } from "@/i18n/react";
 import {
+  autoAssignNewOrders,
   bulkAssignConfirmationOrders,
   listOperationAgents,
   type OperationAgent,
@@ -123,6 +130,7 @@ export function OrdersList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAgentId, setBulkAgentId] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [autoAssignBusy, setAutoAssignBusy] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | Error | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [filters, setFilters] = useState<OrderFilters>(() => ({
@@ -237,6 +245,22 @@ export function OrdersList() {
     };
   }
 
+  async function autoAssign() {
+    setAutoAssignBusy(true);
+    try {
+      const result = await autoAssignNewOrders(
+        selectedIds.size ? [...selectedIds] : undefined,
+      );
+      notify.success(`${operations("auto_assigned")}: ${result.data.assigned}`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setAutoAssignBusy(false);
+    }
+  }
+
   async function bulkAssign() {
     if (!bulkAgentId || selectedIds.size === 0) return;
     setBulkBusy(true);
@@ -315,6 +339,19 @@ export function OrdersList() {
             <span className="shrink-0 text-xs font-medium text-muted-foreground">
               {filteredOrders.length} {t("orders_count")}
             </span>
+            {identity?.role === "admin" && (
+              <button
+                type="button"
+                disabled={autoAssignBusy}
+                onClick={() => void autoAssign()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              >
+                <WandSparkles size={16} />
+                {autoAssignBusy
+                  ? operations("assigning")
+                  : operations("auto_assign_new")}
+              </button>
+            )}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <FilterSelect

@@ -21,7 +21,7 @@
   "delivered": "Livrées",
   "commission": "Commission",
   "agent_settings": "Paramètres des agents de confirmation",
-  "agent_settings_hint": "Configurez l’attribution, la limite de commandes et la commission après livraison",
+  "agent_settings_hint": "Configurez la participation, la limite de commandes ouvertes et les commissions distinctes de confirmation et de suivi",
   "auto_assign": "Attribution auto",
   "max_open": "Limite ouverte",
   "agent_settings_saved": "Paramètres enregistrés",
@@ -36,5 +36,10 @@
   "earned_entries": "commissions acquises",
   "mark_all_paid": "Tout marquer payé",
   "commissions_paid": "Commissions marquées payées",
-  "approval_sent": "Demande d’approbation envoyée sur Telegram"
+  "approval_sent": "Demande d’approbation envoyée sur Telegram",
+  "auto_assign_new": "Attribuer les nouvelles commandes",
+  "assigning": "Attribution…",
+  "auto_assigned": "Nouvelles commandes attribuées",
+  "confirmation_commission": "Commission de confirmation",
+  "follow_up_commission": "Commission de suivi"
 }

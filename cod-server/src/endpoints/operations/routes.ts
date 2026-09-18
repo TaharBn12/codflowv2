@@ -1,5 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   operationAgentSettings,
@@ -7,15 +7,17 @@ import {
   orderConfirmationAssignments,
   orders,
   staffCommissions,
+  telegramApprovalConfig,
   users,
 } from "@/db/schema";
 import type { AppContext } from "@/types";
 import { z } from "zod";
 import { hasPermission } from "../../../../cod-shared/rbac/utils";
+import { chooseLeastLoadedConfirmer, createStaffCommissionStages } from "../../../../cod-shared/queries/orders";
 import {
   configureTelegramWebhook,
   requestCommissionPayoutApproval,
-  telegramConfigured,
+  resolveTelegramConfig,
 } from "@/endpoints/telegram-approvals/service";
 
 const routes = new OpenAPIHono<AppContext>();
@@ -262,6 +264,82 @@ routes.patch("/tasks/:id", async (c) => {
   return c.json({ success: true, message: "Task updated" });
 });
 
+routes.post("/orders/auto-assign", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const body = (await c.req.json().catch(() => ({}))) as {
+    orderIds?: string[];
+  };
+  const parsed = z
+    .object({ orderIds: z.array(z.string().min(1)).max(100).optional() })
+    .safeParse(body);
+  if (!parsed.success)
+    return c.json(
+      {
+        success: false,
+        code: "VALIDATION_FAILED",
+        error: parsed.error.flatten(),
+      },
+      400,
+    );
+  const db = getDb(c.env.DB);
+  const conditions = [
+    eq(orders.status, "new"),
+    sql`${orderConfirmationAssignments.orderId} IS NULL`,
+  ];
+  if (parsed.data.orderIds?.length)
+    conditions.push(inArray(orders.id, parsed.data.orderIds));
+  const pending = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      customerId: orders.customerId,
+    })
+    .from(orders)
+    .leftJoin(
+      orderConfirmationAssignments,
+      eq(orders.id, orderConfirmationAssignments.orderId),
+    )
+    .where(and(...conditions))
+    .orderBy(orders.createdAt)
+    .limit(100)
+    .all();
+  let assigned = 0;
+  for (const order of pending) {
+    const agent = await chooseLeastLoadedConfirmer(db);
+    if (!agent) break;
+    const now = new Date().toISOString();
+    await db.batch([
+      db.insert(orderConfirmationAssignments).values({
+        orderId: order.id,
+        assigneeId: agent.id,
+        assignedBy: c.get("user").id,
+        assignedAt: now,
+        updatedAt: now,
+      }),
+      db.insert(operationTasks).values({
+        id: crypto.randomUUID(),
+        title: `Confirm order ${order.orderNumber}`,
+        type: "confirmation",
+        status: "open",
+        priority: "normal",
+        orderId: order.id,
+        customerId: order.customerId,
+        assigneeId: agent.id,
+        createdBy: c.get("user").id,
+        dueAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      }),
+    ]);
+    await createStaffCommissionStages(db, order.id, false);
+    assigned += 1;
+  }
+  return c.json({
+    success: true,
+    data: { assigned, remaining: pending.length - assigned },
+  });
+});
+
 const bulkAssignSchema = z.object({
   orderIds: z.array(z.string().min(1)).min(1).max(100),
   assigneeId: z.string().min(1),
@@ -305,6 +383,7 @@ routes.post("/orders/bulk-assign", async (c) => {
       id: orders.id,
       orderNumber: orders.orderNumber,
       customerId: orders.customerId,
+      status: orders.status,
     })
     .from(orders)
     .where(inArray(orders.id, parsed.data.orderIds))
@@ -367,7 +446,12 @@ routes.post("/orders/bulk-assign", async (c) => {
       }),
     );
   }
-  if (selected.length) await db.batch(statements as any);
+  if (selected.length) {
+    await db.batch(statements as any);
+    for (const order of selected) {
+      if (order.status === "new") await createStaffCommissionStages(db, order.id, false);
+    }
+  }
   return c.json({
     success: true,
     data: { assigned: selected.length, assignee },
@@ -385,6 +469,7 @@ routes.get("/commissions", async (c) => {
       userId: staffCommissions.userId,
       userName: users.name,
       amount: staffCommissions.amount,
+      category: staffCommissions.category,
       status: staffCommissions.status,
       earnedAt: staffCommissions.earnedAt,
       paidAt: staffCommissions.paidAt,
@@ -400,6 +485,16 @@ routes.get("/commissions", async (c) => {
     .orderBy(desc(staffCommissions.earnedAt))
     .limit(250)
     .all();
+  return c.json({ success: true, data: rows, count: rows.length });
+});
+
+routes.get("/commissions/report", async (c) => {
+  const actor = c.get("user");
+  const parsed = z.object({ period: z.enum(["daily", "monthly"]).default("daily"), from: z.string().optional(), to: z.string().optional(), category: z.enum(["confirmation", "follow_up"]).optional(), userId: z.string().optional() }).safeParse(c.req.query());
+  if (!parsed.success) return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  const bucket = parsed.data.period === "monthly" ? sql<string>`strftime('%Y-%m', ${staffCommissions.createdAt})` : sql<string>`date(${staffCommissions.createdAt})`;
+  const conditions = [actor.role === "admin" ? undefined : eq(staffCommissions.userId, actor.id), parsed.data.from ? gte(staffCommissions.createdAt, parsed.data.from) : undefined, parsed.data.to ? lte(staffCommissions.createdAt, parsed.data.to) : undefined, parsed.data.category ? eq(staffCommissions.category, parsed.data.category) : undefined, actor.role === "admin" && parsed.data.userId ? eq(staffCommissions.userId, parsed.data.userId) : undefined].filter(Boolean) as any[];
+  const rows = await getDb(c.env.DB).select({ period: bucket, userId: staffCommissions.userId, userName: users.name, category: staffCommissions.category, status: staffCommissions.status, amount: sql<number>`sum(${staffCommissions.amount})`, count: sql<number>`count(*)` }).from(staffCommissions).innerJoin(users, eq(staffCommissions.userId, users.id)).where(conditions.length ? and(...conditions) : undefined).groupBy(bucket, staffCommissions.userId, users.name, staffCommissions.category, staffCommissions.status).orderBy(desc(bucket)).all();
   return c.json({ success: true, data: rows, count: rows.length });
 });
 
@@ -428,7 +523,8 @@ routes.post("/commissions/mark-paid", async (c) => {
       ),
     )
     .all();
-  if (telegramConfigured(c.env)) {
+  const telegramConfig = await resolveTelegramConfig(c.env);
+  if (telegramConfig) {
     const approval = await requestCommissionPayoutApproval(
       c.env,
       c.get("user"),
@@ -462,20 +558,103 @@ routes.post("/commissions/mark-paid", async (c) => {
   return c.json({ success: true, data: { paid: result.length } });
 });
 
-routes.get("/telegram/status", (c) =>
-  c.json({ success: true, data: { configured: telegramConfigured(c.env) } }),
-);
-routes.post("/telegram/setup", async (c) => {
+routes.get("/telegram/config", async (c) => {
   if (!isAdmin(c)) return forbidden(c);
-  if (!telegramConfigured(c.env))
+  const resolved = await resolveTelegramConfig(c.env);
+  const stored = await getDb(c.env.DB)
+    .select()
+    .from(telegramApprovalConfig)
+    .where(eq(telegramApprovalConfig.id, "default"))
+    .get();
+  const token = stored?.botToken ?? resolved?.botToken ?? "";
+  return c.json({
+    success: true,
+    data: {
+      configured: Boolean(resolved),
+      source: stored ? "dashboard" : (resolved?.source ?? null),
+      chatId:
+        stored?.chatId ??
+        (resolved?.source === "environment" ? resolved.chatId : ""),
+      enabled: stored?.enabled ?? Boolean(resolved),
+      botTokenMasked: token ? `••••${token.slice(-6)}` : "",
+    },
+  });
+});
+
+routes.put("/telegram/config", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z
+    .object({
+      botToken: z.string().trim().default(""),
+      chatId: z.string().trim().min(1),
+      enabled: z.boolean().default(true),
+    })
+    .safeParse(await c.req.json());
+  if (!parsed.success)
     return c.json(
       {
         success: false,
-        code: "TELEGRAM_NOT_CONFIGURED",
-        error: "Configure Telegram Worker secrets first",
+        code: "VALIDATION_FAILED",
+        error: parsed.error.flatten(),
       },
-      503,
+      400,
     );
+  const db = getDb(c.env.DB);
+  const existing = await db
+    .select()
+    .from(telegramApprovalConfig)
+    .where(eq(telegramApprovalConfig.id, "default"))
+    .get();
+  const botToken = parsed.data.botToken || existing?.botToken || c.env.TELEGRAM_BOT_TOKEN || "";
+  if (!botToken)
+    return c.json(
+      {
+        success: false,
+        code: "BOT_TOKEN_REQUIRED",
+        error: "Bot token is required",
+      },
+      400,
+    );
+  const now = new Date().toISOString();
+  const values = {
+    id: "default",
+    botToken,
+    chatId: parsed.data.chatId,
+    enabled: parsed.data.enabled,
+    webhookSecret:
+      existing?.webhookSecret ||
+      `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll("-", ""),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  await db
+    .insert(telegramApprovalConfig)
+    .values(values)
+    .onConflictDoUpdate({
+      target: telegramApprovalConfig.id,
+      set: {
+        botToken: values.botToken,
+        chatId: values.chatId,
+        enabled: values.enabled,
+        webhookSecret: values.webhookSecret,
+        updatedAt: now,
+      },
+    });
+  if (values.enabled) await configureTelegramWebhook(c.env);
+  return c.json({
+    success: true,
+    data: {
+      configured: values.enabled,
+      source: "dashboard",
+      chatId: values.chatId,
+      enabled: values.enabled,
+      botTokenMasked: `••••${botToken.slice(-6)}`,
+    },
+  });
+});
+
+routes.post("/telegram/setup", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
   const webhookUrl = await configureTelegramWebhook(c.env);
   return c.json({ success: true, data: { webhookUrl } });
 });
@@ -485,6 +664,8 @@ const agentSettingsSchema = z.object({
   maxOpenOrders: z.number().int().min(1).max(500),
   commissionType: z.enum(["fixed", "percentage"]),
   commissionValue: z.number().min(0).max(1000000),
+  confirmationCommissionType: z.enum(["fixed", "percentage"]),
+  confirmationCommissionValue: z.number().min(0).max(1000000),
 });
 
 routes.get("/agents", async (c) => {
@@ -500,6 +681,8 @@ routes.get("/agents", async (c) => {
       maxOpenOrders: sql<number>`coalesce(${operationAgentSettings.maxOpenOrders}, 25)`,
       commissionType: sql<string>`coalesce(${operationAgentSettings.commissionType}, 'fixed')`,
       commissionValue: sql<number>`coalesce(${operationAgentSettings.commissionValue}, 0)`,
+      confirmationCommissionType: sql<string>`coalesce(${operationAgentSettings.confirmationCommissionType}, 'fixed')`,
+      confirmationCommissionValue: sql<number>`coalesce(${operationAgentSettings.confirmationCommissionValue}, 0)`,
     })
     .from(users)
     .leftJoin(
@@ -564,8 +747,10 @@ routes.get("/performance", async (c) => {
       (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('new','confirmed','unreachable')) AS openOrders,
       (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status = 'delivered') AS deliveredOrders,
       (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('returned','cancelled')) AS failedOrders,
-      COALESCE((SELECT SUM(sc.amount) FROM staff_commissions sc WHERE sc.user_id = u.id AND sc.status = 'earned'), 0) AS earnedCommission,
-      COALESCE((SELECT SUM(sc.amount) FROM staff_commissions sc WHERE sc.user_id = u.id AND sc.status = 'paid'), 0) AS paidCommission
+      COALESCE((SELECT SUM(sc.amount) FROM staff_commission_events sc WHERE sc.user_id = u.id AND sc.status = 'earned'), 0) AS earnedCommission,
+      COALESCE((SELECT SUM(sc.amount) FROM staff_commission_events sc WHERE sc.user_id = u.id AND sc.category = 'confirmation' AND sc.status IN ('earned','paid')), 0) AS confirmationCommission,
+      COALESCE((SELECT SUM(sc.amount) FROM staff_commission_events sc WHERE sc.user_id = u.id AND sc.category = 'follow_up' AND sc.status IN ('earned','paid')), 0) AS followUpCommission,
+      COALESCE((SELECT SUM(sc.amount) FROM staff_commission_events sc WHERE sc.user_id = u.id AND sc.status = 'paid'), 0) AS paidCommission
     FROM users u
     LEFT JOIN operation_agent_settings s ON s.user_id = u.id
     WHERE u.role = 'confirmer'

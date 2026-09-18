@@ -21,7 +21,7 @@
   "delivered": "مسلّم",
   "commission": "العمولة",
   "agent_settings": "إعدادات موظفي التأكيد",
-  "agent_settings_hint": "حدد المشاركة في التوزيع، الحد الأقصى للطلبات، والعمولة بعد التسليم",
+  "agent_settings_hint": "إعداد المشاركة في التوزيع وحد الطلبات المفتوحة وعمولتي التأكيد والمتابعة المنفصلتين",
   "auto_assign": "توزيع تلقائي",
   "max_open": "الحد المفتوح",
   "agent_settings_saved": "تم حفظ إعدادات الموظف",
@@ -36,5 +36,10 @@
   "earned_entries": "عمولات مستحقة",
   "mark_all_paid": "تحديد الكل كمدفوع",
   "commissions_paid": "تم تسجيل دفع العمولات",
-  "approval_sent": "تم إرسال طلب الموافقة إلى Telegram"
+  "approval_sent": "تم إرسال طلب الموافقة إلى Telegram",
+  "auto_assign_new": "تعيين الطلبات الجديدة تلقائيًا",
+  "assigning": "جارٍ التعيين…",
+  "auto_assigned": "تم تعيين طلبات جديدة",
+  "confirmation_commission": "عمولة التأكيد",
+  "follow_up_commission": "عمولة المتابعة"
 }

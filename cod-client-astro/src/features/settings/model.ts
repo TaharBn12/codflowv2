@@ -1,6 +1,6 @@
-import { BarChart2, Key, Mail, Palette, Search, ShieldCheck, Star, Store, type LucideIcon } from "lucide-react";
+import { BarChart2, Bot, Key, Mail, Palette, Search, ShieldCheck, Star, Store, type LucideIcon } from "lucide-react";
 
-export type CategoryId = "general" | "branding" | "seo" | "reviews" | "analytics" | "verification" | "email" | "api";
+export type CategoryId = "general" | "branding" | "seo" | "reviews" | "analytics" | "verification" | "email" | "api" | "telegram";
 
 export interface SettingsCategory {
   id: CategoryId;
@@ -19,6 +19,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: "verification", icon: ShieldCheck, labelKey: "otp_title" },
   { id: "email", icon: Mail, labelKey: "email_title" },
   { id: "api", icon: Key, labelKey: "api_key_title" },
+  { id: "telegram", icon: Bot, labelKey: "telegram_title" },
 ];
 
 export function settingsErrorMessage(_cause: unknown, t: (key: string) => string) {

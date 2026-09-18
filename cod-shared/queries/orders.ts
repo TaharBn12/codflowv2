@@ -340,22 +340,44 @@ export async function createOrder(
   return orderData.id;
 }
 
-export async function awardDeliveredStaffCommission(db: AppDb, orderId: string) {
-  const order = await db.select({ assigneeId: orderConfirmationAssignments.assigneeId, price: orders.price,
-    commissionType: operationAgentSettings.commissionType, commissionValue: operationAgentSettings.commissionValue,
-  }).from(orders)
-    .leftJoin(orderConfirmationAssignments, eq(orders.id, orderConfirmationAssignments.orderId))
-    .leftJoin(operationAgentSettings, eq(orderConfirmationAssignments.assigneeId, operationAgentSettings.userId))
-    .where(eq(orders.id, orderId)).get();
-  if (!order?.assigneeId || !order.commissionType || !order.commissionValue) return null;
-  const amount = order.commissionType === "percentage" ? Math.round(order.price * order.commissionValue) / 100 : order.commissionValue;
-  if (amount <= 0) return null;
+export async function createStaffCommissionStages(db: AppDb, orderId: string, earnConfirmation = true) {
+  const row = await db.select({ assigneeId: orderConfirmationAssignments.assigneeId, price: orders.price,
+    followType: operationAgentSettings.commissionType, followValue: operationAgentSettings.commissionValue,
+    confirmationType: operationAgentSettings.confirmationCommissionType, confirmationValue: operationAgentSettings.confirmationCommissionValue,
+  }).from(orders).leftJoin(orderConfirmationAssignments, eq(orders.id, orderConfirmationAssignments.orderId))
+    .leftJoin(operationAgentSettings, eq(orderConfirmationAssignments.assigneeId, operationAgentSettings.userId)).where(eq(orders.id, orderId)).get();
+  if (!row?.assigneeId) return;
   const now = new Date().toISOString();
-  await db.insert(staffCommissions).values({ id: crypto.randomUUID(), orderId, userId: order.assigneeId, amount,
-    rateType: order.commissionType, rateValue: order.commissionValue, status: "earned", earnedAt: now, createdAt: now, updatedAt: now,
-  }).onConflictDoNothing({ target: staffCommissions.orderId });
-  return amount;
+  const stages = [
+    { category: "confirmation" as const, type: row.confirmationType, value: row.confirmationValue, status: earnConfirmation ? "earned" as const : "pending" as const },
+    ...(earnConfirmation ? [{ category: "follow_up" as const, type: row.followType, value: row.followValue, status: "pending" as const }] : []),
+  ];
+  for (const stage of stages) {
+    if (!stage.type || !stage.value || stage.value <= 0) continue;
+    const amount = stage.type === "percentage" ? Math.round(row.price * stage.value) / 100 : stage.value;
+    await db.insert(staffCommissions).values({ id: crypto.randomUUID(), orderId, userId: row.assigneeId,
+      category: stage.category, amount, rateType: stage.type, rateValue: stage.value, status: stage.status,
+      earnedAt: stage.status === "earned" ? now : null, createdAt: now, updatedAt: now,
+    }).onConflictDoNothing({ target: [staffCommissions.orderId, staffCommissions.category] });
+    if (!earnConfirmation && stage.category === "confirmation") {
+      await db.update(staffCommissions).set({ userId: row.assigneeId, amount, rateType: stage.type, rateValue: stage.value, updatedAt: now })
+        .where(and(eq(staffCommissions.orderId, orderId), eq(staffCommissions.category, "confirmation"), eq(staffCommissions.status, "pending")));
+    }
+  }
+  if (earnConfirmation) {
+    await db.update(staffCommissions).set({ status: "earned", earnedAt: now, updatedAt: now })
+      .where(and(eq(staffCommissions.orderId, orderId), eq(staffCommissions.category, "confirmation"), eq(staffCommissions.status, "pending")));
+  }
 }
+
+export async function settleFollowUpCommission(db: AppDb, orderId: string, outcome: "delivered" | "reversed") {
+  const now = new Date().toISOString();
+  await db.update(staffCommissions).set(outcome === "delivered"
+    ? { status: "earned", earnedAt: now, updatedAt: now }
+    : { status: "reversed", reversedAt: now, updatedAt: now })
+    .where(and(eq(staffCommissions.orderId, orderId), eq(staffCommissions.category, "follow_up"), eq(staffCommissions.status, "pending")));
+}
+
 
 export async function updateOrderStatus(
   db: AppDb,
@@ -525,6 +547,12 @@ export async function updateOrderStatus(
   // wasAlreadyTerminal guard then blocked every retry, permanently losing
   // the inventory.
   await db.batch(statements as [BatchStatement, ...BatchStatement[]]);
+
+  // Commission state follows every status source (dashboard, shipment actions,
+  // and carrier webhooks), not only the manual status endpoint.
+  if (newStatus === "confirmed") await createStaffCommissionStages(db, orderId);
+  if (newStatus === "delivered") await settleFollowUpCommission(db, orderId, "delivered");
+  if (newStatus === "returned" || newStatus === "cancelled") await settleFollowUpCommission(db, orderId, "reversed");
 
   return true;
 }

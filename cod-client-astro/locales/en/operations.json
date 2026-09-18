@@ -21,7 +21,7 @@
   "delivered": "Delivered",
   "commission": "Commission",
   "agent_settings": "Confirmation agent settings",
-  "agent_settings_hint": "Configure assignment participation, open-order limit and delivered-order commission",
+  "agent_settings_hint": "Configure assignment participation, open-order limit, and separate confirmation and follow-up commissions",
   "auto_assign": "Auto assign",
   "max_open": "Open limit",
   "agent_settings_saved": "Agent settings saved",
@@ -36,5 +36,10 @@
   "earned_entries": "earned entries",
   "mark_all_paid": "Mark all as paid",
   "commissions_paid": "Commissions marked as paid",
-  "approval_sent": "Approval request sent to Telegram"
+  "approval_sent": "Approval request sent to Telegram",
+  "auto_assign_new": "Auto-assign new orders",
+  "assigning": "Assigning…",
+  "auto_assigned": "New orders assigned",
+  "confirmation_commission": "Confirmation commission",
+  "follow_up_commission": "Follow-up commission"
 }

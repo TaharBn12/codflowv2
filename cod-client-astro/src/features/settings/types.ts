@@ -138,3 +138,12 @@ export interface EmailConnectionCheck {
   domains?: string[];
   outOfCredits?: boolean;
 }
+
+export interface TelegramConfig {
+  configured: boolean;
+  source: "environment" | "dashboard" | null;
+  chatId: string;
+  enabled: boolean;
+  botTokenMasked: string;
+}
+export interface SaveTelegramConfigData { botToken?: string; chatId: string; enabled: boolean; }

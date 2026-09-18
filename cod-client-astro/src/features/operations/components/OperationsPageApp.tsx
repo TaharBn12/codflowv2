@@ -287,7 +287,7 @@ function Gated() {
                         {deliveryRate}%
                       </span>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
                       <div className="rounded-lg bg-muted p-2">
                         <b className="block text-base">{agent.openOrders}</b>
                         {t("open")}
@@ -300,9 +300,15 @@ function Gated() {
                       </div>
                       <div className="rounded-lg bg-muted p-2">
                         <b className="block text-base">
-                          {money.format(Number(agent.earnedCommission))}
+                          {money.format(Number(agent.confirmationCommission))}
                         </b>
-                        {t("commission")}
+                        {t("confirmation_commission")}
+                      </div>
+                      <div className="rounded-lg bg-muted p-2">
+                        <b className="block text-base">
+                          {money.format(Number(agent.followUpCommission))}
+                        </b>
+                        {t("follow_up_commission")}
                       </div>
                     </div>
                   </div>
@@ -351,7 +357,7 @@ function Gated() {
             {agents.map((agent) => (
               <div
                 key={agent.id}
-                className="grid gap-4 p-4 lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-end"
+                className="grid gap-4 p-4 lg:grid-cols-[1fr_auto_auto_auto_auto_auto] lg:items-end"
               >
                 <div>
                   <p className="font-medium">{agent.name}</p>
@@ -399,7 +405,53 @@ function Gated() {
                   />
                 </label>
                 <label className="text-xs text-muted-foreground">
-                  {t("commission")}
+                  {t("confirmation_commission")}
+                  <div className="mt-1 flex">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={agent.confirmationCommissionValue}
+                      onChange={(event) =>
+                        setAgents((rows) =>
+                          rows.map((row) =>
+                            row.id === agent.id
+                              ? {
+                                  ...row,
+                                  confirmationCommissionValue: Number(
+                                    event.target.value,
+                                  ),
+                                }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="h-9 w-24 rounded-s-md border border-input bg-background px-2 text-foreground"
+                    />
+                    <Select
+                      value={agent.confirmationCommissionType}
+                      onChange={(event) =>
+                        setAgents((rows) =>
+                          rows.map((row) =>
+                            row.id === agent.id
+                              ? {
+                                  ...row,
+                                  confirmationCommissionType: event.target
+                                    .value as OperationAgent["confirmationCommissionType"],
+                                }
+                              : row,
+                          ),
+                        )
+                      }
+                      className="h-9 rounded-e-md border border-s-0 border-input bg-background px-2 text-foreground"
+                    >
+                      <option value="fixed">DA</option>
+                      <option value="percentage">%</option>
+                    </Select>
+                  </div>
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  {t("follow_up_commission")}
                   <div className="mt-1 flex">
                     <input
                       type="number"
