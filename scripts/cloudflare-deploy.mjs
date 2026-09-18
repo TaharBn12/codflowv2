@@ -223,6 +223,16 @@ function ensureBucket(create = true) {
   const res = createBucket(NAMES.bucket);
   if (res !== true) {
     if (/exist/i.test(String(res))) { ok(`R2 bucket '${NAMES.bucket}' already exists — reusing it`); return; }
+    // Wrangler/Cloudflare can return a transient non-zero response even though
+    // bucket creation was accepted. Confirm server-side state before failing;
+    // this removes the old "fails once, succeeds on rerun" recovery loop.
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      execFileSync("sleep", ["2"]);
+      if (listBuckets().includes(NAMES.bucket)) {
+        ok(`R2 bucket '${NAMES.bucket}' created (confirmed after transient create response)`);
+        return;
+      }
+    }
     fail(`Could not create R2 bucket '${NAMES.bucket}'.\n${String(res).split("\n").slice(-8).join("\n")}\nIf R2 is not enabled on this account, open dash.cloudflare.com → R2 (requires a payment card on file, free tier), then re-run this script.`);
   }
   ok(`R2 bucket '${NAMES.bucket}' created`);
@@ -774,13 +784,16 @@ async function main() {
     const r = await httpCheck(storeUrl);
     r.status === 200 ? ok(`storefront loads (${storeUrl})`)
       : warn(`storefront returned HTTP ${r.status}.`);
-    warn("workers.dev → workers.dev fetches are blocked by Cloudflare (error 1042): the storefront may render without products until cod-server gets a custom domain. See summary.");
+    if (serverUrl.includes(".workers.dev")) {
+      warn("workers.dev → workers.dev fetches are blocked by Cloudflare (error 1042): the storefront may render without products until cod-server gets a custom domain. See summary.");
+    }
   }
 
   // ── Step 7 — summary + credentials file ──────────────────────────────────
   step("Done — resource inventory");
+  let credPath = "";
   if (!CFG.deployOnly) {
-  const credPath = join(homedir(), `codflow-${CFG.prefix}-credentials.md`);
+  credPath = join(homedir(), `codflow-${CFG.prefix}-credentials.md`);
   const creds =
     `# CodFlow Credentials — ${CFG.prefix}\n\n` +
     `Generated ${new Date().toISOString()} by scripts/cloudflare-deploy.mjs.\n\n` +
