@@ -132,7 +132,10 @@ function sh(cmd, args, opts = {}) {
     });
     return out ?? "";
   } catch (err) {
-    if (opts.allowFail) return err.stdout?.toString() ?? "";
+    if (opts.allowFail) {
+      return [err.stdout?.toString(), err.stderr?.toString()]
+        .filter(Boolean).join("\n");
+    }
     const tail = (err.stderr?.toString() ?? err.message ?? "").split("\n").slice(-12).join("\n");
     fail(`${label}\n${tail}`);
   }
