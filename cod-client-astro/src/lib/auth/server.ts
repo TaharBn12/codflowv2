@@ -92,12 +92,20 @@ export function createAuth(env: AuthEnv, cloudflare?: AuthCloudflareContext) {
         disabledPaths: ["/token"],
         session: {
           storeSessionInDatabase: true,
-          cookieCache: {
-            enabled: true,
-            maxAge: 5 * 60,
-          },
+          // Do not combine Better Auth's signed cookie cache with customSession.
+          // Upstream joins/decodes the two Set-Cookie values incorrectly on
+          // Workers, so sign-in succeeds but get-session returns 500 and the UI
+          // immediately redirects back to /sign-in. D1 is the source of truth.
         },
         advanced: {
+          // Version the cookie namespace so browsers ignore malformed legacy
+          // `better-auth.session_data` cookies left by the old configuration.
+          cookiePrefix: "codflow",
+          defaultCookieAttributes: {
+            secure: true,
+            sameSite: "lax",
+            path: "/",
+          },
           ipAddress: {
             ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"],
           },
