@@ -15,6 +15,9 @@ import {
   drivers,
   driverCompensations,
   users,
+  operationAgentSettings,
+  operationTasks,
+  staffCommissions,
   wilayas,
   communes,
   stockMovements,
@@ -189,6 +192,16 @@ export async function getOrderById(db: AppDb, orderId: string) {
   };
 }
 
+export async function chooseLeastLoadedConfirmer(db: AppDb) {
+  const candidates = await db.select({ id: users.id, name: users.name,
+    maxOpenOrders: sql<number>`coalesce(${operationAgentSettings.maxOpenOrders}, 25)`,
+    openOrders: sql<number>`(SELECT COUNT(*) FROM orders assigned_orders WHERE assigned_orders.confirmation_assignee_id = ${users.id} AND assigned_orders.status IN ('new','confirmed','unreachable'))`,
+  }).from(users).leftJoin(operationAgentSettings, eq(operationAgentSettings.userId, users.id))
+    .where(and(eq(users.role, "confirmer"), eq(users.status, "active"), sql`coalesce(${operationAgentSettings.autoAssignEnabled}, 1) = 1`))
+    .orderBy(sql`openOrders ASC`, users.createdAt).all();
+  return candidates.find((candidate) => candidate.openOrders < candidate.maxOpenOrders) ?? null;
+}
+
 export async function createOrder(
   db: AppDb,
   orderData: typeof orders.$inferInsert,
@@ -196,10 +209,15 @@ export async function createOrder(
   actor?: { id: string; name: string } | null,
 ) {
   const now = orderData.createdAt ?? new Date().toISOString();
-
-  const statements: BatchStatement[] = [
-    db.insert(orders).values(orderData),
-  ];
+  const confirmer = orderData.confirmationAssigneeId ? null : await chooseLeastLoadedConfirmer(db);
+  if (confirmer) { orderData.confirmationAssigneeId = confirmer.id; orderData.confirmationAssignedAt = now; }
+  const statements: BatchStatement[] = [db.insert(orders).values(orderData)];
+  if (confirmer) statements.push(db.insert(operationTasks).values({
+    id: crypto.randomUUID(), title: `Confirm order ${orderData.orderNumber}`,
+    description: `Contact ${orderData.customerName} to confirm the order and delivery details.`, type: "confirmation", status: "open", priority: "normal",
+    orderId: orderData.id!, customerId: orderData.customerId, assigneeId: confirmer.id, createdBy: actor?.id ?? null,
+    dueAt: new Date(Date.parse(now) + 30 * 60 * 1000).toISOString(), createdAt: now, updatedAt: now,
+  }));
 
   if (productsData.length > 0) {
     statements.push(db.insert(orderProducts).values(productsData));
@@ -314,6 +332,20 @@ export async function createOrder(
   await db.batch(statements as [BatchStatement, ...BatchStatement[]]);
 
   return orderData.id;
+}
+
+export async function awardDeliveredStaffCommission(db: AppDb, orderId: string) {
+  const order = await db.select({ assigneeId: orders.confirmationAssigneeId, price: orders.price,
+    commissionType: operationAgentSettings.commissionType, commissionValue: operationAgentSettings.commissionValue,
+  }).from(orders).leftJoin(operationAgentSettings, eq(orders.confirmationAssigneeId, operationAgentSettings.userId)).where(eq(orders.id, orderId)).get();
+  if (!order?.assigneeId || !order.commissionType || !order.commissionValue) return null;
+  const amount = order.commissionType === "percentage" ? Math.round(order.price * order.commissionValue) / 100 : order.commissionValue;
+  if (amount <= 0) return null;
+  const now = new Date().toISOString();
+  await db.insert(staffCommissions).values({ id: crypto.randomUUID(), orderId, userId: order.assigneeId, amount,
+    rateType: order.commissionType, rateValue: order.commissionValue, status: "earned", earnedAt: now, createdAt: now, updatedAt: now,
+  }).onConflictDoNothing({ target: staffCommissions.orderId });
+  return amount;
 }
 
 export async function updateOrderStatus(

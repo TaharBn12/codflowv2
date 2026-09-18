@@ -1,5 +1,6 @@
 import {
   Building2,
+  ClipboardCheck,
   FolderOpen,
   Gift,
   Layers,
@@ -113,6 +114,13 @@ export function useNavSections(): NavSection[] {
               scope: "customer_tags:read",
             },
           ],
+        },
+        {
+          kind: "leaf",
+          href: "/operations",
+          label: tN("sidebar.operations"),
+          icon: ClipboardCheck,
+          scope: "orders:read",
         },
         {
           kind: "leaf",

@@ -461,6 +461,10 @@ export const orders = sqliteTable("orders", {
   assignedBy: text("assigned_by"),
   assignmentNotes: text("assignment_notes"),
 
+  // ── Confirmation-team assignment (separate from delivery assignment) ───
+  confirmationAssigneeId: text("confirmation_assignee_id").references(() => users.id, { onDelete: "set null" }),
+  confirmationAssignedAt: text("confirmation_assigned_at"),
+
   // ── Tracking ─────────────────────────────────────────────────────────────
   trackingNumber: text("tracking_number"),
   trackingUrl: text("tracking_url"),
@@ -528,6 +532,35 @@ export const orders = sqliteTable("orders", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const operationAgentSettings = sqliteTable("operation_agent_settings", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),
+  maxOpenOrders: integer("max_open_orders").notNull().default(25),
+  commissionType: text("commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
+  commissionValue: real("commission_value").notNull().default(0),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const operationTasks = sqliteTable("operation_tasks", {
+  id: text("id").primaryKey(), title: text("title").notNull(), description: text("description"),
+  type: text("type", { enum: ["confirmation", "callback", "address_review", "shipment_follow_up", "follow_up"] }).notNull().default("follow_up"),
+  status: text("status", { enum: ["open", "in_progress", "completed", "cancelled"] }).notNull().default("open"),
+  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"),
+  orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  assigneeId: text("assignee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  dueAt: text("due_at"), completedAt: text("completed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ assigneeStatusDueIdx: index("operation_tasks_assignee_status_due_idx").on(t.assigneeId, t.status, t.dueAt), orderIdx: index("operation_tasks_order_idx").on(t.orderId) }));
+
+export const staffCommissions = sqliteTable("staff_commissions", {
+  id: text("id").primaryKey(), orderId: text("order_id").notNull().unique().references(() => orders.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), amount: real("amount").notNull(),
+  rateType: text("rate_type", { enum: ["fixed", "percentage"] }).notNull(), rateValue: real("rate_value").notNull(),
+  status: text("status", { enum: ["earned", "paid", "reversed"] }).notNull().default("earned"),
+  earnedAt: text("earned_at").notNull(), paidAt: text("paid_at"), reversedAt: text("reversed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ userStatusIdx: index("staff_commissions_user_status_idx").on(t.userId, t.status, t.earnedAt) }));
 
 export const orderAssignments = sqliteTable("order_assignments", {
   id: text("id").primaryKey(),

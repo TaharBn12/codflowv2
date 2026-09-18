@@ -74,6 +74,7 @@ export async function updateStatus(c: Context<AppContext>) {
   const user = c.get("user");
 
   await queries.updateOrderStatus(db, orderId, validated.status, user?.id, user?.name ?? undefined);
+  if (validated.status === "delivered") await queries.awardDeliveredStaffCommission(db, orderId);
 
   // Fire CAPI Purchase Workflow — never blocks the status response.
   // waitUntil: the runtime cancels un-awaited promises after the response,
