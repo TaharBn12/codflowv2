@@ -130,6 +130,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: Surface deploy failure in the check annotation
+        if: failure()
+        run: |
+          LOG="$(tail -c 6000 "${{ runner.temp }}/cloudflare-deploy.log")"
+          LOG="${LOG//'%'/'%25'}"
+          LOG="${LOG//$'\r'/'%0D'}"
+          LOG="${LOG//$'\n'/'%0A'}"
+          echo "::error title=Cloudflare deploy diagnostics::$LOG"
+
       - name: Configure R2 CORS for presigned image uploads
         # One-time Step 3b automation: bucket-level CORS lets browsers PUT
         # images via presigned URLs. Non-blocking — the deploy itself is fine
