@@ -1,12 +1,10 @@
 import { betterAuth } from "better-auth";
 import { withCloudflare } from "better-auth-cloudflare";
-import { customSession, jwt } from "better-auth/plugins";
+import { jwt } from "better-auth/plugins";
 import { getDb } from "../../../../cod-shared/db/client";
-import { userScopes } from "../../../../cod-shared/db/schema";
 import { getStore } from "../../../../cod-shared/queries/stores";
 import { renderPasswordResetEmail } from "../../../../cod-shared/lib/email-templates";
 import { sendTransactionalEmail } from "../../../../cod-shared/lib/transactional-email";
-import { eq } from "drizzle-orm";
 
 export interface AuthEnv {
   DB: D1Database;
@@ -178,26 +176,11 @@ export function createAuth(env: AuthEnv, cloudflare?: AuthCloudflareContext) {
           },
         },
         plugins: [
-          // Attaches real scopes (user_scopes join) to every session response so
-          // the Identity contract is truthful end-to-end. Not added to the JWT
-          // payload — scopes stay server-resolved per request.
-          customSession(async ({ user, session }) => {
-            const rows = await db
-              .select({ scope: userScopes.scope })
-              .from(userScopes)
-              .where(eq(userScopes.userId, user.id));
-            
-            // Strip sensitive fields from user object before sending to browser
-            const { apiKey, ...safeUser } = user as typeof user & { apiKey?: string };
-            
-            return {
-              user: safeUser,
-              session,
-              scopes: (user as { role?: string }).role === "admin"
-                ? ["*"]
-                : rows.map((r) => r.scope),
-            };
-          }),
+          // Keep get-session on Better Auth's native response path. The
+          // customSession plugin currently throws on Cloudflare Workers after
+          // a successful sign-in, producing the dashboard redirect loop. Admin
+          // authorization remains server-enforced; staff scopes are loaded by
+          // protected API endpoints rather than embedded in this response.
           jwt({
             jwt: {
               // Tokens are issued FOR the API resource, matching cod-server's

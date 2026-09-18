@@ -829,7 +829,7 @@ async function main() {
       return { ok: false, detail: "403 INVALID_ORIGIN — redeploying dashboard to re-apply trusted origins…" };
     }
     return { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 100)}` };
-  }, { tries: 30, delayMs: 6000 });
+  }, { tries: 6, delayMs: 5000 });
   {
     const r = await httpCheck(dashUrl);
     r.status === 200 ? ok(`dashboard UI loads (${dashUrl})`)
