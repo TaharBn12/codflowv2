@@ -271,8 +271,10 @@ function addTomlCustomDomain(text, url, additionalUrls = []) {
   // TOML table scope continues until the next table. Put this root-level key
   // directly after `name`, never at EOF (where it would belong to [dev] or
   // [observability] and Wrangler would reject the generated config).
-  const routes = hostnames.map((pattern) => ({ pattern, custom_domain: true }));
-  const route = `# Managed by cloudflare-deploy.mjs. Wrangler creates DNS + TLS with the Worker.\nroutes = ${JSON.stringify(routes)}`;
+  const routes = hostnames
+    .map((pattern) => `{ pattern = "${pattern}", custom_domain = true }`)
+    .join(", ");
+  const route = `# Managed by cloudflare-deploy.mjs. Wrangler creates DNS + TLS with the Worker.\nroutes = [${routes}]`;
   return text.replace(/^(name\s*=\s*"[^"]+")$/m, `$1\n${route}`);
 }
 function genServerToml(tpl, v) {
