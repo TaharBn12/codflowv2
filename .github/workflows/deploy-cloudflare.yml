@@ -142,21 +142,6 @@ jobs:
           LOG="${LOG//$'\n'/'%0A'}"
           echo "::error title=Cloudflare deploy diagnostics::$LOG"
 
-      - name: Configure R2 CORS for presigned image uploads
-        # One-time Step 3b automation: bucket-level CORS lets browsers PUT
-        # images via presigned URLs. Non-blocking — the deploy itself is fine
-        # without it, and it can be re-run any time.
-        run: |
-          if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
-            CF_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" node scripts/setup-r2-cors.mjs \
-              || echo "::warning::R2 CORS setup failed — run cod-server/scripts/setup-r2-cors.mjs manually"
-          else
-            echo "R2 API token secrets not set — skipping CORS setup (Step 3b)."
-            echo "See: R2 → Manage R2 API Tokens → Create (Object Read & Write on ${PROJECT_PREFIX}-images),"
-            echo "then add repo secrets R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY and re-run."
-          fi
-        working-directory: cod-server
-
       - name: Rotate admin API key (revoke key shown in logs)
         # seed-admin prints the admin API key to stdout; on a public repo that
         # lands in public logs, so rotate it to a fresh random value that is

@@ -265,13 +265,14 @@ function customHostname(url) {
     throw err;
   }
 }
-function addTomlCustomDomain(text, url) {
-  const hostname = customHostname(url);
-  if (!hostname) return text;
+function addTomlCustomDomain(text, url, additionalUrls = []) {
+  const hostnames = [url, ...additionalUrls].map(customHostname).filter(Boolean);
+  if (!hostnames.length) return text;
   // TOML table scope continues until the next table. Put this root-level key
   // directly after `name`, never at EOF (where it would belong to [dev] or
   // [observability] and Wrangler would reject the generated config).
-  const route = `# Managed by cloudflare-deploy.mjs. Wrangler creates DNS + TLS with the Worker.\nroutes = [{ pattern = "${hostname}", custom_domain = true }]`;
+  const routes = hostnames.map((pattern) => ({ pattern, custom_domain: true }));
+  const route = `# Managed by cloudflare-deploy.mjs. Wrangler creates DNS + TLS with the Worker.\nroutes = ${JSON.stringify(routes)}`;
   return text.replace(/^(name\s*=\s*"[^"]+")$/m, `$1\n${route}`);
 }
 function genServerToml(tpl, v) {
@@ -297,7 +298,11 @@ function genServerToml(tpl, v) {
     if (/STOREFRONT_URL/.test(t)) t = replaceInlineVar(t, "STOREFRONT_URL", v.storeUrl);
     if (/^STOREFRONT_URL\s*=/m.test(t)) t = replaceTomlVar(t, "STOREFRONT_URL", v.storeUrl);
   }
-  return addTomlCustomDomain(t, v.serverUrl);
+  // Also bind the media hostname to this Worker as a reliable R2-backed image
+  // proxy. This works even when the API token cannot manage an R2 custom
+  // domain directly (common with narrowly scoped deployment tokens).
+  return addTomlCustomDomain(t, v.serverUrl,
+    v.mediaDomain ? [`https://${v.mediaDomain}`] : []);
 }
 function genDashToml(tpl, v) {
   let t = tpl;
@@ -390,6 +395,36 @@ async function waitFor(label, fn, { tries = 24, delayMs = 5000 } = {}) {
     await new Promise((r2) => setTimeout(r2, delayMs));
   }
   fail(`${label} never became ready.`);
+}
+async function configureR2Cors(origins) {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  if (!token) return false;
+  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${CFG.accountId}/r2/buckets/${encodeURIComponent(NAMES.bucket)}/cors`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ rules: [{
+        id: "codflow-browser-uploads",
+        allowed: {
+          origins: [...new Set([...origins, "http://localhost:4321"])],
+          methods: ["PUT", "GET", "HEAD"],
+          headers: ["Content-Type", "Content-Length"],
+        },
+        exposeHeaders: ["ETag"], maxAgeSeconds: 3600,
+      }] }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.success) {
+      warn(`R2 CORS could not be configured through the Cloudflare API: ${json?.errors?.map((e) => e.message).join("; ") || `HTTP ${res.status}`}`);
+      return false;
+    }
+    ok(`R2 CORS configured for ${origins.join(", ")} (browser image uploads enabled)`);
+    return true;
+  } catch (err) {
+    warn(`R2 CORS setup failed without stopping the Worker deploy: ${err.message}`);
+    return false;
+  }
 }
 async function configureR2CustomDomain(hostname) {
   const token = process.env.CLOUDFLARE_API_TOKEN;
@@ -507,7 +542,9 @@ async function main() {
   ensureBucket(!CFG.deployOnly);
   const kvRateId = ensureKv(NAMES.kvRate, !CFG.deployOnly);
   const kvOAuthId = ensureKv(NAMES.kvOAuth, !CFG.deployOnly);
-  if (CFG.mediaDomain) await configureR2CustomDomain(CFG.mediaDomain);
+  // MEDIA_DOMAIN is routed through cod-server (R2-backed image proxy) by the
+  // generated Worker config, avoiding separate zone-level R2 permissions.
+  await configureR2Cors([CFG.dashboardUrl].filter(Boolean));
 
   // ── Secrets (generate once, reuse on re-runs) ────────────────────────────
   let secrets = { BETTER_AUTH_SECRET: "", MCP_LOGIN_TICKET_SECRET: "", STORE_API_KEY: "" };

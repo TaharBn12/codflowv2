@@ -28,6 +28,7 @@ import landingPagesRoutes from "@/endpoints/landing-pages/routes";
 import shippingProfilesRoutes from "@/endpoints/shipping-profiles/routes";
 import driverPaymentsRoutes from "@/endpoints/driver-payments/routes";
 import { uploadRouter, serveRouter } from "@/endpoints/images/routes";
+import { serveMediaImage } from "@/endpoints/images/handlers";
 import activityLogsRoutes from "@/endpoints/activity-logs/routes";
 import storesRoutes from "@/endpoints/stores/routes";
 import reviewsRoutes from "@/endpoints/reviews/routes";
@@ -66,6 +67,16 @@ const app = new OpenAPIHono<AppContext>({ defaultHook: openApiValidationHook });
 // Global middleware
 app.use("*", corsMiddleware);
 app.onError(errorHandler);
+
+// The deployment binds MEDIA_DOMAIN to this Worker as an R2-backed image
+// origin. Public URLs are https://<MEDIA_DOMAIN>/<key>, while API traffic keeps
+// using WORKER_URL. Host-gating prevents this catch-all from affecting the API.
+app.use("*", async (c, next) => {
+  if (c.env.MEDIA_DOMAIN && new URL(c.req.url).hostname === c.env.MEDIA_DOMAIN) {
+    return serveMediaImage(c);
+  }
+  await next();
+});
 
 // Image serving — no auth required (public, cacheable)
 app.route("/images", serveRouter);
