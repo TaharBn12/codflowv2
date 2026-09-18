@@ -116,9 +116,19 @@ jobs:
           [ -n "$IN_SERVER_URL" ]    && ARGS+=(--server-url="$IN_SERVER_URL")
           [ -n "$IN_DASHBOARD_URL" ] && ARGS+=(--dashboard-url="$IN_DASHBOARD_URL")
           [ -n "$IN_STORE_URL" ]     && ARGS+=(--store-url="$IN_STORE_URL")
-          node scripts/cloudflare-deploy.mjs "${ARGS[@]}"
+          set -o pipefail
+          node scripts/cloudflare-deploy.mjs "${ARGS[@]}" 2>&1 | tee "${{ runner.temp }}/cloudflare-deploy.log"
         env:
           CF_DEPLOY_OUTPUT_FILE: ${{ runner.temp }}/deploy-output.env
+
+      - name: Preserve deploy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cloudflare-deploy-log-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cloudflare-deploy.log
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Configure R2 CORS for presigned image uploads
         # One-time Step 3b automation: bucket-level CORS lets browsers PUT
