@@ -43,6 +43,9 @@
  *   --force-reseed        re-seed catalog even if products exist
  *   --dry-run             validate config generation with fake IDs (no network, no writes to repo)
  *   --skip-deploy         create resources + configs + migrate/seed, but skip worker deploys
+ *   --deploy-only         update deploy: locate (never create) resources, skip secrets,
+ *                         skip seed + seed-admin, keep migrations unless --skip-migrations
+ *   --skip-migrations     with --deploy-only: don't touch D1 at all
  *   --server-url, --dashboard-url, --store-url  override captured worker URLs (re-runs)
  */
 
@@ -86,6 +89,8 @@ const CFG = {
   forceReseed: flag("--force-reseed") === "1",
   dryRun: flag("--dry-run") === "1",
   skipDeploy: flag("--skip-deploy") === "1",
+  deployOnly: flag("--deploy-only") === "1" || process.env.DEPLOY_ONLY === "1",
+  skipMigrations: flag("--skip-migrations") === "1" || process.env.SKIP_MIGRATIONS === "1",
   serverUrl: flag("--server-url") ?? "",
   dashboardUrl: flag("--dashboard-url") ?? "",
   storeUrl: flag("--store-url") ?? "",
@@ -183,9 +188,10 @@ function createBucket(name) {
   });
   return /success|created/i.test(out) ? true : out;
 }
-function ensureD1() {
+function ensureD1(create = true) {
   let id = findD1(NAMES.db);
   if (id) { ok(`D1 '${NAMES.db}' already exists — reusing id ${id}`); return id; }
+  if (!create) fail(`D1 '${NAMES.db}' not found in this account. Run the full 'Deploy to Cloudflare' workflow first, then use --deploy-only for updates.`);
   info(`Creating D1 '${NAMES.db}'…`);
   id = createD1(NAMES.db);
   if (!id) id = findD1(NAMES.db);
@@ -193,9 +199,10 @@ function ensureD1() {
   ok(`D1 '${NAMES.db}' id ${id}`);
   return id;
 }
-function ensureKv(title) {
+function ensureKv(title, create = true) {
   const existing = listKv().find((ns) => ns?.title === title);
   if (existing?.id) { ok(`KV '${title}' already exists — reusing id ${existing.id}`); return existing.id; }
+  if (!create) fail(`KV '${title}' not found in this account. Run the full 'Deploy to Cloudflare' workflow first, then use --deploy-only for updates.`);
   info(`Creating KV namespace '${title}'…`);
   let id = createKv(title);
   if (!id) id = listKv().find((ns) => ns?.title === title)?.id ?? null;
@@ -203,11 +210,12 @@ function ensureKv(title) {
   ok(`KV '${title}' id ${id}`);
   return id;
 }
-function ensureBucket() {
+function ensureBucket(create = true) {
   if (listBuckets().includes(NAMES.bucket)) {
     ok(`R2 bucket '${NAMES.bucket}' already exists — reusing it`);
     return;
   }
+  if (!create) fail(`R2 bucket '${NAMES.bucket}' not found in this account. Run the full 'Deploy to Cloudflare' workflow first, then use --deploy-only for updates.`);
   info(`Creating R2 bucket '${NAMES.bucket}'…`);
   const res = createBucket(NAMES.bucket);
   if (res !== true) {
@@ -421,17 +429,21 @@ async function main() {
   }
 
   // ── Step 2 — resources ───────────────────────────────────────────────────
-  step(`Create Cloudflare resources (prefix '${CFG.prefix}')`);
-  const dbId = ensureD1();
-  ensureBucket();
-  const kvRateId = ensureKv(NAMES.kvRate);
-  const kvOAuthId = ensureKv(NAMES.kvOAuth);
+  step(CFG.deployOnly
+    ? `Locate Cloudflare resources (prefix '${CFG.prefix}') — lookup only, nothing created`
+    : `Create Cloudflare resources (prefix '${CFG.prefix}')`);
+  const dbId = ensureD1(!CFG.deployOnly);
+  ensureBucket(!CFG.deployOnly);
+  const kvRateId = ensureKv(NAMES.kvRate, !CFG.deployOnly);
+  const kvOAuthId = ensureKv(NAMES.kvOAuth, !CFG.deployOnly);
 
   // ── Secrets (generate once, reuse on re-runs) ────────────────────────────
-  step("Secrets — generate once, reuse on re-runs");
-  let secrets = genSecrets();
+  let secrets = { BETTER_AUTH_SECRET: "", MCP_LOGIN_TICKET_SECRET: "", STORE_API_KEY: "" };
   let adminPassword = CFG.adminPassword || randomBytes(12).toString("base64url");
   const serverDevVarsPath = join(SERVER_DIR, ".dev.vars");
+  if (!CFG.deployOnly) {
+  step("Secrets — generate once, reuse on re-runs");
+  secrets = genSecrets();
   if (existsSync(serverDevVarsPath)) {
     const prev = parseSimpleEnv(readFileSync(serverDevVarsPath, "utf8"));
     if (prev.BETTER_AUTH_SECRET) secrets.BETTER_AUTH_SECRET = prev.BETTER_AUTH_SECRET;
@@ -442,6 +454,9 @@ async function main() {
     ok("generated fresh BETTER_AUTH_SECRET / STORE_API_KEY / MCP_LOGIN_TICKET_SECRET");
   }
   if ((flag("--admin-password") ?? process.env.ADMIN_PASSWORD)) ok("using provided ADMIN_PASSWORD");
+  } else {
+    info("--deploy-only: skipping secret generation — workers keep their existing secrets.");
+  }
 
   // ── Step 3 — bind configs ────────────────────────────────────────────────
   step("Bind real IDs into wrangler.toml files + env files");
@@ -495,7 +510,10 @@ async function main() {
   process.env.COD_ACCOUNT_ID = CFG.accountId;
   ok("root .env written (COD_DB_NAME etc.)");
 
-  // .dev.vars files (local runs share the same secrets)
+  // .dev.vars files (local runs share the same secrets).
+  // deploy-only: never touch them — a local run must not overwrite real
+  // secrets with this CI session's empty placeholders.
+  if (!CFG.deployOnly) {
   const r2Block = (CFG.r2KeyId && CFG.r2Secret)
     ? `CF_ACCOUNT_ID=${CFG.accountId}\nR2_ACCESS_KEY_ID=${CFG.r2KeyId}\nR2_SECRET_ACCESS_KEY=${CFG.r2Secret}\n` : "";
   writeFileSync(serverDevVarsPath,
@@ -507,8 +525,10 @@ async function main() {
     `# Generated by scripts/cloudflare-deploy.mjs — gitignored.\n` +
     `BETTER_AUTH_SECRET=${secrets.BETTER_AUTH_SECRET}\n` +
     `MCP_LOGIN_TICKET_SECRET=${secrets.MCP_LOGIN_TICKET_SECRET}\n`);
+  ok(".dev.vars written");
+  }
   writeFileSync(join(DASH_DIR, ".env"), `PUBLIC_API_URL="${urls0.serverUrl}"\n`);
-  ok(".dev.vars + dashboard .env written");
+  ok("dashboard .env written");
   if (!CFG.skipDeploy) {
     // deploy URLs discovered below; rewritten then
   }
@@ -527,21 +547,30 @@ async function main() {
   ok(`cod-server live at ${serverUrl}`);
 
   // ── Step 4 — secrets on server ───────────────────────────────────────────
-  step("Set secrets on cod-server");
-  secretPut(NAMES.serverWorker, "BETTER_AUTH_SECRET", secrets.BETTER_AUTH_SECRET, SERVER_DIR);
-  secretPut(NAMES.serverWorker, "MCP_LOGIN_TICKET_SECRET", secrets.MCP_LOGIN_TICKET_SECRET, SERVER_DIR);
-  if (CFG.r2KeyId && CFG.r2Secret) {
-    secretPut(NAMES.serverWorker, "CF_ACCOUNT_ID", CFG.accountId, SERVER_DIR);
-    secretPut(NAMES.serverWorker, "R2_ACCESS_KEY_ID", CFG.r2KeyId, SERVER_DIR);
-    secretPut(NAMES.serverWorker, "R2_SECRET_ACCESS_KEY", CFG.r2Secret, SERVER_DIR);
+  if (!CFG.deployOnly) {
+    step("Set secrets on cod-server");
+    secretPut(NAMES.serverWorker, "BETTER_AUTH_SECRET", secrets.BETTER_AUTH_SECRET, SERVER_DIR);
+    secretPut(NAMES.serverWorker, "MCP_LOGIN_TICKET_SECRET", secrets.MCP_LOGIN_TICKET_SECRET, SERVER_DIR);
+    if (CFG.r2KeyId && CFG.r2Secret) {
+      secretPut(NAMES.serverWorker, "CF_ACCOUNT_ID", CFG.accountId, SERVER_DIR);
+      secretPut(NAMES.serverWorker, "R2_ACCESS_KEY_ID", CFG.r2KeyId, SERVER_DIR);
+      secretPut(NAMES.serverWorker, "R2_SECRET_ACCESS_KEY", CFG.r2Secret, SERVER_DIR);
+    } else {
+      warn("R2 API token not provided — presigned uploads stay disabled until Step 3b (see summary).");
+    }
   } else {
-    warn("R2 API token not provided — presigned uploads stay disabled until Step 3b (see summary).");
+    info("--deploy-only: skipping server secret puts — existing values stay.");
   }
 
   // ── Step 5 — migrate + seed ──────────────────────────────────────────────
-  step("Migrate + seed D1 (remote)");
-  sh("npm", ["run", "db:migrate:local"], { cwd: SERVER_DIR, stdio: "inherit" });
-  sh("npm", ["run", "db:migrate:remote"], { cwd: SERVER_DIR, stdio: "inherit" });
+  if (!CFG.deployOnly || !CFG.skipMigrations) {
+    step(CFG.deployOnly ? "Migrate D1 (remote — idempotent)" : "Migrate + seed D1 (remote)");
+    sh("npm", ["run", "db:migrate:local"], { cwd: SERVER_DIR, stdio: "inherit" });
+    sh("npm", ["run", "db:migrate:remote"], { cwd: SERVER_DIR, stdio: "inherit" });
+  } else {
+    info("--deploy-only + --skip-migrations: D1 left completely untouched.");
+  }
+  if (!CFG.deployOnly) {
   if (!CFG.skipSeed) {
     let productCount = -1;
     if (!CFG.forceReseed) {
@@ -564,6 +593,7 @@ async function main() {
     cwd: DASH_DIR, stdio: "inherit",
     env: { ADMIN_EMAIL: CFG.adminEmail, ADMIN_NAME: CFG.adminName },
   });
+  } // !CFG.deployOnly — catalog + admin user untouched on update deploys
 
   // ── Step 6b — deploy dashboard ───────────────────────────────────────────
   step("Build + deploy dashboard (cod-client-astro)");
@@ -581,9 +611,13 @@ async function main() {
   dashUrl = dashUrl.replace(/\/+$/, "");
   ok(`dashboard live at ${dashUrl}`);
 
-  step("Set secrets on dashboard (same values as server)");
-  secretPut(NAMES.dashWorker, "BETTER_AUTH_SECRET", secrets.BETTER_AUTH_SECRET, DASH_DIR);
-  secretPut(NAMES.dashWorker, "MCP_LOGIN_TICKET_SECRET", secrets.MCP_LOGIN_TICKET_SECRET, DASH_DIR);
+  if (!CFG.deployOnly) {
+    step("Set secrets on dashboard (same values as server)");
+    secretPut(NAMES.dashWorker, "BETTER_AUTH_SECRET", secrets.BETTER_AUTH_SECRET, DASH_DIR);
+    secretPut(NAMES.dashWorker, "MCP_LOGIN_TICKET_SECRET", secrets.MCP_LOGIN_TICKET_SECRET, DASH_DIR);
+  } else {
+    info("--deploy-only: skipping dashboard secret puts — existing values stay.");
+  }
 
   // ── Step 6c — wire real URLs + redeploy ──────────────────────────────────
   step("Wire real URLs into both workers + redeploy");
@@ -621,8 +655,10 @@ async function main() {
     storeUrl = storeUrl.replace(/\/+$/, "");
     ok(`storefront live at ${storeUrl}`);
   }
-  secretPut(NAMES.themeWorker, "STORE_API_KEY", secrets.STORE_API_KEY, THEME_DIR);
-  if (CFG.mediaDomain) secretPut(NAMES.themeWorker, "MEDIA_DOMAIN", CFG.mediaDomain, THEME_DIR);
+  if (!CFG.deployOnly) {
+    secretPut(NAMES.themeWorker, "STORE_API_KEY", secrets.STORE_API_KEY, THEME_DIR);
+    if (CFG.mediaDomain) secretPut(NAMES.themeWorker, "MEDIA_DOMAIN", CFG.mediaDomain, THEME_DIR);
+  }
   // final server redeploy so ALLOWED_ORIGINS includes the store origin
   if (storeUrl.startsWith("http")) {
     serverToml = genServerToml(serverTpl, {
@@ -645,6 +681,17 @@ async function main() {
       : { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 80)}` };
   });
   await waitFor("dashboard sign-in (with Origin header)", async () => {
+    // deploy-only mode has no admin password in scope — treat the endpoint
+    // being up (any auth response) as healthy and move on.
+    if (CFG.deployOnly) {
+      const r = await httpCheck(`${dashUrl}/api/auth/sign-in/email`, {
+        method: "POST", headers: { "Content-Type": "application/json", Origin: dashUrl },
+        body: JSON.stringify({ email: CFG.adminEmail, password: "deploy-only-probe" }),
+      });
+      return r.status !== 500 && r.status !== 0
+        ? { ok: true, detail: `auth endpoint reachable (HTTP ${r.status})` }
+        : { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 100)}` };
+    }
     const r = await httpCheck(`${dashUrl}/api/auth/sign-in/email`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: dashUrl },
@@ -670,6 +717,7 @@ async function main() {
 
   // ── Step 7 — summary + credentials file ──────────────────────────────────
   step("Done — resource inventory");
+  if (!CFG.deployOnly) {
   const credPath = join(homedir(), `codflow-${CFG.prefix}-credentials.md`);
   const creds =
     `# CodFlow Credentials — ${CFG.prefix}\n\n` +
@@ -683,6 +731,7 @@ async function main() {
     `**Security:** store in a password manager, then delete this file.\n`;
   writeFileSync(credPath, creds, { mode: 0o600 });
   chmodSync(credPath, 0o600);
+  }
 
   // CI handoff (GitHub Actions): non-secret summary for the job summary page.
   const outputFile = process.env.CF_DEPLOY_OUTPUT_FILE;
@@ -713,10 +762,10 @@ async function main() {
   KV  ${NAMES.kvOAuth}  ${kvOAuthId}
 
   Server      ${serverUrl}
-  Dashboard   ${dashUrl}   login: ${CFG.adminEmail}
-  Storefront  ${storeUrl}
+  Dashboard   ${dashUrl}${CFG.deployOnly ? "" : `   login: ${CFG.adminEmail}`}
+  Storefront  ${storeUrl}${CFG.deployOnly ? "" : `
 
-  Credentials file (chmod 600): ${credPath}
+  Credentials file (chmod 600): ${credPath}`}
 `);
   if (!CFG.mediaDomain || !CFG.r2KeyId) {
     console.log(`  Remaining — R2 image uploads (runbook Step 3b, needs dashboard clicks):`);
