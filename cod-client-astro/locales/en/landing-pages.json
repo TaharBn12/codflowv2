@@ -74,7 +74,7 @@
     "saved": "Saved",
     "no_images": "No images yet — upload your first creative",
     "save": "Save",
-    "autosave": "Changes save automatically",
+    "autosave": "Changes stay local until you select Save all",
     "slug_edit": "Edit slug",
     "slug_apply": "Apply",
     "slug_invalid": "3-60 chars: lowercase letters, digits, hyphens",
@@ -91,7 +91,7 @@
     "mobile_preview": "Mobile preview",
     "desktop_preview": "Desktop preview",
     "order_button_preview": "Order now",
-    "instant_preview_hint": "Changes preview instantly and save quietly in the background.",
+    "instant_preview_hint": "Changes preview locally and are not sent to the server until you select Save all.",
     "elements_section": "Page elements",
     "layout_section": "Layout and spacing",
     "colors_section": "Colors",
@@ -101,6 +101,9 @@
     "health_product": "Product connected",
     "health_seo": "SEO title added",
     "health_published": "Page published",
-    "reset_design": "Reset design"
+    "reset_design": "Reset design",
+    "unsaved": "Unsaved changes",
+    "save_all": "Save all",
+    "save_before_publish": "Save all changes before publishing"
   }
 }

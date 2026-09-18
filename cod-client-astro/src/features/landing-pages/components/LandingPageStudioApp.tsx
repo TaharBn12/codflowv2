@@ -36,7 +36,6 @@ import type { LandingPage, LandingPageImage } from "@/features/landing-pages/typ
 
 const ACCEPTED = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 const MAX_MB = 10;
-const AUTOSAVE_DELAY_MS = 800;
 const SLUG_PATTERN = /^[a-z0-9-]{3,60}$/;
 
 function swapAt<T>(arr: T[], i: number, j: number): T[] {
@@ -188,7 +187,6 @@ function Gated({ landingPageId }: { landingPageId: string }) {
 
   const [publishOpen, setPublishOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const saveTimer = useRef<number | null>(null);
 
   const canManage = canScope(identity, SCOPES.LANDING_PAGES_MANAGE);
   const canRead = canScope(identity, SCOPES.LANDING_PAGES_READ);
@@ -218,37 +216,52 @@ function Gated({ landingPageId }: { landingPageId: string }) {
     if (canRead) void load();
   }, [canRead, load, identity?.role, identity?.scopes.join(",")]);
 
-  // Debounced autosave: name + gap persist 800ms after the last edit.
-  useEffect(() => {
-    if (!lp || !canManage) return;
-    const designDrifted = (Object.keys(design) as Array<keyof typeof design>)
-      .some((key) => design[key] !== lp[key]);
-    const drifted =
-      (name.trim() !== "" && name !== lp.name) || imageGap !== lp.imageGap || designDrifted;
-    if (!drifted) return;
+  const baseline = lp;
+  const isDirty = baseline !== null && (
+    (name.trim() !== "" && name !== baseline.name) ||
+    imageGap !== baseline.imageGap ||
+    (Object.keys(design) as Array<keyof typeof design>).some((key) => design[key] !== baseline[key])
+  );
 
+  // Edits stay entirely local until the merchant explicitly saves everything.
+  // This prevents network responses, loading overlays, and page repainting while typing.
+  const saveAll = useCallback(async () => {
+    if (!lp || !canManage || !isDirty || saveState === "saving") return;
     setSaveState("saving");
-    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const updated = await updateLandingPage(landingPageId, {
-            ...(name.trim() !== "" && name !== lp.name ? { name: name.trim() } : {}),
-            ...(imageGap !== lp.imageGap ? { imageGap } : {}),
-            ...design,
-          });
-          setLp(updated.data);
-          setSaveState("saved");
-        } catch (cause) {
-          setSaveState("error");
-          notify.error(landingPageErrorMessage(cause, t));
-        }
-      })();
-    }, AUTOSAVE_DELAY_MS);
-    return () => {
-      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    try {
+      const updated = await updateLandingPage(landingPageId, {
+        ...(name.trim() !== "" ? { name: name.trim() } : {}),
+        imageGap,
+        ...design,
+      });
+      setLp(updated.data);
+      setName(updated.data.name);
+      setSaveState("saved");
+      notify.success(t("studio.saved"));
+    } catch (cause) {
+      setSaveState("error");
+      notify.error(landingPageErrorMessage(cause, t));
+    }
+  }, [lp, canManage, isDirty, saveState, landingPageId, name, imageGap, design, t]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveAll();
+      }
     };
-  }, [lp, name, imageGap, design, canManage, landingPageId, t]);
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [isDirty, saveAll]);
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -398,7 +411,9 @@ function Gated({ landingPageId }: { landingPageId: string }) {
       ? t("studio.saving")
       : saveState === "error"
         ? t("error_generic")
-        : t("studio.saved");
+        : isDirty
+          ? t("studio.unsaved")
+          : t("studio.saved");
 
   if (!canRead)
     return (
@@ -522,13 +537,26 @@ function Gated({ landingPageId }: { landingPageId: string }) {
         </>
       )}
 
+      {canManage && (
+        <Button
+          type="button"
+          onClick={() => void saveAll()}
+          disabled={!isDirty || saveState === "saving"}
+          className="h-8 px-3 text-xs"
+        >
+          {saveState === "saving" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+          {t("studio.save_all")}
+        </Button>
+      )}
+
       {/* Publish toggle */}
       {canManage && (
         <div className="relative">
           <button
             type="button"
             onClick={() => setPublishOpen((open) => !open)}
-            disabled={publishing}
+            disabled={publishing || isDirty}
+            title={isDirty ? t("studio.save_before_publish") : undefined}
             className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-60"
           >
             {publishing ? <Loader2 size={13} className="animate-spin" /> : null}
@@ -537,10 +565,9 @@ function Gated({ landingPageId }: { landingPageId: string }) {
           </button>
           {publishOpen && (
             <>
-              <button
-                type="button"
-                className="fixed inset-0 z-10 cursor-default"
-                aria-label={common("cancel")}
+              <div
+                className="fixed inset-0 z-10 bg-transparent"
+                aria-hidden="true"
                 onClick={() => setPublishOpen(false)}
               />
               <div className="absolute end-0 top-9 z-20 w-52 rounded-xl border border-border bg-popover p-1.5 shadow-lg">
@@ -565,7 +592,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
   );
 
   return (
-    <StudioShell title={lp.name} saveState={saveState} saveLabel={saveLabel} toolbar={toolbar}>
+    <StudioShell title={lp.name} saveState={isDirty ? "idle" : saveState} saveLabel={saveLabel} toolbar={toolbar}>
       {actionError && (
         <div className="col-span-full px-4 pt-3">
           <Alert role="alert" tone="critical">
