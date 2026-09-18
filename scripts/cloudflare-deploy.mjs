@@ -680,6 +680,26 @@ async function main() {
   writeFileSync(credPath, creds, { mode: 0o600 });
   chmodSync(credPath, 0o600);
 
+  // CI handoff (GitHub Actions): non-secret summary for the job summary page.
+  const outputFile = process.env.CF_DEPLOY_OUTPUT_FILE;
+  if (outputFile) {
+    writeFileSync(outputFile, [
+      `SERVER_URL=${serverUrl}`,
+      `DASHBOARD_URL=${dashUrl}`,
+      `STOREFRONT_URL=${storeUrl}`,
+      `ADMIN_EMAIL=${CFG.adminEmail}`,
+      `D1_NAME=${NAMES.db}`,
+      `D1_ID=${dbId}`,
+      `R2_BUCKET=${NAMES.bucket}`,
+      `KV_RATE_NAME=${NAMES.kvRate}`,
+      `KV_RATE_ID=${kvRateId}`,
+      `KV_OAUTH_NAME=${NAMES.kvOAuth}`,
+      `KV_OAUTH_ID=${kvOAuthId}`,
+      `PREFIX=${CFG.prefix}`,
+    ].join("\n") + "\n");
+    ok(`deploy summary written to ${outputFile}`);
+  }
+
   console.log(`
   Resource inventory
   ──────────────────────────────────────────────────────────────
