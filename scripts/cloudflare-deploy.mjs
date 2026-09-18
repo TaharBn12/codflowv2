@@ -682,14 +682,6 @@ async function main() {
     info("--deploy-only + --skip-migrations: D1 left completely untouched.");
   }
   if (!CFG.deployOnly) {
-  // A full CI setup generates a fresh BETTER_AUTH_SECRET. JWT private keys are
-  // encrypted with that secret, so an old key left in D1 makes get-session
-  // fail after an otherwise successful login. Remove only signing keys; Better
-  // Auth recreates one with the new secret on the first session request.
-  wrangler(["d1", "execute", NAMES.db, "--remote", "--command", "DELETE FROM jwkss"], {
-    cwd: SERVER_DIR, label: "rotate encrypted Better Auth JWT signing keys",
-  });
-  ok("old encrypted JWT signing keys cleared for the new auth secret");
   if (!CFG.skipSeed) {
     let productCount = -1;
     if (!CFG.forceReseed) {
@@ -789,6 +781,16 @@ async function main() {
     writeFileSync(join(SERVER_DIR, "wrangler.toml"), serverToml);
     sh("npx", ["wrangler", "deploy"], { cwd: SERVER_DIR, label: "wrangler deploy (cod-server, +store origin)" });
     ok("cod-server redeployed with store origin allowed");
+  }
+
+  // A full CI setup generates a fresh BETTER_AUTH_SECRET. Clear JWKs only
+  // after the final dashboard deployment, immediately before the first session
+  // request, so Better Auth cannot reuse a key encrypted by an older secret.
+  if (!CFG.deployOnly) {
+    wrangler(["d1", "execute", NAMES.db, "--remote", "--command", "DELETE FROM jwkss"], {
+      cwd: SERVER_DIR, label: "rotate Better Auth JWT signing keys",
+    });
+    ok("old JWT signing keys cleared; the current dashboard will create a fresh key");
   }
 
   // ── Smoke tests ──────────────────────────────────────────────────────────

@@ -182,6 +182,13 @@ export function createAuth(env: AuthEnv, cloudflare?: AuthCloudflareContext) {
           // authorization remains server-enforced; staff scopes are loaded by
           // protected API endpoints rather than embedded in this response.
           jwt({
+            jwks: {
+              // GitHub recovery deployments cannot read an existing Worker
+              // secret back from Cloudflare. Keeping the JWK unencrypted
+              // prevents a secret rotation from making get-session return 500;
+              // D1 and Worker access remain account-protected.
+              disablePrivateKeyEncryption: true,
+            },
             jwt: {
               // Tokens are issued FOR the API resource, matching cod-server's
               // sessionAuth audience check (docs: "Modify Issuer, Audience…").
