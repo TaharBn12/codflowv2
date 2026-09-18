@@ -382,7 +382,7 @@ async function httpCheck(url, opts = {}) {
       method: opts.method ?? "GET", headers: opts.headers, body: opts.body, signal: ctrl.signal,
     });
     const text = await res.text().catch(() => "");
-    return { status: res.status, text };
+    return { status: res.status, text, headers: res.headers };
   } catch (err) {
     return { status: 0, text: String(err?.message ?? err) };
   } finally {
@@ -808,7 +808,23 @@ async function main() {
       headers: { "Content-Type": "application/json", Origin: dashUrl },
       body: JSON.stringify({ email: CFG.adminEmail, password: adminPassword }),
     });
-    if (r.status === 200) return { ok: true, detail: "200 + session" };
+    if (r.status === 200) {
+      // A 200 sign-in alone is insufficient: the original production bug set
+      // a cookie that was not accepted on the next page, causing an immediate
+      // /dashboard → /sign-in loop. Reproduce the browser's second request.
+      const getSetCookie = r.headers?.getSetCookie?.bind(r.headers);
+      const setCookies = getSetCookie ? getSetCookie() : (r.headers?.get("set-cookie") ?? "")
+        .split(/,\s*(?=[^;,]+=)/).filter(Boolean);
+      const cookie = setCookies.map((value) => value.split(";", 1)[0]).join("; ");
+      if (!cookie) return { ok: false, detail: "200 but no session cookie was set" };
+      const session = await httpCheck(`${dashUrl}/api/auth/get-session`, {
+        headers: { Origin: dashUrl, Cookie: cookie },
+      });
+      if (session.status === 200 && /"user"\s*:/.test(session.text)) {
+        return { ok: true, detail: "200 + cookie persisted + session restored" };
+      }
+      return { ok: false, detail: `sign-in 200 but get-session HTTP ${session.status} ${session.text.slice(0, 100)}` };
+    }
     if (r.status === 403 && /ORIGIN/i.test(r.text)) {
       return { ok: false, detail: "403 INVALID_ORIGIN — redeploying dashboard to re-apply trusted origins…" };
     }
