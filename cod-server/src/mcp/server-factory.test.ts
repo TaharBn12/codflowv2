@@ -19,10 +19,15 @@ import type { Tool } from "ai";
 
 const mocks = vi.hoisted(() => ({
   logActivity: vi.fn(async () => {}),
-  ACTIONS: { MCP_TOOL_CALLED: "mcp.tool_called", MCP_TOOL_DECLINED: "mcp.tool_declined" },
+  ACTIONS: {
+    MCP_TOOL_CALLED: "mcp.tool_called",
+    MCP_TOOL_DECLINED: "mcp.tool_declined",
+  },
   buildToolsForUser: vi.fn(),
   getDb: vi.fn(() => ({})),
-  getMcpAuthContext: vi.fn<() => { props: unknown } | undefined>(() => undefined),
+  getMcpAuthContext: vi.fn<() => { props: unknown } | undefined>(
+    () => undefined,
+  ),
 }));
 
 vi.mock("@/lib/activity", () => ({
@@ -61,12 +66,18 @@ interface RegisteredToolEntry {
 }
 
 function registeredToolNames(server: unknown): string[] {
-  const tools = (server as { _registeredTools: Record<string, unknown> })._registeredTools;
+  const tools = (server as { _registeredTools: Record<string, unknown> })
+    ._registeredTools;
   return Object.keys(tools).sort();
 }
 
-function registeredHandler(server: unknown, name: string): RegisteredToolEntry["handler"] {
-  const tools = (server as { _registeredTools: Record<string, RegisteredToolEntry> })._registeredTools;
+function registeredHandler(
+  server: unknown,
+  name: string,
+): RegisteredToolEntry["handler"] {
+  const tools = (
+    server as { _registeredTools: Record<string, RegisteredToolEntry> }
+  )._registeredTools;
   return tools[name]!.handler;
 }
 
@@ -80,8 +91,14 @@ function makeCtx(): ServerContext {
   } as unknown as ServerContext;
 }
 
-const safeTool = { description: "List customers", execute: vi.fn(async () => ({ success: true })) } as unknown as Tool;
-const dangerousTool = { description: "Delete customer", execute: vi.fn(async () => ({ success: true })) } as unknown as Tool;
+const safeTool = {
+  description: "List customers",
+  execute: vi.fn(async () => ({ success: true })),
+} as unknown as Tool;
+const dangerousTool = {
+  description: "Delete customer",
+  execute: vi.fn(async () => ({ success: true })),
+} as unknown as Tool;
 const dangerousArgs = { customerId: "c1" };
 
 describe("createCodMcpServer", () => {
@@ -106,25 +123,24 @@ describe("createCodMcpServer", () => {
 
     const server = createCodMcpServer(env);
 
-    expect(registeredToolNames(server)).toEqual(["deleteCustomer", "listCustomers"]);
+    expect(registeredToolNames(server)).toEqual([
+      "deleteCustomer",
+      "listCustomers",
+    ]);
   });
 
   it("attaches TOOL_META extensions to matching tools and to no others", () => {
     mocks.buildToolsForUser.mockReturnValue({
       listCustomers: safeTool,
-      uploadLandingPageImage: safeTool,
     });
 
     const server = createCodMcpServer(env);
 
     const tools = (
-      server as unknown as { _registeredTools: Record<string, Record<string, unknown>> }
+      server as unknown as {
+        _registeredTools: Record<string, Record<string, unknown>>;
+      }
     )._registeredTools;
-    expect(tools["uploadLandingPageImage"]._meta).toEqual({
-      "openai/fileParams": ["image"],
-      "openai/toolInvocation/invoking": "Starting background image upload…",
-      "openai/toolInvocation/invoked": "Upload job created — poll status until complete",
-    });
     expect(tools["listCustomers"]._meta).toBeUndefined();
   });
 
@@ -132,7 +148,6 @@ describe("createCodMcpServer", () => {
     mocks.buildToolsForUser.mockReturnValue({
       listCustomers: safeTool,
       deleteCustomer: dangerousTool,
-      uploadLandingPageImage: safeTool,
     });
 
     const server = createCodMcpServer(env);
@@ -146,10 +161,9 @@ describe("createCodMcpServer", () => {
       }
     )._registeredTools;
     expect(tools["listCustomers"].title).toBe("List customers");
-    expect(tools["uploadLandingPageImage"].title).toBe("Upload landing page image");
     // Wiring only: every tool carries a full four-hint annotation object.
     // The VALUES are proven in annotations.test.ts against the real registry.
-    for (const name of ["listCustomers", "deleteCustomer", "uploadLandingPageImage"]) {
+    for (const name of ["listCustomers", "deleteCustomer"]) {
       expect(tools[name].annotations).toMatchObject({
         readOnlyHint: expect.any(Boolean),
         destructiveHint: expect.any(Boolean),
@@ -168,7 +182,9 @@ describe("createCodMcpServer", () => {
     const server = createCodMcpServer(env);
 
     const tools = (
-      server as unknown as { _registeredTools: Record<string, { outputSchema?: unknown }> }
+      server as unknown as {
+        _registeredTools: Record<string, { outputSchema?: unknown }>;
+      }
     )._registeredTools;
     expect(tools["listCustomers"].outputSchema).toBeDefined();
     expect(tools["someUnschemaTool"].outputSchema).toBeUndefined();
@@ -178,10 +194,17 @@ describe("createCodMcpServer", () => {
     mocks.buildToolsForUser.mockReturnValue({ deleteCustomer: dangerousTool });
 
     const server = createCodMcpServer(env);
-    const result = await registeredHandler(server, "deleteCustomer")(dangerousArgs, makeCtx());
+    const result = await registeredHandler(server, "deleteCustomer")(
+      dangerousArgs,
+      makeCtx(),
+    );
 
-    expect(dangerousTool.execute).toHaveBeenCalledWith(dangerousArgs, { toolCallId: "" });
-    expect(result).toEqual({ content: [{ type: "text", text: JSON.stringify({ success: true }) }] });
+    expect(dangerousTool.execute).toHaveBeenCalledWith(dangerousArgs, {
+      toolCallId: "",
+    });
+    expect(result).toEqual({
+      content: [{ type: "text", text: JSON.stringify({ success: true }) }],
+    });
     expect(mocks.logActivity).toHaveBeenCalledWith(
       expect.anything(),
       { id: "u1", name: "Ada", role: "staff" },
@@ -195,10 +218,15 @@ describe("createCodMcpServer", () => {
     mocks.buildToolsForUser.mockReturnValue({ listCustomers: safeTool });
 
     const server = createCodMcpServer(env);
-    const result = await registeredHandler(server, "listCustomers")({}, makeCtx());
+    const result = await registeredHandler(server, "listCustomers")(
+      {},
+      makeCtx(),
+    );
 
     expect(safeTool.execute).toHaveBeenCalledWith({}, { toolCallId: "" });
-    expect(result).toEqual({ content: [{ type: "text", text: JSON.stringify({ success: true }) }] });
+    expect(result).toEqual({
+      content: [{ type: "text", text: JSON.stringify({ success: true }) }],
+    });
     expect(mocks.logActivity).toHaveBeenCalledWith(
       expect.anything(),
       { id: "u1", name: "Ada", role: "staff" },
@@ -225,7 +253,11 @@ describe("createCodMcpServer", () => {
       { id: "u1", name: "Ada", role: "staff" },
       "mcp.tool_called",
       { type: "tool", id: "listCustomers", label: "listCustomers" },
-      expect.objectContaining({ ok: true, clientSubject: "sub-anon-1", clientSession: "sess-anon-2" }),
+      expect.objectContaining({
+        ok: true,
+        clientSubject: "sub-anon-1",
+        clientSession: "sess-anon-2",
+      }),
     );
   });
 
@@ -252,21 +284,31 @@ describe("createCodMcpServer", () => {
       { id: "u1", name: "Ada", role: "staff" },
       "mcp.tool_called",
       { type: "tool", id: "listCustomers", label: "listCustomers" },
-      expect.objectContaining({ ok: false, error: expect.stringContaining("rate_limited") }),
+      expect.objectContaining({
+        ok: false,
+        error: expect.stringContaining("rate_limited"),
+      }),
     );
   });
 
   it("rate-limits on the client subject hint when present, not the user id", async () => {
     mocks.buildToolsForUser.mockReturnValue({ listCustomers: safeTool });
-    const get = vi.fn(async (key: string) => (key.includes("sub-anon") ? "9999" : null));
+    const get = vi.fn(async (key: string) =>
+      key.includes("sub-anon") ? "9999" : null,
+    );
     const kvStub = { get, put: async () => undefined };
     const envWithKv = { DB: {}, RATE_LIMIT: kvStub } as unknown as Env;
 
     const server = createCodMcpServer(envWithKv);
     const ctx = makeCtx();
-    (ctx.mcpReq as unknown as Record<string, unknown>)._meta = { "openai/subject": "sub-anon" };
+    (ctx.mcpReq as unknown as Record<string, unknown>)._meta = {
+      "openai/subject": "sub-anon",
+    };
 
-    const result = (await registeredHandler(server, "listCustomers")({}, ctx)) as {
+    const result = (await registeredHandler(server, "listCustomers")(
+      {},
+      ctx,
+    )) as {
       isError?: boolean;
     };
     expect(get).toHaveBeenCalledWith(expect.stringContaining("sub-anon"));
