@@ -1,0 +1,116 @@
+name: Deploy to Cloudflare
+
+# One-click CodFlow deploy: D1 + R2 + KV + 3 workers (API, dashboard, storefront).
+# Implements .agents/skills/codflow-setup/SKILL.md via scripts/cloudflare-deploy.mjs.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN    Cloudflare API token (Workers + D1 + R2 + KV write)
+#   CLOUDFLARE_ACCOUNT_ID   32-hex Cloudflare account ID
+#   ADMIN_PASSWORD          admin dashboard password (choose it yourself)
+#
+# Run: Actions → Deploy to Cloudflare → Run workflow (select this branch).
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_prefix:
+        description: "Resource + worker name prefix (lowercase, digits, dashes)"
+        default: "codflowv2"
+        required: true
+        type: string
+      admin_email:
+        description: "Admin login email"
+        default: "admin@codflow.store"
+        required: true
+        type: string
+      skip_seed:
+        description: "Skip demo catalog seed (empty store)"
+        default: false
+        required: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy (runbook end-to-end)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      PROJECT_PREFIX: ${{ inputs.project_prefix }}
+      ADMIN_EMAIL: ${{ inputs.admin_email }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Preflight — required secrets present
+        run: |
+          missing=0
+          [ -z "$CLOUDFLARE_API_TOKEN" ] && { echo "::error::Missing repo secret CLOUDFLARE_API_TOKEN"; missing=1; }
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && { echo "::error::Missing repo secret CLOUDFLARE_ACCOUNT_ID"; missing=1; }
+          [ -z "$ADMIN_PASSWORD" ] && { echo "::error::Missing repo secret ADMIN_PASSWORD (choose the admin password yourself)"; missing=1; }
+          if [ "$missing" = 1 ]; then
+            echo "Add them at: repo Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+          echo "All required secrets present."
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy to Cloudflare
+        run: node scripts/cloudflare-deploy.mjs ${{ inputs.skip_seed && '--skip-seed' || '' }}
+        env:
+          CF_DEPLOY_OUTPUT_FILE: ${{ runner.temp }}/deploy-output.env
+
+      - name: Rotate admin API key (revoke key shown in logs)
+        # seed-admin prints the admin API key to stdout; on a public repo that
+        # lands in public logs, so rotate it to a fresh random value that is
+        # never printed. The admin password itself comes from a secret and is
+        # auto-masked by GitHub wherever it appears.
+        run: |
+          node --input-type=module -e "
+            import { execFileSync } from 'node:child_process';
+            import { randomBytes } from 'node:crypto';
+            const db = process.env.PROJECT_PREFIX + '-db';
+            const email = process.env.ADMIN_EMAIL;
+            const key = 'cod_' + randomBytes(16).toString('hex');
+            execFileSync('npx', ['wrangler', 'd1', 'execute', db, '--remote',
+              '--command', \"UPDATE users SET api_key = '\" + key + \"' WHERE email = '\" + email + \"'\"],
+              { stdio: 'pipe' });
+            console.log('admin api_key rotated (old logged value revoked)');
+          "
+
+      - name: Publish deployment summary
+        if: success()
+        run: |
+          # shellcheck disable=SC1090
+          source "${{ runner.temp }}/deploy-output.env"
+          {
+            echo "# ✅ CodFlow deployed — ${PREFIX}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| 🖥️ Dashboard | ${DASHBOARD_URL} |"
+            echo "| 🔌 API | ${SERVER_URL} ([docs](${SERVER_URL}/api/docs)) |"
+            echo "| 🛍️ Storefront | ${STOREFRONT_URL} |"
+            echo "| 📧 Admin email | \`${ADMIN_EMAIL}\` |"
+            echo "| 🔑 Admin password | the \`ADMIN_PASSWORD\` repo secret you set |"
+            echo ""
+            echo "Resources: D1 \`${D1_NAME}\` (${D1_ID}) · R2 \`${R2_BUCKET}\` · KV \`${KV_RATE_NAME}\`, \`${KV_OAUTH_NAME}\`"
+            echo ""
+            echo "> Next: R2 custom media domain + R2 API token for image uploads, and a custom API domain for the storefront catalog — see docs/CLOUDFLARE-DEPLOY.md."
+          } >> "$GITHUB_STEP_SUMMARY"
