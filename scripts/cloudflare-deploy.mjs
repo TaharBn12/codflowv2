@@ -471,7 +471,11 @@ async function main() {
   ok("cod-server/wrangler.toml + cod-client-astro/wrangler.toml + theme wrangler.jsonc written");
   for (const [f, t] of [["cod-server/wrangler.toml", serverToml], ["cod-client-astro/wrangler.toml", dashToml]]) {
     const res = [/00000000-0000/, /00000000000000000000000000000000/, /<your-/, /codflow-os-db/, /"codflow-images"/, /"codflow-server"/, /"codflow-dashboard"/];
-    const hits = res.filter((re) => re.test(t));
+    // Strip comment lines first: templates legitimately reference placeholder
+    // names in docs comments (e.g. "# wrangler d1 create codflow-os-db"), and
+    // only real config values are placeholders. Mirrors assertNoPlaceholders.
+    const code = stripTomlComments(t);
+    const hits = res.filter((re) => re.test(code));
     if (hits.length) fail(`${f} still contains resource placeholders: ${hits.join(" ")}`);
   }
   ok("resource-ID placeholder check passed (URL vars finalized after first deploy)");
