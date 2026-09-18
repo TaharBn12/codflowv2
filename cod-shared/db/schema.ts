@@ -461,10 +461,6 @@ export const orders = sqliteTable("orders", {
   assignedBy: text("assigned_by"),
   assignmentNotes: text("assignment_notes"),
 
-  // ── Confirmation-team assignment (separate from delivery assignment) ───
-  confirmationAssigneeId: text("confirmation_assignee_id").references(() => users.id, { onDelete: "set null" }),
-  confirmationAssignedAt: text("confirmation_assigned_at"),
-
   // ── Tracking ─────────────────────────────────────────────────────────────
   trackingNumber: text("tracking_number"),
   trackingUrl: text("tracking_url"),
@@ -532,6 +528,14 @@ export const orders = sqliteTable("orders", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const orderConfirmationAssignments = sqliteTable("order_confirmation_assignments", {
+  orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
+  assigneeId: text("assignee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assignedBy: text("assigned_by").references(() => users.id, { onDelete: "set null" }),
+  assignedAt: text("assigned_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({ assigneeIdx: index("order_confirmation_assignee_idx").on(t.assigneeId, t.assignedAt) }));
 
 export const operationAgentSettings = sqliteTable("operation_agent_settings", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),

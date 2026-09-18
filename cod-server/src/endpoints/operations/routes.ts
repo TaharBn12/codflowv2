@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import {
   operationAgentSettings,
   operationTasks,
+  orderConfirmationAssignments,
   orders,
   staffCommissions,
   users,
@@ -75,10 +76,14 @@ routes.get("/summary", async (c) => {
     db
       .select({ count: sql<number>`count(*)` })
       .from(orders)
+      .leftJoin(
+        orderConfirmationAssignments,
+        eq(orders.id, orderConfirmationAssignments.orderId),
+      )
       .where(
         and(
           inArray(orders.status, [...activeOrderStatuses]),
-          sql`${orders.confirmationAssigneeId} IS NULL`,
+          sql`${orderConfirmationAssignments.orderId} IS NULL`,
         ),
       )
       .get(),
@@ -300,17 +305,26 @@ routes.post("/orders/bulk-assign", async (c) => {
     .where(inArray(orders.id, parsed.data.orderIds))
     .all();
   const now = new Date().toISOString();
-  const statements: any[] = [
+  const statements: any[] = selected.map((order) =>
     db
-      .update(orders)
-      .set({ confirmationAssigneeId: assignee.id, confirmationAssignedAt: now })
-      .where(
-        inArray(
-          orders.id,
-          selected.map((order) => order.id),
-        ),
-      ),
-  ];
+      .insert(orderConfirmationAssignments)
+      .values({
+        orderId: order.id,
+        assigneeId: assignee.id,
+        assignedBy: c.get("user").id,
+        assignedAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: orderConfirmationAssignments.orderId,
+        set: {
+          assigneeId: assignee.id,
+          assignedBy: c.get("user").id,
+          assignedAt: now,
+          updatedAt: now,
+        },
+      }),
+  );
   for (const order of selected) {
     statements.push(
       db.insert(operationTasks).values({
@@ -417,9 +431,9 @@ routes.get("/performance", async (c) => {
     SELECT u.id, u.name,
       COALESCE(s.auto_assign_enabled, 1) AS autoAssignEnabled,
       COALESCE(s.max_open_orders, 25) AS maxOpenOrders,
-      (SELECT COUNT(*) FROM orders o WHERE o.confirmation_assignee_id = u.id AND o.status IN ('new','confirmed','unreachable')) AS openOrders,
-      (SELECT COUNT(*) FROM orders o WHERE o.confirmation_assignee_id = u.id AND o.status = 'delivered') AS deliveredOrders,
-      (SELECT COUNT(*) FROM orders o WHERE o.confirmation_assignee_id = u.id AND o.status IN ('returned','cancelled')) AS failedOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('new','confirmed','unreachable')) AS openOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status = 'delivered') AS deliveredOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('returned','cancelled')) AS failedOrders,
       COALESCE((SELECT SUM(sc.amount) FROM staff_commissions sc WHERE sc.user_id = u.id AND sc.status = 'earned'), 0) AS earnedCommission,
       COALESCE((SELECT SUM(sc.amount) FROM staff_commissions sc WHERE sc.user_id = u.id AND sc.status = 'paid'), 0) AS paidCommission
     FROM users u
