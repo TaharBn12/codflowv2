@@ -28,6 +28,22 @@ on:
         default: false
         required: false
         type: boolean
+      server_url:
+        description: "API public URL (e.g. https://api.yourdomain.com) — optional; defaults to workers.dev"
+        required: false
+        type: string
+      dashboard_url:
+        description: "Dashboard public URL (e.g. https://admin.yourdomain.com) — optional"
+        required: false
+        type: string
+      store_url:
+        description: "Storefront public URL (e.g. https://yourdomain.com) — optional"
+        required: false
+        type: string
+      media_domain:
+        description: "R2 media custom domain host only (e.g. media.yourdomain.com) — optional"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -47,6 +63,11 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       PROJECT_PREFIX: ${{ inputs.project_prefix }}
       ADMIN_EMAIL: ${{ inputs.admin_email }}
+      # Optional custom domains (workflow_dispatch inputs) — empty = workers.dev
+      IN_SERVER_URL: ${{ inputs.server_url }}
+      IN_DASHBOARD_URL: ${{ inputs.dashboard_url }}
+      IN_STORE_URL: ${{ inputs.store_url }}
+      MEDIA_DOMAIN: ${{ inputs.media_domain }}
     steps:
       - uses: actions/checkout@v7
 
@@ -72,7 +93,16 @@ jobs:
         run: npm ci
 
       - name: Deploy to Cloudflare
-        run: node scripts/cloudflare-deploy.mjs ${{ inputs.skip_seed && '--skip-seed' || '' }}
+        # Build args from env (not ${{ }} interpolation) so input values never
+        # reach the shell for evaluation. Empty inputs are simply omitted.
+        run: |
+          ARGS=()
+          # flag() in cloudflare-deploy.mjs only understands --name=value (no space form)
+          [ "${{ inputs.skip_seed }}" = "true" ] && ARGS+=(--skip-seed)
+          [ -n "$IN_SERVER_URL" ]    && ARGS+=(--server-url="$IN_SERVER_URL")
+          [ -n "$IN_DASHBOARD_URL" ] && ARGS+=(--dashboard-url="$IN_DASHBOARD_URL")
+          [ -n "$IN_STORE_URL" ]     && ARGS+=(--store-url="$IN_STORE_URL")
+          node scripts/cloudflare-deploy.mjs "${ARGS[@]}"
         env:
           CF_DEPLOY_OUTPUT_FILE: ${{ runner.temp }}/deploy-output.env
 
