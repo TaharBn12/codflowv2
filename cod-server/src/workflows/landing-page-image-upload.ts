@@ -44,7 +44,7 @@ import { ACTIONS, logActivity } from "@/lib/activity";
 const actorSchema = z.strictObject({
   id: z.string().min(1),
   name: z.string().min(1),
-  role: z.enum(["admin", "staff"]),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]),
 });
 
 const baseShape = {

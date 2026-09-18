@@ -10,7 +10,7 @@ export interface Identity {
     /** Email language preference (ar | en) — carried for the profile page. */
     language?: string;
   };
-  role: "admin" | "staff";
+  role: "admin" | "staff" | "confirmer" | "driver";
   scopes: string[];
 }
 

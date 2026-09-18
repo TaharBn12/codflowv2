@@ -8,13 +8,32 @@ const landingPageBaseSchema = z.object({
     .regex(/^[a-z0-9-]{3,60}$/, "Slug must be 3-60 chars: lowercase letters, digits, hyphens")
     .optional(),
   productId: z.string().min(1),
-  /** Pixels between stacked images — the only spacing setting. */
-  imageGap: z.number().int().min(0).max(200).default(0),
+  imageGap: z.number().int().min(0).max(200),
+  sidePadding: z.number().int().min(0).max(120),
+  contentMaxWidth: z.number().int().min(0).max(2400),
+  showImages: z.boolean(),
+  showOrderForm: z.boolean(),
+  showStickyCta: z.boolean(),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  buttonColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  buttonTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  buttonRadius: z.number().int().min(0).max(100),
   metaTitle: z.string().max(200).nullable().optional(),
   metaDescription: z.string().max(300).nullable().optional(),
 });
 
-export const createLandingPageSchema = landingPageBaseSchema;
+export const createLandingPageSchema = landingPageBaseSchema.extend({
+  imageGap: landingPageBaseSchema.shape.imageGap.default(0),
+  sidePadding: landingPageBaseSchema.shape.sidePadding.default(0),
+  contentMaxWidth: landingPageBaseSchema.shape.contentMaxWidth.default(0),
+  showImages: landingPageBaseSchema.shape.showImages.default(true),
+  showOrderForm: landingPageBaseSchema.shape.showOrderForm.default(true),
+  showStickyCta: landingPageBaseSchema.shape.showStickyCta.default(true),
+  backgroundColor: landingPageBaseSchema.shape.backgroundColor.default("#ffffff"),
+  buttonColor: landingPageBaseSchema.shape.buttonColor.default("#7c3aed"),
+  buttonTextColor: landingPageBaseSchema.shape.buttonTextColor.default("#ffffff"),
+  buttonRadius: landingPageBaseSchema.shape.buttonRadius.default(12),
+});
 
 export const updateLandingPageSchema = landingPageBaseSchema
   .omit({ productId: true })

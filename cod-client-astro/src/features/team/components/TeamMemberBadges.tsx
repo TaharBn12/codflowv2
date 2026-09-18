@@ -47,7 +47,7 @@ export function RoleBadge({ role }: { role: TeamMember["role"] }) {
       <span className="ms-1">{common("roles.admin")}</span>
     </Badge>
   ) : (
-    <Badge tone="neutral">{common("roles.staff")}</Badge>
+    <Badge tone="neutral">{common(`roles.${role}`)}</Badge>
   );
 }
 

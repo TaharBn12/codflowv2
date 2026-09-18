@@ -184,7 +184,8 @@
     "email_failed": "L'e-mail d'invitation n'a pas pu être envoyé.",
     "email_not_configured": "L'envoi d'e-mails n'est pas configuré.",
     "email_share_manually": "Partagez le mot de passe temporaire avec le membre manuellement.",
-    "email_language_label": "Langue de l'e-mail d'invitation"
+    "email_language_label": "Langue de l'e-mail d'invitation",
+    "automatic_role_permissions": "Les autorisations sont attribuées automatiquement à ce rôle et appliquées par le serveur."
   },
   "error_member_not_found": "Membre de l’équipe introuvable",
   "error_duplicate_email": "Un utilisateur avec cet e-mail existe déjà",

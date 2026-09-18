@@ -35,7 +35,7 @@ import { RotateKeyDialog } from "@/features/team/components/RotateKeyDialog";
 import { TeamDesktopRow, TeamMobileCard } from "@/features/team/components/TeamRow";
 
 const EMPTY_FILTERS: TeamFilters = { query: "", role: "all", status: "all" };
-const ROLE_OPTIONS = ["admin", "staff"] as const;
+const ROLE_OPTIONS = ["admin", "staff", "confirmer", "driver"] as const;
 const STATUS_OPTIONS = ["active", "inactive"] as const;
 const PAGE_SIZE = 10;
 

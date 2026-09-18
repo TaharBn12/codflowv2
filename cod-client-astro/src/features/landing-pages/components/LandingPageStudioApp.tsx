@@ -148,6 +148,12 @@ function Gated({ landingPageId }: { landingPageId: string }) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [name, setName] = useState("");
   const [imageGap, setImageGap] = useState(0);
+  const [design, setDesign] = useState({
+    sidePadding: 0, contentMaxWidth: 0,
+    showImages: true, showOrderForm: true, showStickyCta: true,
+    backgroundColor: "#ffffff", buttonColor: "#7c3aed",
+    buttonTextColor: "#ffffff", buttonRadius: 12,
+  });
 
   // Slug editing: committed value (autosaved) + in-flight draft while editing
   const [slugDraft, setSlugDraft] = useState<string | null>(null);
@@ -168,6 +174,13 @@ function Gated({ landingPageId }: { landingPageId: string }) {
       setLp(data);
       setName(data.name);
       setImageGap(data.imageGap);
+      setDesign({
+        sidePadding: data.sidePadding, contentMaxWidth: data.contentMaxWidth,
+        showImages: data.showImages, showOrderForm: data.showOrderForm,
+        showStickyCta: data.showStickyCta, backgroundColor: data.backgroundColor,
+        buttonColor: data.buttonColor, buttonTextColor: data.buttonTextColor,
+        buttonRadius: data.buttonRadius,
+      });
       setSlugDraft(null);
       setSaveState("idle");
     } catch (cause) {
@@ -182,8 +195,10 @@ function Gated({ landingPageId }: { landingPageId: string }) {
   // Debounced autosave: name + gap persist 800ms after the last edit.
   useEffect(() => {
     if (!lp || !canManage) return;
+    const designDrifted = (Object.keys(design) as Array<keyof typeof design>)
+      .some((key) => design[key] !== lp[key]);
     const drifted =
-      (name.trim() !== "" && name !== lp.name) || imageGap !== lp.imageGap;
+      (name.trim() !== "" && name !== lp.name) || imageGap !== lp.imageGap || designDrifted;
     if (!drifted) return;
 
     setSaveState("saving");
@@ -194,6 +209,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
           const updated = await updateLandingPage(landingPageId, {
             ...(name.trim() !== "" && name !== lp.name ? { name: name.trim() } : {}),
             ...(imageGap !== lp.imageGap ? { imageGap } : {}),
+            ...design,
           });
           setLp(updated.data);
           setSaveState("saved");
@@ -206,7 +222,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
     return () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
-  }, [lp, name, imageGap, canManage, landingPageId, t]);
+  }, [lp, name, imageGap, design, canManage, landingPageId, t]);
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -714,6 +730,35 @@ function Gated({ landingPageId }: { landingPageId: string }) {
               className="w-full accent-primary"
             />
           </label>
+        </div>
+        <div className="mt-5 space-y-4 border-t border-border pt-4">
+          {(["showImages", "showOrderForm", "showStickyCta"] as const).map((key) => (
+            <label key={key} className="flex items-center justify-between gap-3 text-xs font-semibold">
+              {t(`studio.${key}`)}
+              <input type="checkbox" checked={design[key]} disabled={!canManage}
+                onChange={(e) => setDesign((v) => ({ ...v, [key]: e.currentTarget.checked }))}
+                className="size-4 accent-primary" />
+            </label>
+          ))}
+          {(["sidePadding", "contentMaxWidth", "buttonRadius"] as const).map((key) => (
+            <label key={key} className="block">
+              <span className="mb-1 flex justify-between text-xs font-semibold">
+                {t(`studio.${key}`)} <span className="text-muted-foreground">{design[key]}px</span>
+              </span>
+              <input type="range" min={0} max={key === "contentMaxWidth" ? 1200 : key === "buttonRadius" ? 50 : 64}
+                value={design[key]} disabled={!canManage}
+                onChange={(e) => setDesign((v) => ({ ...v, [key]: Number(e.currentTarget.value) }))}
+                className="w-full accent-primary" />
+            </label>
+          ))}
+          {(["backgroundColor", "buttonColor", "buttonTextColor"] as const).map((key) => (
+            <label key={key} className="flex items-center justify-between gap-3 text-xs font-semibold">
+              {t(`studio.${key}`)}
+              <input type="color" value={design[key]} disabled={!canManage}
+                onChange={(e) => setDesign((v) => ({ ...v, [key]: e.currentTarget.value }))}
+                className="h-8 w-12 cursor-pointer rounded border border-border bg-transparent" />
+            </label>
+          ))}
         </div>
         <div className="mt-auto pt-4">
           <div className="rounded-xl border border-border p-3">

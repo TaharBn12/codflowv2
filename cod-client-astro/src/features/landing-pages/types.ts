@@ -33,6 +33,15 @@ export interface LandingPage {
   productId: string;
   status: LandingPageStatus;
   imageGap: number;
+  sidePadding: number;
+  contentMaxWidth: number;
+  showImages: boolean;
+  showOrderForm: boolean;
+  showStickyCta: boolean;
+  backgroundColor: string;
+  buttonColor: string;
+  buttonTextColor: string;
+  buttonRadius: number;
   metaTitle: string | null;
   metaDescription: string | null;
   views: number;
@@ -74,6 +83,15 @@ export interface UpdateLandingPageInput {
   name?: string;
   slug?: string;
   imageGap?: number;
+  sidePadding?: number;
+  contentMaxWidth?: number;
+  showImages?: boolean;
+  showOrderForm?: boolean;
+  showStickyCta?: boolean;
+  backgroundColor?: string;
+  buttonColor?: string;
+  buttonTextColor?: string;
+  buttonRadius?: number;
   metaTitle?: string | null;
   metaDescription?: string | null;
 }

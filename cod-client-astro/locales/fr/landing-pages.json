@@ -78,6 +78,15 @@
     "slug_edit": "Modifier le slug",
     "slug_apply": "Appliquer",
     "slug_invalid": "3-60 caractères : minuscules, chiffres, tirets",
-    "gap_hint": "Espace entre les images empilées"
+    "gap_hint": "Espace entre les images empilées",
+    "showImages": "Afficher les images",
+    "showOrderForm": "Afficher le formulaire",
+    "showStickyCta": "Afficher le bouton fixe",
+    "sidePadding": "Marge latérale",
+    "contentMaxWidth": "Largeur maximale (0 = totale)",
+    "buttonRadius": "Arrondi du bouton",
+    "backgroundColor": "Arrière-plan",
+    "buttonColor": "Couleur du bouton",
+    "buttonTextColor": "Texte du bouton"
   }
 }

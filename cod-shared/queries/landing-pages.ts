@@ -44,6 +44,15 @@ export interface CreateLandingPageData {
   slug?: string;
   productId: string;
   imageGap?: number;
+  sidePadding?: number;
+  contentMaxWidth?: number;
+  showImages?: boolean;
+  showOrderForm?: boolean;
+  showStickyCta?: boolean;
+  backgroundColor?: string;
+  buttonColor?: string;
+  buttonTextColor?: string;
+  buttonRadius?: number;
   metaTitle?: string | null;
   metaDescription?: string | null;
 }
@@ -52,6 +61,15 @@ export interface UpdateLandingPageData {
   name?: string;
   slug?: string;
   imageGap?: number;
+  sidePadding?: number;
+  contentMaxWidth?: number;
+  showImages?: boolean;
+  showOrderForm?: boolean;
+  showStickyCta?: boolean;
+  backgroundColor?: string;
+  buttonColor?: string;
+  buttonTextColor?: string;
+  buttonRadius?: number;
   metaTitle?: string | null;
   metaDescription?: string | null;
 }
@@ -301,6 +319,15 @@ export async function createLandingPage(
     productId: data.productId,
     status: "draft",
     imageGap: data.imageGap ?? 0,
+    sidePadding: data.sidePadding ?? 0,
+    contentMaxWidth: data.contentMaxWidth ?? 0,
+    showImages: data.showImages ?? true,
+    showOrderForm: data.showOrderForm ?? true,
+    showStickyCta: data.showStickyCta ?? true,
+    backgroundColor: data.backgroundColor ?? "#ffffff",
+    buttonColor: data.buttonColor ?? "#7c3aed",
+    buttonTextColor: data.buttonTextColor ?? "#ffffff",
+    buttonRadius: data.buttonRadius ?? 12,
     metaTitle: data.metaTitle ?? null,
     metaDescription: data.metaDescription ?? null,
     views: 0,
@@ -323,6 +350,15 @@ export async function updateLandingPage(
       ...(data.name !== undefined && { name: data.name }),
       ...(data.slug !== undefined && { slug: data.slug }),
       ...(data.imageGap !== undefined && { imageGap: data.imageGap }),
+      ...(data.sidePadding !== undefined && { sidePadding: data.sidePadding }),
+      ...(data.contentMaxWidth !== undefined && { contentMaxWidth: data.contentMaxWidth }),
+      ...(data.showImages !== undefined && { showImages: data.showImages }),
+      ...(data.showOrderForm !== undefined && { showOrderForm: data.showOrderForm }),
+      ...(data.showStickyCta !== undefined && { showStickyCta: data.showStickyCta }),
+      ...(data.backgroundColor !== undefined && { backgroundColor: data.backgroundColor }),
+      ...(data.buttonColor !== undefined && { buttonColor: data.buttonColor }),
+      ...(data.buttonTextColor !== undefined && { buttonTextColor: data.buttonTextColor }),
+      ...(data.buttonRadius !== undefined && { buttonRadius: data.buttonRadius }),
       ...(data.metaTitle !== undefined && { metaTitle: data.metaTitle ?? null }),
       ...(data.metaDescription !== undefined && { metaDescription: data.metaDescription ?? null }),
       updatedAt: now,
@@ -525,6 +561,15 @@ export async function duplicateLandingPage(db: AppDb, id: string): Promise<strin
       productId: source.productId,
       status: "draft",
       imageGap: source.imageGap,
+      sidePadding: source.sidePadding,
+      contentMaxWidth: source.contentMaxWidth,
+      showImages: source.showImages,
+      showOrderForm: source.showOrderForm,
+      showStickyCta: source.showStickyCta,
+      backgroundColor: source.backgroundColor,
+      buttonColor: source.buttonColor,
+      buttonTextColor: source.buttonTextColor,
+      buttonRadius: source.buttonRadius,
       metaTitle: source.metaTitle,
       metaDescription: source.metaDescription,
       views: 0,

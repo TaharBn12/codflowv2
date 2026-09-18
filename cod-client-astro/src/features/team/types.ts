@@ -1,4 +1,4 @@
-export type TeamRole = "admin" | "staff";
+export type TeamRole = "admin" | "staff" | "confirmer" | "driver";
 export type TeamStatus = "active" | "inactive";
 
 /** A team member as returned by the users API (apiKey is stripped server-side). */
@@ -19,7 +19,7 @@ export interface ActivityLog {
   id: string;
   actorId: string;
   actorName: string;
-  actorRole: "admin" | "staff";
+  actorRole: "admin" | "staff" | "confirmer" | "driver";
   action: string;
   entityType: string;
   entityId: string;

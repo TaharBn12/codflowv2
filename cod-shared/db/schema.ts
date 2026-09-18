@@ -9,7 +9,7 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
-  role: text("role", { enum: ["admin", "staff"] })
+  role: text("role", { enum: ["admin", "staff", "confirmer", "driver"] })
     .notNull()
     .default("staff"),
   status: text("status", { enum: ["active", "inactive"] })
@@ -922,7 +922,7 @@ export const activityLogs = sqliteTable("activity_logs", {
   actorId: text("actor_id").notNull(),
   /** Denormalised name — preserved even if user is later deleted. */
   actorName: text("actor_name").notNull(),
-  actorRole: text("actor_role", { enum: ["admin", "staff"] }).notNull(),
+  actorRole: text("actor_role", { enum: ["admin", "staff", "confirmer", "driver"] }).notNull(),
   /** Dot-notation action: "order.created", "user.role_changed", etc. */
   action: text("action").notNull(),
   /** Entity category: "order", "customer", "driver", "product", "user". */
@@ -1135,6 +1135,15 @@ export const landingPages = sqliteTable("landing_pages", {
   sidePadding: integer("side_padding").notNull().default(0),
   /** Max content width in pixels. 0 = full width (mobile-first default). */
   contentMaxWidth: integer("content_max_width").notNull().default(0),
+
+  // ── Visibility and presentation controls ─────────────────────────────────
+  showImages: integer("show_images", { mode: "boolean" }).notNull().default(true),
+  showOrderForm: integer("show_order_form", { mode: "boolean" }).notNull().default(true),
+  showStickyCta: integer("show_sticky_cta", { mode: "boolean" }).notNull().default(true),
+  backgroundColor: text("background_color").notNull().default("#ffffff"),
+  buttonColor: text("button_color").notNull().default("#7c3aed"),
+  buttonTextColor: text("button_text_color").notNull().default("#ffffff"),
+  buttonRadius: integer("button_radius").notNull().default(12),
 
   // ── SEO ───────────────────────────────────────────────────────────────────
   metaTitle: text("meta_title"),

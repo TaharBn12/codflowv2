@@ -78,6 +78,15 @@
     "slug_edit": "تعديل الرابط",
     "slug_apply": "تطبيق",
     "slug_invalid": "٣-٦٠ حرفًا: أحرف صغيرة وأرقام وشرطات",
-    "gap_hint": "المسافة بين الصور المتراصة"
+    "gap_hint": "المسافة بين الصور المتراصة",
+    "showImages": "إظهار مجموعة الصور",
+    "showOrderForm": "إظهار نموذج الطلب",
+    "showStickyCta": "إظهار زر الطلب الثابت",
+    "sidePadding": "الهامش الجانبي",
+    "contentMaxWidth": "أقصى عرض للمحتوى (0 = كامل)",
+    "buttonRadius": "استدارة زوايا الزر",
+    "backgroundColor": "خلفية الصفحة",
+    "buttonColor": "لون الزر",
+    "buttonTextColor": "لون نص الزر"
   }
 }

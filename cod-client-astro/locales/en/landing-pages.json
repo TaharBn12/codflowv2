@@ -78,6 +78,15 @@
     "slug_edit": "Edit slug",
     "slug_apply": "Apply",
     "slug_invalid": "3-60 chars: lowercase letters, digits, hyphens",
-    "gap_hint": "Space between the stacked images"
+    "gap_hint": "Space between the stacked images",
+    "showImages": "Show image stack",
+    "showOrderForm": "Show order form",
+    "showStickyCta": "Show sticky order button",
+    "sidePadding": "Side padding",
+    "contentMaxWidth": "Maximum content width (0 = full)",
+    "buttonRadius": "Button corner radius",
+    "backgroundColor": "Page background",
+    "buttonColor": "Button color",
+    "buttonTextColor": "Button text"
   }
 }

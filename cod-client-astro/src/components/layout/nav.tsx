@@ -128,6 +128,13 @@ export function useNavSections(): NavSection[] {
       label: tN("sidebar.inventory"),
       items: [
         {
+          kind: "leaf",
+          href: "/landing-pages",
+          label: tN("sidebar.landing_pages"),
+          icon: Megaphone,
+          scope: "landing_pages:read",
+        },
+        {
           kind: "group",
           id: "products",
           label: tN("sidebar.products"),
@@ -156,13 +163,7 @@ export function useNavSections(): NavSection[] {
               icon: Gift,
               scope: "offers:read",
             },
-            {
-              kind: "leaf",
-              href: "/landing-pages",
-              label: tN("sidebar.landing_pages"),
-              icon: Megaphone,
-              scope: "landing_pages:read",
-            },
+
           ],
         },
         {
