@@ -50,7 +50,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync,
 } from "node:fs";
@@ -704,6 +704,17 @@ async function main() {
     cwd: DASH_DIR, stdio: "inherit",
     env: { ADMIN_EMAIL: CFG.adminEmail, ADMIN_NAME: CFG.adminName },
   });
+
+  // CI workspaces do not retain .dev.vars, so every full recovery run creates
+  // a new raw storefront key. Keep D1's default key hash in sync even when the
+  // catalog seed is correctly skipped; otherwise the theme sends a new key
+  // while /store/* still validates the old one and silently renders no items.
+  const storeKeyHash = createHash("sha256").update(secrets.STORE_API_KEY).digest("hex");
+  wrangler(["d1", "execute", NAMES.db, "--remote", "--command",
+    `UPDATE store_api_keys SET key_hash = '${storeKeyHash}' WHERE name = 'default'`], {
+    cwd: SERVER_DIR, label: "sync default storefront API key hash",
+  });
+  ok("D1 storefront API key synchronized with server + theme secrets");
   } // !CFG.deployOnly — catalog + admin user untouched on update deploys
 
   // ── Step 6b — deploy dashboard ───────────────────────────────────────────
@@ -801,6 +812,21 @@ async function main() {
       ? { ok: true, detail: "200" }
       : { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 80)}` };
   });
+  if (!CFG.deployOnly) {
+    await waitFor("storefront authenticated catalog", async () => {
+      const r = await httpCheck(`${serverUrl}/store/products?limit=12`, {
+        headers: { "X-Store-API-Key": secrets.STORE_API_KEY },
+      });
+      if (r.status !== 200) {
+        return { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 100)}` };
+      }
+      const body = tryJson(r.text);
+      const count = Array.isArray(body?.data) ? body.data.length : 0;
+      return count > 0
+        ? { ok: true, detail: `200 + ${count} visible product(s)` }
+        : { ok: false, detail: "200 but catalog has zero visible products" };
+    }, { tries: 6, delayMs: 3000 });
+  }
   await waitFor("dashboard sign-in (with Origin header)", async () => {
     // deploy-only mode has no admin password in scope — treat the endpoint
     // being up (any auth response) as healthy and move on.
