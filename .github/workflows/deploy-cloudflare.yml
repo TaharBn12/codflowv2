@@ -28,6 +28,22 @@ on:
         default: false
         required: false
         type: boolean
+      server_url:
+        description: "API public URL (e.g. https://api.yourdomain.com) — optional; defaults to workers.dev"
+        required: false
+        type: string
+      dashboard_url:
+        description: "Dashboard public URL (e.g. https://admin.yourdomain.com) — optional"
+        required: false
+        type: string
+      store_url:
+        description: "Storefront public URL (e.g. https://yourdomain.com) — optional"
+        required: false
+        type: string
+      media_domain:
+        description: "R2 media custom domain host only (e.g. media.yourdomain.com) — optional"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -47,6 +63,16 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       PROJECT_PREFIX: ${{ inputs.project_prefix }}
       ADMIN_EMAIL: ${{ inputs.admin_email }}
+      # Optional custom domains (workflow_dispatch inputs) — empty = workers.dev
+      IN_SERVER_URL: ${{ inputs.server_url }}
+      IN_DASHBOARD_URL: ${{ inputs.dashboard_url }}
+      IN_STORE_URL: ${{ inputs.store_url }}
+      MEDIA_DOMAIN: ${{ inputs.media_domain }}
+      # Optional R2 API token (repo secrets) — unlocks "Step 3b" image uploads:
+      # cloudflare-deploy.mjs installs them as CF_ACCOUNT_ID / R2_ACCESS_KEY_ID /
+      # R2_SECRET_ACCESS_KEY worker secrets when both are present.
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v7
 
@@ -72,9 +98,33 @@ jobs:
         run: npm ci
 
       - name: Deploy to Cloudflare
-        run: node scripts/cloudflare-deploy.mjs ${{ inputs.skip_seed && '--skip-seed' || '' }}
+        # Build args from env (not ${{ }} interpolation) so input values never
+        # reach the shell for evaluation. Empty inputs are simply omitted.
+        run: |
+          ARGS=()
+          # flag() in cloudflare-deploy.mjs only understands --name=value (no space form)
+          [ "${{ inputs.skip_seed }}" = "true" ] && ARGS+=(--skip-seed)
+          [ -n "$IN_SERVER_URL" ]    && ARGS+=(--server-url="$IN_SERVER_URL")
+          [ -n "$IN_DASHBOARD_URL" ] && ARGS+=(--dashboard-url="$IN_DASHBOARD_URL")
+          [ -n "$IN_STORE_URL" ]     && ARGS+=(--store-url="$IN_STORE_URL")
+          node scripts/cloudflare-deploy.mjs "${ARGS[@]}"
         env:
           CF_DEPLOY_OUTPUT_FILE: ${{ runner.temp }}/deploy-output.env
+
+      - name: Configure R2 CORS for presigned image uploads
+        # One-time Step 3b automation: bucket-level CORS lets browsers PUT
+        # images via presigned URLs. Non-blocking — the deploy itself is fine
+        # without it, and it can be re-run any time.
+        run: |
+          if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
+            CF_ACCOUNT_ID="$CLOUDFLARE_ACCOUNT_ID" node scripts/setup-r2-cors.mjs \
+              || echo "::warning::R2 CORS setup failed — run cod-server/scripts/setup-r2-cors.mjs manually"
+          else
+            echo "R2 API token secrets not set — skipping CORS setup (Step 3b)."
+            echo "See: R2 → Manage R2 API Tokens → Create (Object Read & Write on ${PROJECT_PREFIX}-images),"
+            echo "then add repo secrets R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY and re-run."
+          fi
+        working-directory: cod-server
 
       - name: Rotate admin API key (revoke key shown in logs)
         # seed-admin prints the admin API key to stdout; on a public repo that

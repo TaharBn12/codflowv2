@@ -1,0 +1,130 @@
+name: Deploy update (workers only)
+
+# Lightweight CI deploy for code changes: rebuild + redeploy the 3 workers
+# (API, dashboard, storefront) WITHOUT touching Cloudflare resources —
+# no D1/R2/KV creation, no secret (re)generation, no catalog seed, no
+# admin-password reset. D1 migrations still run (idempotent, no-op when the
+# schema hasn't changed) so code and schema never drift; pass
+# DEPLOY_ONLY_EXTRA_ARGS=--skip-migrations in a manual run to skip them too.
+#
+# Prerequisite: the full "Deploy to Cloudflare" workflow must have succeeded
+# at least once — this fails fast with a clear message if resources are
+# missing instead of creating anything.
+#
+# Triggered automatically on every push to main that touches app code, or
+# manually from Actions → Deploy update (workers only) → Run workflow.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN    Cloudflare API token (Workers + D1 + R2 + KV write)
+#   CLOUDFLARE_ACCOUNT_ID   32-hex Cloudflare account ID
+#
+# Optional repo variables (Actions → Variables tab):
+#   PROJECT_PREFIX          worker/resource prefix (default: codflowv2 — must match the full deploy)
+#   SERVER_URL              e.g. https://api.yourdomain.com
+#   DASHBOARD_URL           e.g. https://admin.yourdomain.com
+#   STORE_URL               e.g. https://yourdomain.com
+#   MEDIA_DOMAIN            e.g. media.yourdomain.com
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cod-server/**"
+      - "cod-client-astro/**"
+      - "cod-astro/**"
+      - "cod-shared/**"
+      - "scripts/cloudflare-deploy.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-update.yml"
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "API public URL (e.g. https://api.yourdomain.com) — optional; overrides repo variable SERVER_URL"
+        required: false
+        type: string
+      dashboard_url:
+        description: "Dashboard public URL (e.g. https://admin.yourdomain.com) — optional"
+        required: false
+        type: string
+      store_url:
+        description: "Storefront public URL (e.g. https://yourdomain.com) — optional"
+        required: false
+        type: string
+      media_domain:
+        description: "R2 media custom domain host only (e.g. media.yourdomain.com) — optional"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy update — workers only
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'codflowv2' }}
+      # Custom-domain overrides: dispatch input wins, then repo variable, else workers.dev
+      IN_SERVER_URL: ${{ inputs.server_url || vars.SERVER_URL }}
+      IN_DASHBOARD_URL: ${{ inputs.dashboard_url || vars.DASHBOARD_URL }}
+      IN_STORE_URL: ${{ inputs.store_url || vars.STORE_URL }}
+      MEDIA_DOMAIN: ${{ inputs.media_domain || vars.MEDIA_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Preflight — required secrets present
+        run: |
+          missing=0
+          [ -z "$CLOUDFLARE_API_TOKEN" ] && { echo "::error::Missing repo secret CLOUDFLARE_API_TOKEN"; missing=1; }
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && { echo "::error::Missing repo secret CLOUDFLARE_ACCOUNT_ID"; missing=1; }
+          if [ "$missing" = 1 ]; then
+            echo "Add them at: repo Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+          echo "All required secrets present."
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy update to Cloudflare (workers only)
+        run: |
+          ARGS=(--deploy-only)
+          [ -n "$DEPLOY_ONLY_EXTRA_ARGS" ] && ARGS+=($DEPLOY_ONLY_EXTRA_ARGS)
+          # flag() only understands --name=value (no space form)
+          [ -n "$IN_SERVER_URL" ]    && ARGS+=(--server-url="$IN_SERVER_URL")
+          [ -n "$IN_DASHBOARD_URL" ] && ARGS+=(--dashboard-url="$IN_DASHBOARD_URL")
+          [ -n "$IN_STORE_URL" ]     && ARGS+=(--store-url="$IN_STORE_URL")
+          node scripts/cloudflare-deploy.mjs "${ARGS[@]}"
+        env:
+          CF_DEPLOY_OUTPUT_FILE: ${{ runner.temp }}/deploy-output.env
+
+      - name: Publish update summary
+        if: success()
+        run: |
+          # shellcheck disable=SC1090
+          source "${{ runner.temp }}/deploy-output.env"
+          {
+            echo "# ♻️ CodFlow updated — ${PREFIX}"
+            echo ""
+            echo "Workers redeployed; D1/R2/KV/secrets/catalog/admin untouched."
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| 🖥️ Dashboard | ${DASHBOARD_URL} |"
+            echo "| 🔌 API | ${SERVER_URL} ([docs](${SERVER_URL}/api/docs)) |"
+            echo "| 🛍️ Storefront | ${STOREFRONT_URL} |"
+          } >> "$GITHUB_STEP_SUMMARY"
