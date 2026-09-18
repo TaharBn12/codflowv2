@@ -115,7 +115,7 @@ export async function serveMediaImage(c: Context<AppContext>) {
   return serveImageKey(c, key);
 }
 
-async function serveImageKey(c: Context<AppContext>, key: string) {
+async function serveImageKey(c: Context<AppContext>, key: string | undefined) {
   const bucket = c.env.IMAGES;
 
   if (!key) {
