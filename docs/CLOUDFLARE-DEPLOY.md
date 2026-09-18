@@ -14,12 +14,26 @@
 
 ## المتطلبات
 
-- **Node.js 22.12+** ([تحميل](https://nodejs.org/))
-- حساب **Cloudflare** مجاني + تفعيل **R2**
+- حساب **Cloudflare** + تفعيل **R2**
   (لوحة Cloudflare ← R2 — يتطلب بطاقة بنكية على الملف، ضمن الشريحة المجانية)
-- صلاحيات التوكن: Workers + D1 + R2 + KV (الأسهل: توكن بصلاحيات واسعة للحساب)
+- توكن API بصلاحيات: Workers + D1 + R2 + KV (الأسهل: توكن بصلاحيات واسعة للحساب)
+- للطريقتين 2 و3 فقط: **Node.js 22.12+** ([تحميل](https://nodejs.org/))
 
-## الطريقة 1: من جهازك (دقيقتان)
+## الطريقة 1: زر واحد من GitHub (الأسهل — بدون أي تثبيت)
+
+1. افتح: `Settings ← Secrets and variables ← Actions ← New repository secret`
+   وأضف 3 أسرار:
+   | الاسم | القيمة |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | توكن Cloudflare |
+   | `CLOUDFLARE_ACCOUNT_ID` | معرّف الحساب (32 خانة) |
+   | `ADMIN_PASSWORD` | كلمة مرور مدير لوحة التحكم (اخترها بنفسك) |
+2. افتح تبويب **Actions** ← اختر **Deploy to Cloudflare** ← **Run workflow**
+   (اترك القيم الافتراضية أو غيّر البادئة والبريد) ← **Run workflow**
+3. انتظر ~15 دقيقة — في النهاية تجد الروابط الثلاثة في صفحة **Summary**،
+   وكلمة المرور هي نفس `ADMIN_PASSWORD` الذي أدخلته.
+
+## الطريقة 2: من جهازك (دقيقتان)
 
 ```bash
 git clone <repo-url> codflow && cd codflow
