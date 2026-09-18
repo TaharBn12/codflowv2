@@ -11,6 +11,10 @@ name: Deploy to Cloudflare
 # Run: Actions → Deploy to Cloudflare → Run workflow (select this branch).
 
 on:
+  # Arena's GitHub integration cannot dispatch workflows directly. Pushing this
+  # deployment branch therefore performs the requested full recovery upload.
+  push:
+    branches: [arena/01a0b487-codflowv2]
   workflow_dispatch:
     inputs:
       project_prefix:
@@ -65,13 +69,14 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-      PROJECT_PREFIX: ${{ inputs.project_prefix }}
-      ADMIN_EMAIL: ${{ inputs.admin_email }}
-      # Optional custom domains (workflow_dispatch inputs) — empty = workers.dev
-      IN_SERVER_URL: ${{ inputs.server_url }}
-      IN_DASHBOARD_URL: ${{ inputs.dashboard_url }}
-      IN_STORE_URL: ${{ inputs.store_url }}
-      MEDIA_DOMAIN: ${{ inputs.media_domain }}
+      PROJECT_PREFIX: ${{ inputs.project_prefix || 'codflowv2' }}
+      ADMIN_EMAIL: ${{ inputs.admin_email || 'admin@codflow.store' }}
+      # These defaults keep every recovery upload on the requested domain,
+      # whether started manually or by a push to the recovery branch.
+      IN_SERVER_URL: ${{ inputs.server_url || 'https://api.codfly.dpdns.org' }}
+      IN_DASHBOARD_URL: ${{ inputs.dashboard_url || 'https://dashboard.codfly.dpdns.org' }}
+      IN_STORE_URL: ${{ inputs.store_url || 'https://codfly.dpdns.org' }}
+      MEDIA_DOMAIN: ${{ inputs.media_domain || 'media.codfly.dpdns.org' }}
       # Optional R2 API token (repo secrets) — unlocks "Step 3b" image uploads:
       # cloudflare-deploy.mjs installs them as CF_ACCOUNT_ID / R2_ACCESS_KEY_ID /
       # R2_SECRET_ACCESS_KEY worker secrets when both are present.
