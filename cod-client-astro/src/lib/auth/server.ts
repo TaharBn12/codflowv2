@@ -88,9 +88,6 @@ export function createAuth(env: AuthEnv, cloudflare?: AuthCloudflareContext) {
             .filter(Boolean),
         ],
         disabledPaths: ["/token"],
-        // Let the Astro route convert unexpected production auth exceptions
-        // into a diagnostic response; expected API errors keep their status.
-        onAPIError: { throw: true },
         session: {
           storeSessionInDatabase: true,
           // Do not combine Better Auth's signed cookie cache with customSession.
