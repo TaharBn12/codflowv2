@@ -133,7 +133,10 @@ jobs:
       - name: Surface deploy failure in the check annotation
         if: failure()
         run: |
-          LOG="$(tail -c 6000 "${{ runner.temp }}/cloudflare-deploy.log")"
+          # GitHub check annotations truncate around 6 KB after command
+          # escaping; keep the final 2.5 KB so the actual Wrangler error is
+          # never displaced by verbose Astro build output.
+          LOG="$(tail -c 2500 "${{ runner.temp }}/cloudflare-deploy.log")"
           LOG="${LOG//'%'/'%25'}"
           LOG="${LOG//$'\r'/'%0D'}"
           LOG="${LOG//$'\n'/'%0A'}"
