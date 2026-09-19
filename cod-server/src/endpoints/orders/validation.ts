@@ -77,6 +77,8 @@ export const orderFiltersSchema = z.object({
   status: z.enum(ORDER_STATUSES).optional(),
   wilayaId: z.coerce.number().int().optional(),
   search: z.string().optional(),
+  confirmationAssignment: z.enum(["assigned", "unassigned", "all"]).optional(),
+  confirmerId: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   cursor: z

@@ -1,6 +1,6 @@
 /**
  * COD Flow Server - Cloudflare Worker
- * 
+ *
  * Main entry point for the backend API.
  */
 
@@ -14,6 +14,9 @@ import { errorHandler } from "@/middleware/error";
 // Import routes
 import storeRoutes from "@/endpoints/store/routes";
 import webhooksRouter from "@/endpoints/webhooks/routes";
+import supportWebhookRoutes from "@/endpoints/support/webhooks";
+import customerExperienceRoutes from "@/endpoints/customer-experience/routes";
+import telegramApprovalsRoutes from "@/endpoints/telegram-approvals/routes";
 import ordersRoutes from "@/endpoints/orders/routes";
 import usersRoutes from "@/endpoints/users/routes";
 import customersRoutes from "@/endpoints/customers/routes";
@@ -24,10 +27,10 @@ import wilayasRoutes from "@/endpoints/wilayas/routes";
 import deliveryCompaniesRoutes from "@/endpoints/delivery-companies/routes";
 import productsRoutes from "@/endpoints/products/routes";
 import productGroupsRoutes from "@/endpoints/product-groups/routes";
-import landingPagesRoutes from "@/endpoints/landing-pages/routes";
 import shippingProfilesRoutes from "@/endpoints/shipping-profiles/routes";
 import driverPaymentsRoutes from "@/endpoints/driver-payments/routes";
 import { uploadRouter, serveRouter } from "@/endpoints/images/routes";
+import { serveMediaImage } from "@/endpoints/images/handlers";
 import activityLogsRoutes from "@/endpoints/activity-logs/routes";
 import storesRoutes from "@/endpoints/stores/routes";
 import reviewsRoutes from "@/endpoints/reviews/routes";
@@ -38,6 +41,8 @@ import { openApiValidationHook } from "@/openapi/validation-hook";
 import mcpManagementRoutes from "@/endpoints/mcp/routes";
 import analyticsRoutes from "@/endpoints/analytics/routes";
 import abandonedOrdersRoutes from "@/endpoints/abandoned-orders/routes";
+import supportRoutes from "@/endpoints/support/routes";
+import operationsRoutes from "@/endpoints/operations/routes";
 import storeAbandonedRoutes from "@/endpoints/abandoned-orders/store-routes";
 import storeOtpRoutes from "@/endpoints/store-otp/store-routes";
 
@@ -46,7 +51,11 @@ import { sweepAbandonedOrders } from "@/cron/sweep-abandoned-orders";
 // MCP remote server (remote Model Context Protocol endpoint for Claude / AI agents).
 // The OAuthProvider owns OAuth (discovery, client registration, tokens, revocation)
 // and the `/mcp` protected route; the Hono app below is its defaultHandler.
-import { OAuthProvider, type OAuthProviderOptions, type TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
+import {
+  OAuthProvider,
+  type OAuthProviderOptions,
+  type TokenExchangeCallbackOptions,
+} from "@cloudflare/workers-oauth-provider";
 import { createCodMcpHandler } from "@/mcp/server-factory";
 import { authorizeGet, authorizePost } from "@/mcp/authorize";
 import { recordMcpLastUsed } from "@/mcp/last-used";
@@ -67,6 +76,19 @@ const app = new OpenAPIHono<AppContext>({ defaultHook: openApiValidationHook });
 app.use("*", corsMiddleware);
 app.onError(errorHandler);
 
+// The deployment binds MEDIA_DOMAIN to this Worker as an R2-backed image
+// origin. Public URLs are https://<MEDIA_DOMAIN>/<key>, while API traffic keeps
+// using WORKER_URL. Host-gating prevents this catch-all from affecting the API.
+app.use("*", async (c, next) => {
+  if (
+    c.env.MEDIA_DOMAIN &&
+    new URL(c.req.url).hostname === c.env.MEDIA_DOMAIN
+  ) {
+    return serveMediaImage(c);
+  }
+  await next();
+});
+
 // Image serving — no auth required (public, cacheable)
 app.route("/images", serveRouter);
 
@@ -77,6 +99,9 @@ registerSpecEndpoint(app);
 // Webhook receivers — public, no auth, signature-verified internally
 // MUST be mounted BEFORE app.use("/api/*", authMiddleware)
 app.route("/webhooks", webhooksRouter);
+app.route("/webhooks/telegram", telegramApprovalsRoutes);
+app.route("/webhooks/support", supportWebhookRoutes);
+app.route("/customer-order", customerExperienceRoutes);
 
 // Store API — separate auth (must be before /api/* authMiddleware)
 app.use("/store/*", storeAuthMiddleware);
@@ -95,7 +120,7 @@ app.get("/", (c) => {
     service: "COD Flow API",
     version: "1.0.0",
     status: "healthy",
-    environment: c.env.ENVIRONMENT
+    environment: c.env.ENVIRONMENT,
   });
 });
 
@@ -119,7 +144,6 @@ app.route("/api/wilayas", wilayasRoutes);
 app.route("/api/delivery-companies", deliveryCompaniesRoutes);
 app.route("/api/products", productsRoutes);
 app.route("/api/product-groups", productGroupsRoutes);
-app.route("/api/landing-pages", landingPagesRoutes);
 app.route("/api/shipping-profiles", shippingProfilesRoutes);
 app.route("/api/driver-payments", driverPaymentsRoutes);
 app.route("/api/stores", storesRoutes);
@@ -130,6 +154,8 @@ app.route("/api/products", productStockRouter);
 app.route("/api/mcp", mcpManagementRoutes);
 app.route("/api/analytics", analyticsRoutes);
 app.route("/api/abandoned-orders", abandonedOrdersRoutes);
+app.route("/api/operations", operationsRoutes);
+app.route("/api/support", supportRoutes);
 
 // 404 handler
 app.notFound((c) => {
@@ -158,7 +184,8 @@ function oauthProviderOptions(env: Env): OAuthProviderOptions<Env> {
   return {
     apiRoute: "/mcp",
     apiHandler: {
-      fetch: (request, requestEnv, ctx) => createCodMcpHandler(requestEnv)(request, requestEnv, ctx),
+      fetch: (request, requestEnv, ctx) =>
+        createCodMcpHandler(requestEnv)(request, requestEnv, ctx),
     },
     defaultHandler: {
       fetch: (request, requestEnv, ctx) => app.fetch(request, requestEnv, ctx),
@@ -194,9 +221,11 @@ export default {
   async scheduled(
     _event: ScheduledEvent,
     env: Env,
-    ctx: ExecutionContext
+    ctx: ExecutionContext,
   ): Promise<void> {
     ctx.waitUntil(sweepAbandonedOrders(env));
-    ctx.waitUntil(getOAuthProvider(env).purgeExpiredData(env, { batchSize: 50 }));
+    ctx.waitUntil(
+      getOAuthProvider(env).purgeExpiredData(env, { batchSize: 50 }),
+    );
   },
 };

@@ -29,17 +29,13 @@ import { DANGEROUS_TOOLS } from "./elicit";
  * reads gated more tightly on purpose (e.g. upload-status polling is only
  * useful to callers who can upload).
  */
-const READ_ONLY_OVERRIDES: ReadonlySet<string> = new Set([
-  "getLandingPageImageUploadStatus",
-]);
+const READ_ONLY_OVERRIDES: ReadonlySet<string> = new Set();
 
 /**
  * Tools that reach the open internet. `openWorldHint` is true only for these;
  * everything else touches a bounded private workspace (the merchant's store).
  */
-const OPEN_WORLD_TOOLS: ReadonlySet<string> = new Set([
-  "uploadLandingPageImage", // fetches agent-supplied public image URLs
-]);
+const OPEN_WORLD_TOOLS: ReadonlySet<string> = new Set();
 
 /**
  * Write tools documented as safe to repeat with the same arguments — the
@@ -63,7 +59,9 @@ function writeScopeToolNames(): Set<string> {
   const out = new Set<string>();
   for (const entry of TOOL_REGISTRY) {
     if (!isReadScopeEntry(entry)) {
-      for (const name of Object.keys(entry.build({} as never, {} as never, {} as never))) {
+      for (const name of Object.keys(
+        entry.build({} as never, {} as never, {} as never),
+      )) {
         out.add(name);
       }
     }
@@ -74,7 +72,8 @@ function writeScopeToolNames(): Set<string> {
 const WRITE_SCOPE_TOOLS = writeScopeToolNames();
 
 function deriveAnnotations(name: string): ToolAnnotations {
-  const isReadOnly = READ_ONLY_OVERRIDES.has(name) || !WRITE_SCOPE_TOOLS.has(name);
+  const isReadOnly =
+    READ_ONLY_OVERRIDES.has(name) || !WRITE_SCOPE_TOOLS.has(name);
   return {
     readOnlyHint: isReadOnly,
     destructiveHint: !isReadOnly && DANGEROUS_TOOLS.has(name),
@@ -83,8 +82,12 @@ function deriveAnnotations(name: string): ToolAnnotations {
   };
 }
 
-export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = Object.fromEntries(
-  TOOL_NAMES.map((name) => [name, deriveAnnotations(name)]),
-);
+export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> =
+  Object.fromEntries(TOOL_NAMES.map((name) => [name, deriveAnnotations(name)]));
 
-export { READ_ONLY_OVERRIDES, OPEN_WORLD_TOOLS, IDEMPOTENT_WRITE_TOOLS, WRITE_SCOPE_TOOLS };
+export {
+  READ_ONLY_OVERRIDES,
+  OPEN_WORLD_TOOLS,
+  IDEMPOTENT_WRITE_TOOLS,
+  WRITE_SCOPE_TOOLS,
+};

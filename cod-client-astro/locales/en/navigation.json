@@ -23,10 +23,12 @@
     "system": "System",
     "reviews": "Reviews",
     "offers": "Offers",
-    "landing_pages": "Landing Pages",
+    "landing_pages": "Landing Page",
     "stock_management": "Stock Management",
     "api_reference": "API Reference",
-    "mcp": "AI Agents"
+    "mcp": "AI Agents",
+    "operations": "Operations & tasks",
+    "support": "Customer support"
   },
   "navbar": {
     "search_placeholder": "Search for orders, customers...",

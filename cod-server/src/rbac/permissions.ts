@@ -64,7 +64,7 @@ export async function getUserScopes(
 export async function checkPermission(
   db: DrizzleD1Database,
   userId: string,
-  userRole: "admin" | "staff",
+  userRole: "admin" | "staff" | "confirmer" | "driver",
   requiredScope: string
 ): Promise<boolean> {
   // Admin bypass - no database query needed
@@ -94,7 +94,7 @@ export async function checkPermission(
 export async function checkAnyPermission(
   db: DrizzleD1Database,
   userId: string,
-  userRole: "admin" | "staff",
+  userRole: "admin" | "staff" | "confirmer" | "driver",
   requiredScopes: string[]
 ): Promise<boolean> {
   // Admin bypass
@@ -124,7 +124,7 @@ export async function checkAnyPermission(
 export async function checkAllPermissions(
   db: DrizzleD1Database,
   userId: string,
-  userRole: "admin" | "staff",
+  userRole: "admin" | "staff" | "confirmer" | "driver",
   requiredScopes: string[]
 ): Promise<boolean> {
   // Admin bypass

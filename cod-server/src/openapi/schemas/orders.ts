@@ -147,6 +147,12 @@ const OrderBaseSchema = z.object({
   assignedAt: z.string().datetime().nullable(),
   assignedBy: z.string().nullable(),
   assignmentNotes: z.string().nullable(),
+  confirmationAssigneeId: z.string().nullable().openapi({
+    description: "Current confirmation or follow-up agent user ID",
+  }),
+  confirmationAssigneeName: z.string().nullable().openapi({
+    description: "Current confirmation or follow-up agent display name",
+  }),
   
   // Carrier integration
   trackingNumber: z.string().nullable(),

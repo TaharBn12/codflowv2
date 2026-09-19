@@ -38,7 +38,9 @@ export function fetchIdentity(): Promise<Identity | null> {
         email: body.user.email,
         language: body.user.language,
       },
-      role: body.user.role === "admin" ? "admin" : "staff",
+      role: (["admin", "staff", "confirmer", "driver"] as const).includes(body.user.role as any)
+        ? body.user.role as "admin" | "staff" | "confirmer" | "driver"
+        : "staff",
       scopes: body.scopes ?? [],
     };
   })();

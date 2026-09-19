@@ -435,7 +435,7 @@ export type LandingPageToolEnv = Pick<
  *  upload tool needs it (the background workflow audits through this actor). */
 export interface LandingPageToolSession {
   userId: string;
-  role: "admin" | "staff";
+  role: "admin" | "staff" | "confirmer" | "driver";
   name?: string;
   email?: string;
 }

@@ -10,7 +10,7 @@ const LANGS = ["en", "ar", "fr"] as const;
 const NAMESPACES = [
   "orders", "auth", "common", "navigation", "dashboard", "customers",
   "customer-groups", "customer-tags", "reviews", "products", "product-groups",
-  "offers", "landing-pages", "delivery", "delivery_companies", "settings",
+  "offers", "operations", "support", "landing-pages", "delivery", "delivery_companies", "settings",
   "team", "mcp", "profile",
 ] as const;
 const EXTENSIONS = new Set([".astro", ".js", ".jsx", ".ts", ".tsx"]);

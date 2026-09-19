@@ -50,7 +50,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync,
 } from "node:fs";
@@ -96,6 +96,9 @@ const CFG = {
   storeUrl: flag("--store-url") ?? "",
   r2KeyId: process.env.R2_ACCESS_KEY_ID ?? "",
   r2Secret: process.env.R2_SECRET_ACCESS_KEY ?? "",
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramChatId: process.env.TELEGRAM_APPROVAL_CHAT_ID ?? "",
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
   accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? process.env.COD_ACCOUNT_ID ?? "",
 };
 const NAMES = {
@@ -132,7 +135,10 @@ function sh(cmd, args, opts = {}) {
     });
     return out ?? "";
   } catch (err) {
-    if (opts.allowFail) return err.stdout?.toString() ?? "";
+    if (opts.allowFail) {
+      return [err.stdout?.toString(), err.stderr?.toString()]
+        .filter(Boolean).join("\n");
+    }
     const tail = (err.stderr?.toString() ?? err.message ?? "").split("\n").slice(-12).join("\n");
     fail(`${label}\n${tail}`);
   }
@@ -220,6 +226,16 @@ function ensureBucket(create = true) {
   const res = createBucket(NAMES.bucket);
   if (res !== true) {
     if (/exist/i.test(String(res))) { ok(`R2 bucket '${NAMES.bucket}' already exists — reusing it`); return; }
+    // Wrangler/Cloudflare can return a transient non-zero response even though
+    // bucket creation was accepted. Confirm server-side state before failing;
+    // this removes the old "fails once, succeeds on rerun" recovery loop.
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      execFileSync("sleep", ["2"]);
+      if (listBuckets().includes(NAMES.bucket)) {
+        ok(`R2 bucket '${NAMES.bucket}' created (confirmed after transient create response)`);
+        return;
+      }
+    }
     fail(`Could not create R2 bucket '${NAMES.bucket}'.\n${String(res).split("\n").slice(-8).join("\n")}\nIf R2 is not enabled on this account, open dash.cloudflare.com → R2 (requires a payment card on file, free tier), then re-run this script.`);
   }
   ok(`R2 bucket '${NAMES.bucket}' created`);
@@ -236,6 +252,33 @@ function replaceInlineVar(text, key, value) {
   if (!re.test(text)) fail(`Template drift: inline key '${key}' not found while generating config.`);
   re.lastIndex = 0;
   return text.replace(re, `$1${value}$2`);
+}
+function customHostname(url) {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") fail(`Custom deployment URL must use https: ${url}`);
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      fail(`Custom deployment URL must be an origin without a path: ${url}`);
+    }
+    if (parsed.hostname === "localhost" || parsed.hostname.endsWith(".workers.dev")) return "";
+    return parsed.hostname;
+  } catch (err) {
+    if (err instanceof TypeError) fail(`Invalid deployment URL: ${url}`);
+    throw err;
+  }
+}
+function addTomlCustomDomain(text, url, additionalUrls = []) {
+  const hostnames = [url, ...additionalUrls].map(customHostname).filter(Boolean);
+  if (!hostnames.length) return text;
+  // TOML table scope continues until the next table. Put this root-level key
+  // directly after `name`, never at EOF (where it would belong to [dev] or
+  // [observability] and Wrangler would reject the generated config).
+  const routes = hostnames
+    .map((pattern) => `{ pattern = "${pattern}", custom_domain = true }`)
+    .join(", ");
+  const route = `# Managed by cloudflare-deploy.mjs. Wrangler creates DNS + TLS with the Worker.\nroutes = [${routes}]`;
+  return text.replace(/^(name\s*=\s*"[^"]+")$/m, `$1\n${route}`);
 }
 function genServerToml(tpl, v) {
   let t = tpl;
@@ -260,7 +303,11 @@ function genServerToml(tpl, v) {
     if (/STOREFRONT_URL/.test(t)) t = replaceInlineVar(t, "STOREFRONT_URL", v.storeUrl);
     if (/^STOREFRONT_URL\s*=/m.test(t)) t = replaceTomlVar(t, "STOREFRONT_URL", v.storeUrl);
   }
-  return t;
+  // Also bind the media hostname to this Worker as a reliable R2-backed image
+  // proxy. This works even when the API token cannot manage an R2 custom
+  // domain directly (common with narrowly scoped deployment tokens).
+  return addTomlCustomDomain(t, v.serverUrl,
+    v.mediaDomain ? [`https://${v.mediaDomain}`] : []);
 }
 function genDashToml(tpl, v) {
   let t = tpl;
@@ -271,11 +318,15 @@ function genDashToml(tpl, v) {
   t = replaceTomlVar(t, "PUBLIC_APP_URL", v.dashUrl);
   t = replaceTomlVar(t, "PUBLIC_API_URL", v.serverUrl);
   t = replaceTomlVar(t, "PUBLIC_TRUSTED_ORIGINS", v.trustedOrigins);
-  return t;
+  return addTomlCustomDomain(t, v.dashUrl);
 }
-function genThemeWrangler(tpl, workerName) {
+function genThemeWrangler(tpl, workerName, storeUrl = "") {
   if (!tpl.includes('"codflow-os-theme01"')) fail("Template drift: theme01 worker name not found.");
-  return tpl.split('"codflow-os-theme01"').join(`"${workerName}"`);
+  const config = JSON.parse(tpl.replace(/^\s*\/\/.*$/gm, ""));
+  config.name = workerName;
+  const hostname = customHostname(storeUrl);
+  if (hostname) config.routes = [{ pattern: hostname, custom_domain: true }];
+  return `${JSON.stringify(config, null, 2)}\n`;
 }
 const HARD_PLACEHOLDER_RES = [
   /00000000-0000/, /00000000000000000000000000000000/, /<your-/,
@@ -334,7 +385,7 @@ async function httpCheck(url, opts = {}) {
       method: opts.method ?? "GET", headers: opts.headers, body: opts.body, signal: ctrl.signal,
     });
     const text = await res.text().catch(() => "");
-    return { status: res.status, text };
+    return { status: res.status, text, headers: res.headers };
   } catch (err) {
     return { status: 0, text: String(err?.message ?? err) };
   } finally {
@@ -349,6 +400,66 @@ async function waitFor(label, fn, { tries = 24, delayMs = 5000 } = {}) {
     await new Promise((r2) => setTimeout(r2, delayMs));
   }
   fail(`${label} never became ready.`);
+}
+async function configureR2Cors(origins) {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  if (!token) return false;
+  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${CFG.accountId}/r2/buckets/${encodeURIComponent(NAMES.bucket)}/cors`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ rules: [{
+        id: "codflow-browser-uploads",
+        allowed: {
+          origins: [...new Set([...origins, "http://localhost:4321"])],
+          methods: ["PUT", "GET", "HEAD"],
+          headers: ["Content-Type", "Content-Length"],
+        },
+        exposeHeaders: ["ETag"], maxAgeSeconds: 3600,
+      }] }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.success) {
+      warn(`R2 CORS could not be configured through the Cloudflare API: ${json?.errors?.map((e) => e.message).join("; ") || `HTTP ${res.status}`}`);
+      return false;
+    }
+    ok(`R2 CORS configured for ${origins.join(", ")} (browser image uploads enabled)`);
+    return true;
+  } catch (err) {
+    warn(`R2 CORS setup failed without stopping the Worker deploy: ${err.message}`);
+    return false;
+  }
+}
+async function configureR2CustomDomain(hostname) {
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  if (!hostname || !token) return false;
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  try {
+    const zonesRes = await fetch("https://api.cloudflare.com/client/v4/zones?per_page=50", { headers });
+    const zonesJson = await zonesRes.json();
+    const zone = zonesJson?.result
+      ?.filter((z) => hostname === z.name || hostname.endsWith(`.${z.name}`))
+      .sort((a, b) => b.name.length - a.name.length)[0];
+    if (!zone) {
+      warn(`R2 custom domain ${hostname} not connected automatically: its Cloudflare zone is not visible to this API token.`);
+      return false;
+    }
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${CFG.accountId}/r2/buckets/${encodeURIComponent(NAMES.bucket)}/domains/custom/${encodeURIComponent(hostname)}`;
+    const res = await fetch(endpoint, {
+      method: "PUT", headers, body: JSON.stringify({ enabled: true, zoneId: zone.id }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.success) {
+      warn(`R2 custom domain ${hostname} could not be connected automatically: ${json?.errors?.map((e) => e.message).join("; ") || `HTTP ${res.status}`}`);
+      return false;
+    }
+    ok(`R2 custom domain ${hostname} connected to '${NAMES.bucket}' (DNS + TLS managed by Cloudflare)`);
+    return true;
+  } catch (err) {
+    warn(`R2 custom domain ${hostname} setup failed without stopping the Worker deploy: ${err.message}`);
+    return false;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -385,7 +496,7 @@ async function main() {
     const themeTpl = readFileSync(join(THEME_DIR, "wrangler.jsonc"), "utf8");
     const s = genServerToml(serverTpl, fake);
     const d = genDashToml(dashTpl, fake);
-    const th = genThemeWrangler(themeTpl, NAMES.themeWorker);
+    const th = genThemeWrangler(themeTpl, NAMES.themeWorker, fake.storeUrl);
     for (const [label, text] of [["server", s], ["dashboard", d]]) {
       const hard = HARD_PLACEHOLDER_RES.filter((re) => re.test(text));
       if (hard.length) fail(`dry-run: ${label} placeholders remain: ${hard.join(" ")}`);
@@ -436,6 +547,9 @@ async function main() {
   ensureBucket(!CFG.deployOnly);
   const kvRateId = ensureKv(NAMES.kvRate, !CFG.deployOnly);
   const kvOAuthId = ensureKv(NAMES.kvOAuth, !CFG.deployOnly);
+  // MEDIA_DOMAIN is routed through cod-server (R2-backed image proxy) by the
+  // generated Worker config, avoiding separate zone-level R2 permissions.
+  await configureR2Cors([CFG.dashboardUrl].filter(Boolean));
 
   // ── Secrets (generate once, reuse on re-runs) ────────────────────────────
   let secrets = { BETTER_AUTH_SECRET: "", MCP_LOGIN_TICKET_SECRET: "", STORE_API_KEY: "" };
@@ -479,7 +593,7 @@ async function main() {
   let serverToml = genServerToml(serverTpl, urls0);
   let dashToml = genDashToml(dashTpl, urls0);
   const themeTpl = readFileSync(join(THEME_DIR, "wrangler.jsonc"), "utf8");
-  const themeWrangler = genThemeWrangler(themeTpl, NAMES.themeWorker);
+  const themeWrangler = genThemeWrangler(themeTpl, NAMES.themeWorker, CFG.storeUrl);
   writeFileSync(join(SERVER_DIR, "wrangler.toml"), serverToml);
   writeFileSync(join(DASH_DIR, "wrangler.toml"), dashToml);
   writeFileSync(join(THEME_DIR, "wrangler.jsonc"), themeWrangler);
@@ -558,6 +672,22 @@ async function main() {
     } else {
       warn("R2 API token not provided — presigned uploads stay disabled until Step 3b (see summary).");
     }
+    const telegramValues = [CFG.telegramBotToken, CFG.telegramChatId, CFG.telegramWebhookSecret];
+    if (telegramValues.every(Boolean)) {
+      secretPut(NAMES.serverWorker, "TELEGRAM_BOT_TOKEN", CFG.telegramBotToken, SERVER_DIR);
+      secretPut(NAMES.serverWorker, "TELEGRAM_APPROVAL_CHAT_ID", CFG.telegramChatId, SERVER_DIR);
+      secretPut(NAMES.serverWorker, "TELEGRAM_WEBHOOK_SECRET", CFG.telegramWebhookSecret, SERVER_DIR);
+      const response = await fetch(`https://api.telegram.org/bot${CFG.telegramBotToken}/setWebhook`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: `${serverUrl}/webhooks/telegram`, secret_token: CFG.telegramWebhookSecret, allowed_updates: ["callback_query"] }),
+      });
+      if (!response.ok) fail(`Telegram setWebhook failed (${response.status})`);
+      ok("Telegram approval webhook configured");
+    } else if (telegramValues.some(Boolean)) {
+      warn("Telegram approvals need all three secrets: BOT_TOKEN, APPROVAL_CHAT_ID, WEBHOOK_SECRET.");
+    } else {
+      info("Telegram approval secrets not supplied — approvals remain optional/direct.");
+    }
   } else {
     info("--deploy-only: skipping server secret puts — existing values stay.");
   }
@@ -593,6 +723,17 @@ async function main() {
     cwd: DASH_DIR, stdio: "inherit",
     env: { ADMIN_EMAIL: CFG.adminEmail, ADMIN_NAME: CFG.adminName },
   });
+
+  // CI workspaces do not retain .dev.vars, so every full recovery run creates
+  // a new raw storefront key. Keep D1's default key hash in sync even when the
+  // catalog seed is correctly skipped; otherwise the theme sends a new key
+  // while /store/* still validates the old one and silently renders no items.
+  const storeKeyHash = createHash("sha256").update(secrets.STORE_API_KEY).digest("hex");
+  wrangler(["d1", "execute", NAMES.db, "--remote", "--command",
+    `UPDATE store_api_keys SET key_hash = '${storeKeyHash}' WHERE name = 'default'`], {
+    cwd: SERVER_DIR, label: "sync default storefront API key hash",
+  });
+  ok("D1 storefront API key synchronized with server + theme secrets");
   } // !CFG.deployOnly — catalog + admin user untouched on update deploys
 
   // ── Step 6b — deploy dashboard ───────────────────────────────────────────
@@ -672,6 +813,16 @@ async function main() {
     ok("cod-server redeployed with store origin allowed");
   }
 
+  // A full CI setup generates a fresh BETTER_AUTH_SECRET. Clear JWKs only
+  // after the final dashboard deployment, immediately before the first session
+  // request, so Better Auth cannot reuse a key encrypted by an older secret.
+  if (!CFG.deployOnly) {
+    wrangler(["d1", "execute", NAMES.db, "--remote", "--command", "DELETE FROM jwkss"], {
+      cwd: SERVER_DIR, label: "rotate Better Auth JWT signing keys",
+    });
+    ok("old JWT signing keys cleared; the current dashboard will create a fresh key");
+  }
+
   // ── Smoke tests ──────────────────────────────────────────────────────────
   step("Smoke tests");
   await waitFor("cod-server /api/docs", async () => {
@@ -680,6 +831,21 @@ async function main() {
       ? { ok: true, detail: "200" }
       : { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 80)}` };
   });
+  if (!CFG.deployOnly) {
+    await waitFor("storefront authenticated catalog", async () => {
+      const r = await httpCheck(`${serverUrl}/store/products?limit=12`, {
+        headers: { "X-Store-API-Key": secrets.STORE_API_KEY },
+      });
+      if (r.status !== 200) {
+        return { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 100)}` };
+      }
+      const body = tryJson(r.text);
+      const count = Array.isArray(body?.data) ? body.data.length : 0;
+      return count > 0
+        ? { ok: true, detail: `200 + ${count} visible product(s)` }
+        : { ok: false, detail: "200 but catalog has zero visible products" };
+    }, { tries: 6, delayMs: 3000 });
+  }
   await waitFor("dashboard sign-in (with Origin header)", async () => {
     // deploy-only mode has no admin password in scope — treat the endpoint
     // being up (any auth response) as healthy and move on.
@@ -697,12 +863,28 @@ async function main() {
       headers: { "Content-Type": "application/json", Origin: dashUrl },
       body: JSON.stringify({ email: CFG.adminEmail, password: adminPassword }),
     });
-    if (r.status === 200) return { ok: true, detail: "200 + session" };
+    if (r.status === 200) {
+      // A 200 sign-in alone is insufficient: the original production bug set
+      // a cookie that was not accepted on the next page, causing an immediate
+      // /dashboard → /sign-in loop. Reproduce the browser's second request.
+      const getSetCookie = r.headers?.getSetCookie?.bind(r.headers);
+      const setCookies = getSetCookie ? getSetCookie() : (r.headers?.get("set-cookie") ?? "")
+        .split(/,\s*(?=[^;,]+=)/).filter(Boolean);
+      const cookie = setCookies.map((value) => value.split(";", 1)[0]).join("; ");
+      if (!cookie) return { ok: false, detail: "200 but no session cookie was set" };
+      const session = await httpCheck(`${dashUrl}/api/auth/get-session`, {
+        headers: { Origin: dashUrl, Cookie: cookie },
+      });
+      if (session.status === 200 && /"user"\s*:/.test(session.text)) {
+        return { ok: true, detail: "200 + cookie persisted + session restored" };
+      }
+      return { ok: false, detail: `sign-in 200 but get-session HTTP ${session.status} ${session.text.slice(0, 100)}` };
+    }
     if (r.status === 403 && /ORIGIN/i.test(r.text)) {
       return { ok: false, detail: "403 INVALID_ORIGIN — redeploying dashboard to re-apply trusted origins…" };
     }
     return { ok: false, detail: `HTTP ${r.status} ${r.text.slice(0, 100)}` };
-  }, { tries: 30, delayMs: 6000 });
+  }, { tries: 6, delayMs: 5000 });
   {
     const r = await httpCheck(dashUrl);
     r.status === 200 ? ok(`dashboard UI loads (${dashUrl})`)
@@ -712,13 +894,16 @@ async function main() {
     const r = await httpCheck(storeUrl);
     r.status === 200 ? ok(`storefront loads (${storeUrl})`)
       : warn(`storefront returned HTTP ${r.status}.`);
-    warn("workers.dev → workers.dev fetches are blocked by Cloudflare (error 1042): the storefront may render without products until cod-server gets a custom domain. See summary.");
+    if (serverUrl.includes(".workers.dev")) {
+      warn("workers.dev → workers.dev fetches are blocked by Cloudflare (error 1042): the storefront may render without products until cod-server gets a custom domain. See summary.");
+    }
   }
 
   // ── Step 7 — summary + credentials file ──────────────────────────────────
   step("Done — resource inventory");
+  let credPath = "";
   if (!CFG.deployOnly) {
-  const credPath = join(homedir(), `codflow-${CFG.prefix}-credentials.md`);
+  credPath = join(homedir(), `codflow-${CFG.prefix}-credentials.md`);
   const creds =
     `# CodFlow Credentials — ${CFG.prefix}\n\n` +
     `Generated ${new Date().toISOString()} by scripts/cloudflare-deploy.mjs.\n\n` +

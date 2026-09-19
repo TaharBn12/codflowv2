@@ -184,7 +184,8 @@
     "email_failed": "تعذر إرسال بريد الدعوة.",
     "email_not_configured": "إرسال البريد الإلكتروني غير مُهيّأ.",
     "email_share_manually": "شارك كلمة المرور المؤقتة مع العضو يدوياً.",
-    "email_language_label": "لغة بريد الدعوة"
+    "email_language_label": "لغة بريد الدعوة",
+    "automatic_role_permissions": "يتم تعيين الصلاحيات تلقائيًا لهذا الدور وتطبيقها من الخادم."
   },
   "error_member_not_found": "عضو الفريق غير موجود",
   "error_duplicate_email": "يوجد مستخدم بهذا البريد الإلكتروني بالفعل",

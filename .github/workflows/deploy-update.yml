@@ -73,10 +73,10 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'codflowv2' }}
       # Custom-domain overrides: dispatch input wins, then repo variable, else workers.dev
-      IN_SERVER_URL: ${{ inputs.server_url || vars.SERVER_URL }}
-      IN_DASHBOARD_URL: ${{ inputs.dashboard_url || vars.DASHBOARD_URL }}
-      IN_STORE_URL: ${{ inputs.store_url || vars.STORE_URL }}
-      MEDIA_DOMAIN: ${{ inputs.media_domain || vars.MEDIA_DOMAIN }}
+      IN_SERVER_URL: ${{ inputs.server_url || vars.SERVER_URL || 'https://api.codfly.dpdns.org' }}
+      IN_DASHBOARD_URL: ${{ inputs.dashboard_url || vars.DASHBOARD_URL || 'https://dashboard.codfly.dpdns.org' }}
+      IN_STORE_URL: ${{ inputs.store_url || vars.STORE_URL || 'https://codfly.dpdns.org' }}
+      MEDIA_DOMAIN: ${{ inputs.media_domain || vars.MEDIA_DOMAIN || 'media.codfly.dpdns.org' }}
     steps:
       - uses: actions/checkout@v7
 

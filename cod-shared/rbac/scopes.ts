@@ -150,6 +150,31 @@ export type Scope = typeof SCOPES[keyof typeof SCOPES];
  */
 export const ALL_SCOPES = Object.values(SCOPES).filter(scope => scope !== "*");
 
+export type TeamRole = "admin" | "staff" | "confirmer" | "driver";
+
+/** Automatic least-privilege grants for operational team roles. */
+export const ROLE_DEFAULT_SCOPES: Record<Exclude<TeamRole, "admin" | "staff">, readonly Scope[]> = {
+  confirmer: [
+    SCOPES.DASHBOARD_VIEW,
+    SCOPES.ORDERS_READ,
+    SCOPES.ORDERS_UPDATE,
+    SCOPES.CUSTOMERS_READ,
+    SCOPES.CUSTOMERS_UPDATE,
+    SCOPES.ABANDONED_ORDERS_READ,
+    SCOPES.ABANDONED_ORDERS_MANAGE,
+  ],
+  driver: [
+    SCOPES.DASHBOARD_VIEW,
+    SCOPES.ORDERS_READ,
+    SCOPES.ORDERS_UPDATE,
+    SCOPES.DELIVERY_READ,
+  ],
+};
+
+export function defaultScopesForRole(role: TeamRole): readonly Scope[] {
+  return role === "confirmer" || role === "driver" ? ROLE_DEFAULT_SCOPES[role] : [];
+}
+
 /**
  * Scope categories for UI grouping
  */
@@ -226,10 +251,6 @@ export const SCOPE_CATEGORIES = {
   abandonedOrders: {
     label: "Abandoned Orders",
     scopes: [SCOPES.ABANDONED_ORDERS_READ, SCOPES.ABANDONED_ORDERS_MANAGE],
-  },
-  landingPages: {
-    label: "Landing Pages",
-    scopes: [SCOPES.LANDING_PAGES_READ, SCOPES.LANDING_PAGES_MANAGE],
   },
   mcp: {
     label: "AI Agents (MCP)",

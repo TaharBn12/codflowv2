@@ -18,7 +18,7 @@ export interface McpProps extends Record<string, unknown> {
   /** Better Auth user UUID. */
   userId: string;
   /** Admin or staff; admins bypass every scope check. */
-  role: "admin" | "staff";
+  role: "admin" | "staff" | "confirmer" | "driver";
   /**
    * Scopes granted to this OAuth grant. Never includes "*" — admin bypass uses
    * `role`, not a wildcard scope.

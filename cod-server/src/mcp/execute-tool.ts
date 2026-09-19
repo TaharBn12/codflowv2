@@ -8,7 +8,7 @@ import { TOOL_OUTPUT_SCHEMAS } from "./schemas";
 export interface McpActor {
   id: string;
   name: string;
-  role: "admin" | "staff";
+  role: "admin" | "staff" | "confirmer" | "driver";
 }
 
 export interface ExecuteToolInput {

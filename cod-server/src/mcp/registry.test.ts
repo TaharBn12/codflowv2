@@ -32,8 +32,6 @@ vi.mock("@/endpoints/customers/ai-tools", () => ({
     "createNewCustomer",
     "updateCustomerProfile",
     "getCustomerOrderHistory",
-  "getLandingPageDetails",
-  "getLandingPageStats",
     "getCustomerMemberships",
     "deleteCustomer",
   ),
@@ -47,17 +45,14 @@ vi.mock("@/endpoints/drivers/ai-tools", () => ({
     "updateDriverProfile",
     "updateDriverStatus",
     "deleteDriver",
-  "deleteLandingPage",
   ),
 }));
 
 vi.mock("@/endpoints/driver-payments/ai-tools", () => ({
   getDriverPaymentTools: () => toolMap(
     "listDriverPayments",
-  "listLandingPages",
     "getPendingSettlements",
     "createDriverSettlement",
-  "createLandingPage",
   ),
 }));
 
@@ -91,27 +86,6 @@ vi.mock("@/endpoints/offers/ai-tools", () => ({
     "createOffer",
     "updateOffer",
     "deleteOffer",
-  ),
-}));
-
-vi.mock("@/endpoints/landing-pages/ai-tools", () => ({
-  getLandingPageTools: vi.fn(() =>
-    toolMap(
-      "listLandingPages",
-      "getLandingPageDetails",
-      "getLandingPageImageUploadStatus",
-      "getLandingPageStats",
-      "archiveLandingPage",
-      "createLandingPage",
-      "deleteLandingPage",
-      "duplicateLandingPage",
-      "publishLandingPage",
-      "removeLandingPageImage",
-      "reorderLandingPageImages",
-      "unpublishLandingPage",
-      "updateLandingPage",
-      "uploadLandingPageImage",
-    ),
   ),
 }));
 
@@ -210,7 +184,6 @@ vi.mock("@/db", () => ({
 }));
 
 import { buildToolsForUser } from "./registry";
-import { getLandingPageTools } from "@/endpoints/landing-pages/ai-tools";
 import { SCOPES } from "../../../cod-shared/rbac/scopes";
 import type { McpProps } from "./props";
 import type { Env } from "@/types/env";
@@ -237,13 +210,11 @@ const ALL_TOOLS = [
   "addCustomerToGroup",
   "adjustProductStock",
   "adjustVariantStock",
-  "archiveLandingPage",
   "assignDriverToOrder",
   "assignTagToCustomer",
   "createCustomerGroup",
   "createCustomerTag",
   "createDriverSettlement",
-  "createLandingPage",
   "createNewCustomer",
   "createNewDriver",
   "createNewProduct",
@@ -256,7 +227,6 @@ const ALL_TOOLS = [
   "deleteCustomerGroup",
   "deleteCustomerTag",
   "deleteDriver",
-  "deleteLandingPage",
   "deleteOffer",
   "deleteOrder",
   "deleteProduct",
@@ -264,7 +234,6 @@ const ALL_TOOLS = [
   "deleteProductVariant",
   "deleteReview",
   "deleteShippingProfile",
-  "duplicateLandingPage",
   "findCustomerByPhone",
   "getCustomerDetails",
   "getCustomerGroupDetails",
@@ -273,9 +242,6 @@ const ALL_TOOLS = [
   "getCustomerTagDetails",
   "getDefaultShippingRules",
   "getDriverDetails",
-  "getLandingPageDetails",
-  "getLandingPageImageUploadStatus",
-  "getLandingPageStats",
   "getOfferDetails",
   "getOrderDetails",
   "getPendingSettlements",
@@ -292,7 +258,6 @@ const ALL_TOOLS = [
   "listCustomers",
   "listDriverPayments",
   "listDrivers",
-  "listLandingPages",
   "listOffers",
   "listOrders",
   "listProductGroups",
@@ -303,23 +268,18 @@ const ALL_TOOLS = [
   "listWilayaCommunes",
   "listWilayas",
   "moderateReview",
-  "publishLandingPage",
   "recordOrderProductReturn",
   "removeCustomerFromGroup",
-  "removeLandingPageImage",
-  "reorderLandingPageImages",
   "resetShippingCommuneOverride",
   "setShippingCommuneOverride",
   "setShippingProfileRules",
   "unassignDriverFromOrder",
   "unassignTagFromCustomer",
-  "unpublishLandingPage",
   "updateCustomerGroup",
   "updateCustomerProfile",
   "updateCustomerTag",
   "updateDriverProfile",
   "updateDriverStatus",
-  "updateLandingPage",
   "updateOffer",
   "updateOrderStatus",
   "updateProductDetails",
@@ -329,7 +289,6 @@ const ALL_TOOLS = [
   "updateShippingProfile",
   "updateVariant",
   "updateVariantStockThreshold",
-  "uploadLandingPageImage",
 ];
 
 describe("buildToolsForUser — scope gating", () => {
@@ -404,30 +363,5 @@ describe("buildToolsForUser — scope gating", () => {
     expect(tools).toContain("deleteCustomer");
   });
 
-  it("LANDING_PAGES_MANAGE grants the full landing-page write suite incl. image upload", () => {
-    expect(names(makeProps({ scopes: [SCOPES.LANDING_PAGES_MANAGE] }))).toEqual([
-      "archiveLandingPage",
-      "createLandingPage",
-      "deleteLandingPage",
-      "duplicateLandingPage",
-      "getLandingPageImageUploadStatus",
-      "publishLandingPage",
-      "removeLandingPageImage",
-      "reorderLandingPageImages",
-      "unpublishLandingPage",
-      "updateLandingPage",
-      "uploadLandingPageImage",
-    ]);
-  });
 
-  it("passes (env, props) through to factory build calls — identity and bindings reach tool domains", () => {
-    const props = makeProps({ scopes: [SCOPES.LANDING_PAGES_MANAGE] });
-    buildToolsForUser(env, props);
-
-    expect(vi.mocked(getLandingPageTools)).toHaveBeenCalledWith(
-      expect.anything(),
-      env,
-      props,
-    );
-  });
 });

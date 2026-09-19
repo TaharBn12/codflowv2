@@ -11,7 +11,7 @@ import { users, userScopes } from "../db/schema";
 import type { AppDb } from "../db/client";
 
 export interface UserFilters {
-  role?: "admin" | "staff";
+  role?: "admin" | "staff" | "confirmer" | "driver";
   status?: "active" | "inactive";
   search?: string;
   limit?: number;

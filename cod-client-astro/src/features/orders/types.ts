@@ -83,6 +83,8 @@ export interface OrderBase {
   feePaymentId?: string | null;
   createdAt: string;
   updatedAt: string;
+  confirmationAssigneeId?: string | null;
+  confirmationAssigneeName?: string | null;
 }
 
 export interface OrderListItem extends OrderBase {

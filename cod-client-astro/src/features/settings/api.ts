@@ -11,6 +11,8 @@ import type {
   SaveTurnstileConfigData,
   StoreConfig,
   TurnstileConfig,
+  TelegramConfig,
+  SaveTelegramConfigData,
   UpdateStoreData,
 } from "./types";
 
@@ -73,4 +75,12 @@ export async function saveEmailConfig(data: SaveEmailConfigData) {
 
 export async function testEmailConnection(apiKey?: string) {
   return (await apiFetch<DataEnvelope<EmailConnectionCheck>>("/api/stores/email-config/test", json({ method: "POST", body: JSON.stringify(apiKey ? { apiKey } : {}) }))).data;
+}
+
+export async function getTelegramConfig() {
+  return (await apiFetch<DataEnvelope<TelegramConfig>>("/api/operations/telegram/config")).data;
+}
+
+export async function saveTelegramConfig(data: SaveTelegramConfigData) {
+  return (await apiFetch<DataEnvelope<TelegramConfig>>("/api/operations/telegram/config", json({ method: "PUT", body: JSON.stringify(data) }))).data;
 }

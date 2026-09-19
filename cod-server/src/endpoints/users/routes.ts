@@ -28,7 +28,7 @@ const idParams = z.object({
 // ─── Request schemas ──────────────────────────────────────────────────────────
 
 const listQuerySchema = z.object({
-  role: z.enum(["admin", "staff"]).optional(),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
   search: z.string().optional().openapi({ description: "Search by name or email" }),
   limit: z.coerce.number().int().positive().max(100).default(50),
@@ -38,7 +38,7 @@ const listQuerySchema = z.object({
 const createBodySchema = z.object({
   email: z.string().email("Invalid email format").openapi({ example: "staff@example.com" }),
   name: z.string().min(1, "Name is required").openapi({ example: "Ahmed Benali" }),
-  role: z.enum(["admin", "staff"]).default("staff").openapi({
+  role: z.enum(["admin", "staff", "confirmer", "driver"]).default("staff").openapi({
     description: "Defaults to `staff`.",
   }),
   scopes: z.array(z.string()).default([]).openapi({
@@ -54,12 +54,12 @@ const createBodySchema = z.object({
 const updateBodySchema = z.object({
   email: z.string().email("Invalid email format").optional(),
   name: z.string().min(1, "Name is required").optional(),
-  role: z.enum(["admin", "staff"]).optional(),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
 });
 
 const updateRoleBodySchema = z.object({
-  role: z.enum(["admin", "staff"]),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]),
 });
 
 const grantScopeBodySchema = z.object({

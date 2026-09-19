@@ -133,7 +133,18 @@
     "error_load": "Impossible de charger les paramètres de la boutique",
     "domain_label": "Domaine de la vitrine",
     "domain_placeholder": "boutique.exemple.com",
-    "domain_hint": "Le domaine personnalisé de votre vitrine. Les liens de partage des pages d'atterrissage en sont dérivés. Laissez vide pour utiliser l'URL par défaut du déploiement."
+    "domain_hint": "Le domaine personnalisé de votre vitrine. Les liens de partage des pages d'atterrissage en sont dérivés. Laissez vide pour utiliser l'URL par défaut du déploiement.",
+    "telegram_title": "Approbations Telegram",
+    "telegram_subtitle": "Configurez le bot pour les approbations administratives sécurisées",
+    "telegram_enabled": "Activer les approbations Telegram",
+    "telegram_enabled_hint": "Envoyer les actions sensibles aux administrateurs",
+    "telegram_token": "Jeton du bot",
+    "telegram_token_hint": "Stocké en sécurité sur le serveur et jamais renvoyé au navigateur",
+    "telegram_token_placeholder": "Collez le jeton de BotFather",
+    "telegram_stored": "Jeton enregistré",
+    "telegram_chat_id": "ID du chat approbateur",
+    "telegram_chat_hint": "Seuls les retours de ce chat Telegram sont acceptés",
+    "telegram_environment": "Les secrets d’environnement ont actuellement priorité sur les paramètres du tableau de bord."
   },
   "shipping": {
     "title": "Tarifs de livraison",

@@ -13,7 +13,7 @@ export const UserSchema = z
     email: z.string().email().openapi({ example: "staff@example.com" }),
     emailVerified: z.boolean().openapi({ example: true }),
     image: z.string().nullable().openapi({ description: "Avatar image URL", example: null }),
-    role: z.enum(["admin", "staff"]).openapi({ example: "staff" }),
+    role: z.enum(["admin", "staff", "confirmer", "driver"]).openapi({ example: "staff" }),
     status: z.enum(["active", "inactive"]).openapi({ example: "active" }),
     language: z.string().openapi({
       description: 'UI language preference for emails: "ar" | "en"',

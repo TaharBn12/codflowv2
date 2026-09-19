@@ -184,7 +184,8 @@
     "email_failed": "The invite email could not be sent.",
     "email_not_configured": "Email sending is not configured.",
     "email_share_manually": "Share the temporary password with the member manually.",
-    "email_language_label": "Invite email language"
+    "email_language_label": "Invite email language",
+    "automatic_role_permissions": "Permissions are assigned automatically for this role and enforced by the server."
   },
   "error_member_not_found": "Team member not found",
   "error_duplicate_email": "A user with this email already exists",

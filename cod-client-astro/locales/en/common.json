@@ -8,7 +8,9 @@
   "move_down": "Move down",
   "roles": {
     "admin": "Admin",
-    "staff": "Staff"
+    "staff": "Staff",
+    "confirmer": "Order Confirmer",
+    "driver": "Driver"
   },
   "time": {
     "moments_ago": "moments ago",
