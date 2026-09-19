@@ -23,7 +23,6 @@ import {
   saveOperationAgentSettings,
   getOperationsSummary,
   listOperationTasks,
-  updateOperationTask,
   type AgentPerformance,
   type OperationAgent,
   type StaffCommission,
@@ -79,19 +78,6 @@ function Gated() {
   useEffect(() => {
     void load();
   }, [identity?.role, isAdmin]);
-
-  async function changeTask(
-    task: OperationTask,
-    status: OperationTask["status"],
-  ) {
-    try {
-      await updateOperationTask(task.id, status);
-      notify.success(t("task_updated"));
-      await load();
-    } catch (cause) {
-      notify.error(cause instanceof Error ? cause.message : String(cause));
-    }
-  }
 
   async function payEarnedCommissions() {
     const ids = commissions
@@ -223,29 +209,15 @@ function Gated() {
                         : ""}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    {task.status === "open" && (
-                      <button
-                        onClick={() => void changeTask(task, "in_progress")}
-                        className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-                      >
-                        {t("start")}
-                      </button>
-                    )}
-                    {task.status !== "completed" &&
-                      task.status !== "cancelled" && (
-                        <button
-                          onClick={() => void changeTask(task, "completed")}
-                          className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
-                        >
-                          {t("complete")}
-                        </button>
-                      )}
-                    {task.status === "completed" && (
-                      <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
-                        {t("completed")}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {t("order_status")}
+                    </span>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">
+                      {task.orderStatus
+                        ? t(`order_statuses.${task.orderStatus}`)
+                        : "—"}
+                    </span>
                   </div>
                 </div>
               ))}

@@ -17,7 +17,8 @@
     "driver": "السائق",
     "date": "التاريخ",
     "not_assigned": "غير معين",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "confirmation_assignment": "التأكيد / المتابعة"
   },
   "actions": {
     "view": "عرض",
@@ -73,7 +74,13 @@
     "company": "شركة",
     "unassigned": "غير معين",
     "wilaya": "الولاية",
-    "all_wilayas": "جميع الولايات"
+    "all_wilayas": "جميع الولايات",
+    "confirmation_assignment": "تعيين موظف التأكيد",
+    "all_assignments": "كل التعيينات",
+    "assigned_confirmation": "معيّنة",
+    "unassigned_confirmation": "بدون موظف تأكيد",
+    "confirmer": "موظف التأكيد",
+    "all_confirmers": "كل موظفي التأكيد"
   },
   "type": {
     "online": "أونلاين",
@@ -299,5 +306,10 @@
       "description": "المتسوقون الذين يبدأون طلباً ولا يُكملونه سيظهرون هنا كفرص استرجاع."
     },
     "recovered_order": "الطلب {number}"
+  },
+  "assignment": {
+    "confirmation_agent": "موظف التأكيد",
+    "follow_up_agent": "موظف المتابعة",
+    "unassigned": "غير معيّن"
   }
 }

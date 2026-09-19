@@ -11,6 +11,8 @@ import { useT } from "@/i18n/react";
 import {
   autoAssignNewOrders,
   bulkAssignConfirmationOrders,
+  getAutomationSettings,
+  saveAutomationSettings,
   listOperationAgents,
   type OperationAgent,
 } from "@/features/operations/api";
@@ -60,6 +62,8 @@ const EMPTY_FILTERS: OrderFilters = {
   delivery: "all",
   wilaya: "all",
   type: "all",
+  confirmationAssignment: "all",
+  confirmerId: "all",
 };
 
 function OrderSkeleton() {
@@ -131,6 +135,8 @@ export function OrdersList() {
   const [bulkAgentId, setBulkAgentId] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [autoAssignBusy, setAutoAssignBusy] = useState(false);
+  const [automationEnabled, setAutomationEnabled] = useState(true);
+  const [automationBusy, setAutomationBusy] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | Error | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [filters, setFilters] = useState<OrderFilters>(() => ({
@@ -157,7 +163,14 @@ export function OrdersList() {
       setOrders(orderResponse.data ?? []);
       setCompanies(companyResponse);
       setDrivers(driverResponse);
-      if (identity?.role === "admin") setAgents(await listOperationAgents());
+      if (identity?.role === "admin") {
+        const [nextAgents, automation] = await Promise.all([
+          listOperationAgents(),
+          getAutomationSettings(),
+        ]);
+        setAgents(nextAgents);
+        setAutomationEnabled(automation.autoAssignEnabled);
+      }
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause : new Error(String(cause)));
     }
@@ -231,6 +244,8 @@ export function OrdersList() {
     companies,
     onChanged: load,
     onError: setActionError,
+    agents,
+    isAdmin: identity?.role === "admin",
   };
   function selectionProps(orderId: string) {
     if (identity?.role !== "admin") return {};
@@ -274,6 +289,25 @@ export function OrdersList() {
       setActionError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBulkBusy(false);
+    }
+  }
+
+  async function toggleAutomation() {
+    setAutomationBusy(true);
+    try {
+      const result = await saveAutomationSettings(!automationEnabled);
+      setAutomationEnabled(result.autoAssignEnabled);
+      notify.success(
+        operations(
+          result.autoAssignEnabled
+            ? "automation_enabled"
+            : "automation_disabled",
+        ),
+      );
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setAutomationBusy(false);
     }
   }
 
@@ -340,17 +374,28 @@ export function OrdersList() {
               {filteredOrders.length} {t("orders_count")}
             </span>
             {identity?.role === "admin" && (
-              <button
-                type="button"
-                disabled={autoAssignBusy}
-                onClick={() => void autoAssign()}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-              >
-                <WandSparkles size={16} />
-                {autoAssignBusy
-                  ? operations("assigning")
-                  : operations("auto_assign_new")}
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={automationBusy}
+                  onClick={() => void toggleAutomation()}
+                  className={`h-10 rounded-lg border px-3 text-sm font-semibold ${automationEnabled ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700" : "border-border bg-muted text-muted-foreground"}`}
+                >
+                  {operations("automatic_distribution")}:{" "}
+                  {operations(automationEnabled ? "enabled" : "disabled")}
+                </button>
+                <button
+                  type="button"
+                  disabled={autoAssignBusy}
+                  onClick={() => void autoAssign()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  <WandSparkles size={16} />
+                  {autoAssignBusy
+                    ? operations("assigning")
+                    : operations("auto_assign_new")}
+                </button>
+              </>
             )}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -366,6 +411,37 @@ export function OrdersList() {
                 </option>
               ))}
             </FilterSelect>
+            {identity?.role === "admin" && (
+              <>
+                <FilterSelect
+                  label={t("filters.confirmation_assignment")}
+                  value={filters.confirmationAssignment ?? "all"}
+                  onChange={(value) =>
+                    setFilter("confirmationAssignment", value)
+                  }
+                >
+                  <option value="all">{t("filters.all_assignments")}</option>
+                  <option value="assigned">
+                    {t("filters.assigned_confirmation")}
+                  </option>
+                  <option value="unassigned">
+                    {t("filters.unassigned_confirmation")}
+                  </option>
+                </FilterSelect>
+                <FilterSelect
+                  label={t("filters.confirmer")}
+                  value={filters.confirmerId ?? "all"}
+                  onChange={(value) => setFilter("confirmerId", value)}
+                >
+                  <option value="all">{t("filters.all_confirmers")}</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name}
+                    </option>
+                  ))}
+                </FilterSelect>
+              </>
+            )}
             <FilterSelect
               label={t("filters.delivery_method")}
               value={filters.delivery}
@@ -492,6 +568,9 @@ export function OrdersList() {
                       direction={sortDirection}
                       onSort={handleSort}
                     />
+                    <TableHead className="text-start">
+                      {t("table.confirmation_assignment")}
+                    </TableHead>
                     <SortHeader
                       label={t("table.wilaya")}
                       sortKey="wilaya"

@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   operationAgentSettings,
+  operationAutomationSettings,
   operationTasks,
   orderConfirmationAssignments,
   orders,
@@ -80,20 +81,22 @@ routes.get("/summary", async (c) => {
       )
       .groupBy(staffCommissions.status)
       .all(),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(orders)
-      .leftJoin(
-        orderConfirmationAssignments,
-        eq(orders.id, orderConfirmationAssignments.orderId),
-      )
-      .where(
-        and(
-          inArray(orders.status, [...activeOrderStatuses]),
-          sql`${orderConfirmationAssignments.orderId} IS NULL`,
-        ),
-      )
-      .get(),
+    actor.role === "admin"
+      ? db
+          .select({ count: sql<number>`count(*)` })
+          .from(orders)
+          .leftJoin(
+            orderConfirmationAssignments,
+            eq(orders.id, orderConfirmationAssignments.orderId),
+          )
+          .where(
+            and(
+              inArray(orders.status, [...activeOrderStatuses]),
+              sql`${orderConfirmationAssignments.orderId} IS NULL`,
+            ),
+          )
+          .get()
+      : Promise.resolve({ count: 0 }),
   ]);
   const tasks = Object.fromEntries(
     taskRows.map((row) => [row.status, row.count]),
@@ -143,8 +146,10 @@ routes.get("/tasks", async (c) => {
       completedAt: operationTasks.completedAt,
       createdAt: operationTasks.createdAt,
       updatedAt: operationTasks.updatedAt,
+      orderStatus: orders.status,
     })
     .from(operationTasks)
+    .leftJoin(orders, eq(operationTasks.orderId, orders.id))
     .leftJoin(users, eq(operationTasks.assigneeId, users.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(
@@ -401,7 +406,6 @@ routes.post("/orders/bulk-assign", async (c) => {
                 selected.map((order) => order.id),
               ),
               inArray(operationTasks.status, ["open", "in_progress"]),
-              eq(operationTasks.type, "confirmation"),
             ),
           ),
       ]
@@ -429,11 +433,12 @@ routes.post("/orders/bulk-assign", async (c) => {
     ),
   );
   for (const order of selected) {
+    if (["delivered", "returned", "cancelled"].includes(order.status)) continue;
     statements.push(
       db.insert(operationTasks).values({
         id: crypto.randomUUID(),
-        title: `Confirm order ${order.orderNumber}`,
-        type: "confirmation",
+        title: `${order.status === "new" ? "Confirm" : "Follow up"} order ${order.orderNumber}`,
+        type: order.status === "new" ? "confirmation" : "follow_up",
         status: "open",
         priority: "normal",
         orderId: order.id,
@@ -449,7 +454,7 @@ routes.post("/orders/bulk-assign", async (c) => {
   if (selected.length) {
     await db.batch(statements as any);
     for (const order of selected) {
-      if (order.status === "new") await createStaffCommissionStages(db, order.id, false);
+      await createStaffCommissionStages(db, order.id, order.status !== "new");
     }
   }
   return c.json({
@@ -657,6 +662,27 @@ routes.post("/telegram/setup", async (c) => {
   if (!isAdmin(c)) return forbidden(c);
   const webhookUrl = await configureTelegramWebhook(c.env);
   return c.json({ success: true, data: { webhookUrl } });
+});
+
+routes.get("/automation-settings", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const db = getDb(c.env.DB);
+  const row = await db.select().from(operationAutomationSettings).where(eq(operationAutomationSettings.id, "default")).get();
+  return c.json({ success: true, data: { autoAssignEnabled: row?.autoAssignEnabled ?? true } });
+});
+
+routes.put("/automation-settings", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z.object({ autoAssignEnabled: z.boolean() }).safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ success: false, error: parsed.error.flatten(), code: "VALIDATION_FAILED" }, 400);
+  const now = new Date().toISOString();
+  const values = { id: "default", autoAssignEnabled: parsed.data.autoAssignEnabled, updatedBy: c.get("user").id, createdAt: now, updatedAt: now };
+  const db = getDb(c.env.DB);
+  await db.insert(operationAutomationSettings).values(values).onConflictDoUpdate({
+    target: operationAutomationSettings.id,
+    set: { autoAssignEnabled: values.autoAssignEnabled, updatedBy: values.updatedBy, updatedAt: now },
+  });
+  return c.json({ success: true, data: { autoAssignEnabled: values.autoAssignEnabled } });
 });
 
 const agentSettingsSchema = z.object({

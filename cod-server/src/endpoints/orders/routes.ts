@@ -8,6 +8,9 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { AppContext } from "@/types";
 import { defineRoute } from "@/lib/route-builder";
 import { SCOPES } from "../../../../cod-shared/rbac/scopes";
+import { getDb } from "@/db";
+import { orderConfirmationAssignments } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 
 import * as handlers from "./handlers";
 import * as statusTransitions from "./status-transitions";
@@ -659,6 +662,19 @@ Provider support: ecotrack ✅ | others ❌ OPERATION_NOT_SUPPORTED.`,
 // IMPORTANT: /bulk-dispatch must come before /{id} routes — otherwise
 // "bulk-dispatch" would be captured as an id param.
 const router = new OpenAPIHono<AppContext>();
+
+// Return 404 for every direct read or mutation of another confirmer's order.
+const requireConfirmerOwnership = async (c: any, next: () => Promise<void>) => {
+  const actor = c.get("user");
+  if (actor?.role !== "confirmer") return next();
+  const assignment = await getDb(c.env.DB).select({ orderId: orderConfirmationAssignments.orderId })
+    .from(orderConfirmationAssignments)
+    .where(and(eq(orderConfirmationAssignments.orderId, c.req.param("id")), eq(orderConfirmationAssignments.assigneeId, actor.id))).get();
+  if (!assignment) return c.json({ success: false, error: "Order not found", code: "NOT_FOUND" }, 404);
+  return next();
+};
+router.use("/:id", requireConfirmerOwnership);
+router.use("/:id/*", requireConfirmerOwnership);
 
 router.openapi(listOrdersRoute.route, listOrdersRoute.handler);
 router.openapi(bulkDispatchRoute.route, bulkDispatchRoute.handler);

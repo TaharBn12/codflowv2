@@ -59,6 +59,16 @@ describe("Analytics routes (defineRoute)", () => {
     expect(getOrderStatusStats).toHaveBeenCalledWith(mockDb);
   });
 
+  it("scopes confirmer statistics to the authenticated confirmer", async () => {
+    vi.mocked(getOrderStatusStats).mockResolvedValue([]);
+    const app = makeApp({ id: "confirmer-1", name: "Agent", role: "confirmer", scopes: ["dashboard:view"] });
+
+    const res = await app.request("/api/analytics/dashboard-stats");
+
+    expect(res.status).toBe(200);
+    expect(getOrderStatusStats).toHaveBeenCalledWith(mockDb, "confirmer-1");
+  });
+
   it("allows admin without explicit dashboard:view scope", async () => {
     vi.mocked(getOrderStatusStats).mockResolvedValue([]);
     const app = makeApp({ id: "u1", name: "Admin", role: "admin", scopes: [] });

@@ -554,6 +554,14 @@ export const orderConfirmationAssignments = sqliteTable("order_confirmation_assi
   updatedAt: text("updated_at").notNull(),
 }, (t) => ({ assigneeIdx: index("order_confirmation_assignee_idx").on(t.assigneeId, t.assignedAt) }));
 
+export const operationAutomationSettings = sqliteTable("operation_automation_settings", {
+  id: text("id").primaryKey().default("default"),
+  autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const operationAgentSettings = sqliteTable("operation_agent_settings", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),

@@ -99,6 +99,18 @@ describe("orders model", () => {
     expect(result.map((item) => item.id)).toEqual(["2"]);
   });
 
+  it("filters confirmation assignments by state and agent", () => {
+    const orders = [
+      order({ id: "1", confirmationAssigneeId: null }),
+      order({ id: "2", confirmationAssigneeId: "agent-1", confirmationAssigneeName: "Amina" }),
+      order({ id: "3", confirmationAssigneeId: "agent-2", confirmationAssigneeName: "Sami" }),
+    ];
+    const base = { query: "", status: "all", delivery: "all", wilaya: "all", type: "all" };
+
+    expect(filterOrders(orders, { ...base, confirmationAssignment: "unassigned", confirmerId: "all" }).map((item) => item.id)).toEqual(["1"]);
+    expect(filterOrders(orders, { ...base, confirmationAssignment: "all", confirmerId: "agent-1" }).map((item) => item.id)).toEqual(["2"]);
+  });
+
   it("calculates the COD total from product price and delivery fee", () => {
     expect(orderTotal(order())).toBe(9400);
     expect(formatMoney(9400, "en")).toBe("9,400 DA");

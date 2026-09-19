@@ -25,6 +25,7 @@ export type OperationTask = {
   assigneeName: string | null;
   dueAt: string | null;
   createdAt: string;
+  orderStatus: string | null;
 };
 
 export type AgentPerformance = {
@@ -165,4 +166,12 @@ export async function autoAssignNewOrders(orderIds?: string[]) {
 
 export async function getCommissionReport(period: "daily" | "monthly") {
   return (await apiFetch<Envelope<Array<{ period: string; userId: string; userName: string; category: "confirmation" | "follow_up"; status: StaffCommission["status"]; amount: number; count: number }>>>(`/api/operations/commissions/report?period=${period}`)).data;
+}
+
+export async function getAutomationSettings() {
+  return (await apiFetch<Envelope<{ autoAssignEnabled: boolean }>>("/api/operations/automation-settings")).data;
+}
+
+export async function saveAutomationSettings(autoAssignEnabled: boolean) {
+  return (await apiFetch<Envelope<{ autoAssignEnabled: boolean }>>("/api/operations/automation-settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ autoAssignEnabled }) })).data;
 }

@@ -41,5 +41,24 @@
   "assigning": "جارٍ التعيين…",
   "auto_assigned": "تم تعيين طلبات جديدة",
   "confirmation_commission": "عمولة التأكيد",
-  "follow_up_commission": "عمولة المتابعة"
+  "follow_up_commission": "عمولة المتابعة",
+  "order_status": "حالة الطلب",
+  "automatic_distribution": "التوزيع التلقائي",
+  "enabled": "مفعّل",
+  "disabled": "متوقف",
+  "automation_enabled": "تم تفعيل التوزيع التلقائي",
+  "automation_disabled": "تم إيقاف التوزيع التلقائي",
+  "order_statuses": {
+    "new": "جديد",
+    "confirmed": "مؤكد",
+    "unreachable": "متعذر الاتصال",
+    "preparing": "قيد التحضير",
+    "ready": "جاهز",
+    "assigned": "معيّن",
+    "dispatched": "تم الإرسال",
+    "out_for_delivery": "قيد التوصيل",
+    "delivered": "تم التوصيل",
+    "returned": "مرتجع",
+    "cancelled": "ملغى"
+  }
 }

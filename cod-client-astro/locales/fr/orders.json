@@ -17,7 +17,8 @@
     "driver": "Livreur",
     "date": "Date",
     "not_assigned": "Non assigné",
-    "total": "Total"
+    "total": "Total",
+    "confirmation_assignment": "Confirmation / suivi"
   },
   "actions": {
     "view": "Voir",
@@ -73,7 +74,13 @@
     "company": "Société",
     "unassigned": "Non assigné",
     "wilaya": "Wilaya",
-    "all_wilayas": "Toutes les wilayas"
+    "all_wilayas": "Toutes les wilayas",
+    "confirmation_assignment": "Affectation confirmation",
+    "all_assignments": "Toutes les affectations",
+    "assigned_confirmation": "Affectées",
+    "unassigned_confirmation": "Sans agent",
+    "confirmer": "Agent de confirmation",
+    "all_confirmers": "Tous les agents"
   },
   "type": {
     "online": "En ligne",
@@ -299,5 +306,10 @@
       "description": "Les clients qui commencent une commande sans la terminer apparaîtront ici comme des leads à récupérer."
     },
     "recovered_order": "Commande {number}"
+  },
+  "assignment": {
+    "confirmation_agent": "Agent de confirmation",
+    "follow_up_agent": "Agent de suivi",
+    "unassigned": "Non affecté"
   }
 }

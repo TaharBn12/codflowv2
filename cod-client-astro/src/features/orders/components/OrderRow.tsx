@@ -1,6 +1,7 @@
 import { MapPin, PackageOpen, Star } from "lucide-react";
-import { useLocale } from "@/i18n/react";
-import { TableCell, TableRow } from "@/components/ui";
+import { useState } from "react";
+import { useLocale, useT } from "@/i18n/react";
+import { Select, TableCell, TableRow } from "@/components/ui";
 import { formatMoney, orderTotal } from "@/features/orders/model";
 import type {
   DeliveryCompany,
@@ -10,6 +11,10 @@ import type {
 import { OrderStatus } from "@/features/orders/components/OrderStatus";
 import { OrderDelivery } from "@/features/orders/components/OrderDelivery";
 import { OrderRowActions } from "@/features/orders/components/OrderFulfillmentActions";
+import {
+  bulkAssignConfirmationOrders,
+  type OperationAgent,
+} from "@/features/operations/api";
 
 interface RowProps {
   order: OrderListItem;
@@ -17,8 +22,70 @@ interface RowProps {
   companies: DeliveryCompany[];
   onChanged: () => void | Promise<void>;
   onError: (message: string) => void;
+  agents?: OperationAgent[];
+  isAdmin?: boolean;
   selected?: boolean;
   onSelected?: (selected: boolean) => void;
+}
+
+function ConfirmationAssignment({
+  order,
+  agents = [],
+  isAdmin,
+  onChanged,
+  onError,
+}: Pick<RowProps, "order" | "agents" | "isAdmin" | "onChanged" | "onError">) {
+  const t = useT("orders");
+  const [busy, setBusy] = useState(false);
+  const isConfirmation =
+    order.status === "new" || order.status === "unreachable";
+  const label = isConfirmation
+    ? t("assignment.confirmation_agent")
+    : t("assignment.follow_up_agent");
+  if (!isAdmin)
+    return (
+      <div className="text-xs">
+        <span className="block text-muted-foreground">{label}</span>
+        <span className="font-medium">
+          {order.confirmationAssigneeName ?? t("assignment.unassigned")}
+        </span>
+      </div>
+    );
+  return (
+    <label className="block min-w-36 text-xs">
+      <span className="mb-1 block text-muted-foreground">{label}</span>
+      <Select
+        value={order.confirmationAssigneeId ?? ""}
+        disabled={busy}
+        aria-label={label}
+        onChange={async (event) => {
+          const assigneeId = event.target.value;
+          if (!assigneeId) return;
+          setBusy(true);
+          try {
+            await bulkAssignConfirmationOrders([order.id], assigneeId);
+            await onChanged();
+          } catch (cause) {
+            onError(cause instanceof Error ? cause.message : String(cause));
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="h-8 text-xs"
+      >
+        <option value="" disabled>
+          {t("assignment.unassigned")}
+        </option>
+        {agents
+          .filter((agent) => agent.status === "active")
+          .map((agent) => (
+            <option key={agent.id} value={agent.id}>
+              {agent.name}
+            </option>
+          ))}
+      </Select>
+    </label>
+  );
 }
 
 export function OrderDesktopRow({
@@ -27,6 +94,8 @@ export function OrderDesktopRow({
   companies,
   onChanged,
   onError,
+  agents,
+  isAdmin,
   selected,
   onSelected,
 }: RowProps) {
@@ -69,6 +138,15 @@ export function OrderDesktopRow({
         <OrderStatus order={order} onChanged={onChanged} onError={onError} />
       </TableCell>
       <TableCell>
+        <ConfirmationAssignment
+          order={order}
+          agents={agents}
+          isAdmin={isAdmin}
+          onChanged={onChanged}
+          onError={onError}
+        />
+      </TableCell>
+      <TableCell>
         <span className="inline-flex max-w-44 items-start gap-1.5 truncate text-xs font-medium">
           <MapPin size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
           {order.wilaya}
@@ -100,6 +178,8 @@ export function OrderMobileCard({
   companies,
   onChanged,
   onError,
+  agents,
+  isAdmin,
   selected,
   onSelected,
 }: RowProps) {
@@ -155,6 +235,15 @@ export function OrderMobileCard({
         <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
           {formatMoney(orderTotal(order), locale)}
         </span>
+      </div>
+      <div className="mt-3">
+        <ConfirmationAssignment
+          order={order}
+          agents={agents}
+          isAdmin={isAdmin}
+          onChanged={onChanged}
+          onError={onError}
+        />
       </div>
       <div className="mt-2">
         <OrderDelivery order={order} companies={companies} />

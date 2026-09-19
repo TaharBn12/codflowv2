@@ -41,5 +41,24 @@
   "assigning": "Assigning…",
   "auto_assigned": "New orders assigned",
   "confirmation_commission": "Confirmation commission",
-  "follow_up_commission": "Follow-up commission"
+  "follow_up_commission": "Follow-up commission",
+  "order_status": "Order status",
+  "automatic_distribution": "Automatic distribution",
+  "enabled": "On",
+  "disabled": "Off",
+  "automation_enabled": "Automatic distribution enabled",
+  "automation_disabled": "Automatic distribution disabled",
+  "order_statuses": {
+    "new": "New",
+    "confirmed": "Confirmed",
+    "unreachable": "Unreachable",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "assigned": "Assigned",
+    "dispatched": "Dispatched",
+    "out_for_delivery": "Out for delivery",
+    "delivered": "Delivered",
+    "returned": "Returned",
+    "cancelled": "Cancelled"
+  }
 }

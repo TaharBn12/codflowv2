@@ -33,7 +33,11 @@ export async function listOrders(c: Context<AppContext>) {
       search: c.req.query("search"),
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
+      confirmationAssignment: c.req.query("confirmationAssignment"),
+      confirmerId: c.req.query("confirmerId"),
     });
+    const actor = c.get("user");
+    if (actor.role === "confirmer") filters.confirmerId = actor.id;
 
     const orders = await queries.getAllOrders(db, filters);
 
@@ -62,6 +66,10 @@ export async function getOrder(c: Context<AppContext>) {
   const order = await queries.getOrderById(db, orderId);
 
   if (!order) {
+    throw new NotFoundError("Order", orderId);
+  }
+  const actor = c.get("user");
+  if (actor.role === "confirmer" && order.confirmationAssigneeId !== actor.id) {
     throw new NotFoundError("Order", orderId);
   }
 
