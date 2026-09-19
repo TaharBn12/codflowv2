@@ -26,7 +26,9 @@
     "view_details": "Voir les détails",
     "assign_driver": "Assigner un livreur",
     "dispatch_to_company": "Expédier à une société",
-    "update_status": "Mettre à jour le statut"
+    "update_status": "Mettre à jour le statut",
+    "customer_link": "Lien de suivi client",
+    "customer_link_copied": "Lien de suivi client copié"
   },
   "assign_driver_dialog": {
     "title": "Assigner un livreur",

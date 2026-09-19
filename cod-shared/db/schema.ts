@@ -599,6 +599,43 @@ export const telegramApprovalConfig = sqliteTable("telegram_approval_config", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
 });
 
+export const supportChannels = sqliteTable("support_channels", {
+  id: text("id").primaryKey(), type: text("type", { enum: ["whatsapp", "email"] }).notNull(), name: text("name").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), provider: text("provider").notNull(), senderId: text("sender_id"),
+  accessToken: text("access_token"), verifyToken: text("verify_token"), appSecret: text("app_secret"), webhookSecret: text("webhook_secret"),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ typeIdx: uniqueIndex("support_channels_type_idx").on(t.type) }));
+
+export const supportConversations = sqliteTable("support_conversations", {
+  id: text("id").primaryKey(), channelId: text("channel_id").notNull().references(() => supportChannels.id, { onDelete: "cascade" }),
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }), orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+  contact: text("contact").notNull(), contactName: text("contact_name"), subject: text("subject"),
+  status: text("status", { enum: ["open", "pending", "resolved", "closed"] }).notNull().default("open"),
+  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"),
+  assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }), unreadCount: integer("unread_count").notNull().default(0),
+  lastMessageAt: text("last_message_at").notNull(), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ statusLastIdx: index("support_conversations_status_last_idx").on(t.status, t.lastMessageAt), assigneeIdx: index("support_conversations_assignee_idx").on(t.assigneeId, t.status), contactIdx: index("support_conversations_contact_idx").on(t.contact) }));
+
+export const supportMessages = sqliteTable("support_messages", {
+  id: text("id").primaryKey(), conversationId: text("conversation_id").notNull().references(() => supportConversations.id, { onDelete: "cascade" }),
+  direction: text("direction", { enum: ["inbound", "outbound", "internal"] }).notNull(), channelType: text("channel_type", { enum: ["whatsapp", "email"] }).notNull(),
+  senderId: text("sender_id").references(() => users.id, { onDelete: "set null" }), body: text("body").notNull(), externalId: text("external_id"),
+  deliveryStatus: text("delivery_status", { enum: ["queued", "sent", "delivered", "read", "failed", "received"] }).notNull().default("queued"), errorCode: text("error_code"), createdAt: text("created_at").notNull(),
+}, (t) => ({ externalIdx: uniqueIndex("support_messages_external_idx").on(t.channelType, t.externalId), conversationIdx: index("support_messages_conversation_idx").on(t.conversationId, t.createdAt) }));
+
+export const supportTickets = sqliteTable("support_tickets", {
+  id: text("id").primaryKey(), ticketNumber: text("ticket_number").notNull().unique(), conversationId: text("conversation_id").references(() => supportConversations.id, { onDelete: "set null" }),
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }), orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+  subject: text("subject").notNull(), description: text("description"), status: text("status", { enum: ["open", "in_progress", "waiting_customer", "resolved", "closed"] }).notNull().default("open"),
+  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"), assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+  createdBy: text("created_by").notNull().references(() => users.id), dueAt: text("due_at"), resolvedAt: text("resolved_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ statusPriorityIdx: index("support_tickets_status_priority_idx").on(t.status, t.priority, t.createdAt), assigneeIdx: index("support_tickets_assignee_idx").on(t.assigneeId, t.status) }));
+
+export const customerOrderLinks = sqliteTable("customer_order_links", {
+  id: text("id").primaryKey(), orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }), tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: text("expires_at").notNull(), revokedAt: text("revoked_at"), lastViewedAt: text("last_viewed_at"), createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }), createdAt: text("created_at").notNull(),
+}, (t) => ({ orderIdx: index("customer_order_links_order_idx").on(t.orderId, t.expiresAt) }));
+
 export const orderAssignments = sqliteTable("order_assignments", {
   id: text("id").primaryKey(),
   orderId: text("order_id")

@@ -27,7 +27,8 @@
     "stock_management": "إدارة المخزون",
     "api_reference": "مرجع API",
     "mcp": "وكلاء الذكاء الاصطناعي",
-    "operations": "العمليات والمهام"
+    "operations": "العمليات والمهام",
+    "support": "دعم العملاء"
   },
   "navbar": {
     "search_placeholder": "البحث عن طلبات، عملاء...",

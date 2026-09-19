@@ -26,7 +26,9 @@
     "view_details": "عرض التفاصيل",
     "assign_driver": "تعيين سائق",
     "dispatch_to_company": "إرسال لشركة توصيل",
-    "update_status": "تحديث الحالة"
+    "update_status": "تحديث الحالة",
+    "customer_link": "رابط العميل",
+    "customer_link_copied": "تم نسخ رابط متابعة العميل"
   },
   "assign_driver_dialog": {
     "title": "تعيين سائق",

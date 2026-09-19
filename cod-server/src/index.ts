@@ -14,6 +14,8 @@ import { errorHandler } from "@/middleware/error";
 // Import routes
 import storeRoutes from "@/endpoints/store/routes";
 import webhooksRouter from "@/endpoints/webhooks/routes";
+import supportWebhookRoutes from "@/endpoints/support/webhooks";
+import customerExperienceRoutes from "@/endpoints/customer-experience/routes";
 import telegramApprovalsRoutes from "@/endpoints/telegram-approvals/routes";
 import ordersRoutes from "@/endpoints/orders/routes";
 import usersRoutes from "@/endpoints/users/routes";
@@ -39,6 +41,7 @@ import { openApiValidationHook } from "@/openapi/validation-hook";
 import mcpManagementRoutes from "@/endpoints/mcp/routes";
 import analyticsRoutes from "@/endpoints/analytics/routes";
 import abandonedOrdersRoutes from "@/endpoints/abandoned-orders/routes";
+import supportRoutes from "@/endpoints/support/routes";
 import operationsRoutes from "@/endpoints/operations/routes";
 import storeAbandonedRoutes from "@/endpoints/abandoned-orders/store-routes";
 import storeOtpRoutes from "@/endpoints/store-otp/store-routes";
@@ -97,6 +100,8 @@ registerSpecEndpoint(app);
 // MUST be mounted BEFORE app.use("/api/*", authMiddleware)
 app.route("/webhooks", webhooksRouter);
 app.route("/webhooks/telegram", telegramApprovalsRoutes);
+app.route("/webhooks/support", supportWebhookRoutes);
+app.route("/customer-order", customerExperienceRoutes);
 
 // Store API — separate auth (must be before /api/* authMiddleware)
 app.use("/store/*", storeAuthMiddleware);
@@ -150,6 +155,7 @@ app.route("/api/mcp", mcpManagementRoutes);
 app.route("/api/analytics", analyticsRoutes);
 app.route("/api/abandoned-orders", abandonedOrdersRoutes);
 app.route("/api/operations", operationsRoutes);
+app.route("/api/support", supportRoutes);
 
 // 404 handler
 app.notFound((c) => {

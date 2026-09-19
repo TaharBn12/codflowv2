@@ -27,7 +27,8 @@
     "stock_management": "Stock Management",
     "api_reference": "API Reference",
     "mcp": "AI Agents",
-    "operations": "Operations & tasks"
+    "operations": "Operations & tasks",
+    "support": "Customer support"
   },
   "navbar": {
     "search_placeholder": "Search for orders, customers...",

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Building2,
   Eye,
+  Link,
   MoreHorizontal,
   Trash2,
   Truck,
@@ -9,6 +10,7 @@ import {
 import { canScope, useIdentity } from "@/features/auth/components/RequireAuth";
 import { useT } from "@/i18n/react";
 import { notify } from "@/lib/notify";
+import { createCustomerLink } from "@/features/support/api";
 import { deleteOrder } from "@/features/orders/api";
 import {
   canAssignOrder,
@@ -100,6 +102,18 @@ export function OrderRowActions({
           <Eye size={14} />
           {t("actions.view")}
         </DropdownLink>
+        <DropdownItem onClick={async () => {
+          try {
+            const result = await createCustomerLink(order.id);
+            await navigator.clipboard.writeText(result.url);
+            notify.success(t("actions.customer_link_copied"));
+          } catch (cause) {
+            onError(cause instanceof Error ? cause.message : String(cause));
+          }
+        }}>
+          <Link size={14} />
+          {t("actions.customer_link")}
+        </DropdownItem>
         {showAssign && (
           <DropdownItem onClick={() => setAssignOpen(true)}>
             <Truck size={14} />

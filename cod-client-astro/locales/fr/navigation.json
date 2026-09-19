@@ -27,7 +27,8 @@
     "stock_management": "Gestion de stock",
     "api_reference": "Référence API",
     "mcp": "Agents IA",
-    "operations": "Opérations et tâches"
+    "operations": "Opérations et tâches",
+    "support": "Support client"
   },
   "navbar": {
     "search_placeholder": "Rechercher des commandes, clients...",

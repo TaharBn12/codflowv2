@@ -1,0 +1,24 @@
+import { Hono } from "hono";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { getDb } from "@/db";
+import { supportChannels, supportConversations, supportMessages } from "@/db/schema";
+import type { AppContext } from "@/types";
+
+const routes = new Hono<AppContext>();
+const now = () => new Date().toISOString();
+export async function validSignature(secret: string, raw: string, supplied?: string) {
+  if (!supplied?.startsWith("sha256=")) return false; const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw)); const expected = `sha256=${Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("")}`; if (expected.length !== supplied.length) return false; let diff = 0; for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ supplied.charCodeAt(i); return diff === 0;
+}
+async function receive(db: any, channel: any, input: { contact: string; name?: string; subject?: string; body: string; externalId?: string }) {
+  let conversation = await db.select().from(supportConversations).where(and(eq(supportConversations.channelId, channel.id), eq(supportConversations.contact, input.contact), inArray(supportConversations.status, ["open", "pending"]))).get(); const timestamp = now();
+  if (!conversation) { conversation = { id: crypto.randomUUID(), channelId: channel.id, customerId: null, orderId: null, contact: input.contact, contactName: input.name ?? null, subject: input.subject ?? null, status: "open", priority: "normal", assigneeId: null, unreadCount: 0, lastMessageAt: timestamp, createdAt: timestamp, updatedAt: timestamp }; await db.insert(supportConversations).values(conversation); }
+  const message = { id: crypto.randomUUID(), conversationId: conversation.id, direction: "inbound", channelType: channel.type, senderId: null, body: input.body, externalId: input.externalId ?? null, deliveryStatus: "received", errorCode: null, createdAt: timestamp };
+  const inserted = await db.insert(supportMessages).values(message).onConflictDoNothing().returning({ id: supportMessages.id }).get(); if (inserted) await db.update(supportConversations).set({ status: "open", unreadCount: sql`${supportConversations.unreadCount} + 1`, lastMessageAt: timestamp, updatedAt: timestamp }).where(eq(supportConversations.id, conversation.id)); return conversation.id;
+}
+
+routes.get("/whatsapp", async (c) => { const channel = await getDb(c.env.DB).select().from(supportChannels).where(eq(supportChannels.type, "whatsapp")).get(); if (c.req.query("hub.mode") === "subscribe" && channel?.verifyToken && c.req.query("hub.verify_token") === channel.verifyToken) return c.text(c.req.query("hub.challenge") ?? "", 200); return c.text("Forbidden", 403); });
+routes.post("/whatsapp", async (c) => { const db = getDb(c.env.DB); const channel = await db.select().from(supportChannels).where(eq(supportChannels.type, "whatsapp")).get(); if (!channel?.enabled || !channel.appSecret) return c.json({ ok: false }, 403); const raw = await c.req.text(); if (!await validSignature(channel.appSecret, raw, c.req.header("x-hub-signature-256"))) return c.json({ ok: false }, 403); const payload = JSON.parse(raw) as any; for (const entry of payload.entry ?? []) for (const change of entry.changes ?? []) { const value = change.value ?? {}; for (const message of value.messages ?? []) { const contact = value.contacts?.find((item: any) => item.wa_id === message.from); const body = message.text?.body ?? message.button?.text ?? `[${message.type ?? "message"}]`; await receive(db, channel, { contact: message.from, name: contact?.profile?.name, body, externalId: message.id }); } for (const status of value.statuses ?? []) await db.update(supportMessages).set({ deliveryStatus: ["sent", "delivered", "read", "failed"].includes(status.status) ? status.status : "sent", errorCode: status.errors?.[0]?.code ? String(status.errors[0].code) : null }).where(eq(supportMessages.externalId, status.id)); } return c.json({ ok: true }); });
+
+routes.post("/email", async (c) => { const db = getDb(c.env.DB); const channel = await db.select().from(supportChannels).where(eq(supportChannels.type, "email")).get(); if (!channel?.enabled || !channel.webhookSecret || c.req.header("x-support-webhook-secret") !== channel.webhookSecret) return c.json({ ok: false }, 403); const payload = await c.req.json<any>(); if (!payload.from || !payload.text) return c.json({ ok: false }, 400); const conversationId = await receive(db, channel, { contact: String(payload.from), name: payload.name ? String(payload.name) : undefined, subject: payload.subject ? String(payload.subject) : undefined, body: String(payload.text), externalId: payload.messageId ? String(payload.messageId) : undefined }); return c.json({ ok: true, conversationId }); });
+
+export default routes;

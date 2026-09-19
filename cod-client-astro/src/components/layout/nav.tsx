@@ -3,6 +3,7 @@ import {
   ClipboardCheck,
   FolderOpen,
   Gift,
+  Headphones,
   Layers,
   LayoutDashboard,
   Package,
@@ -114,6 +115,13 @@ export function useNavSections(): NavSection[] {
               scope: "customer_tags:read",
             },
           ],
+        },
+        {
+          kind: "leaf",
+          href: "/support",
+          label: tN("sidebar.support"),
+          icon: Headphones,
+          scope: "customers:read",
         },
         {
           kind: "leaf",
