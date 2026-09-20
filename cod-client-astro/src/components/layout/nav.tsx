@@ -1,9 +1,10 @@
 import {
   Building2,
+  ClipboardCheck,
   FolderOpen,
   Gift,
+  Headphones,
   Layers,
-  Megaphone,
   LayoutDashboard,
   Package,
   PackageX,
@@ -117,6 +118,20 @@ export function useNavSections(): NavSection[] {
         },
         {
           kind: "leaf",
+          href: "/support",
+          label: tN("sidebar.support"),
+          icon: Headphones,
+          scope: "customers:read",
+        },
+        {
+          kind: "leaf",
+          href: "/operations",
+          label: tN("sidebar.operations"),
+          icon: ClipboardCheck,
+          scope: "operations:view",
+        },
+        {
+          kind: "leaf",
           href: "/reviews",
           label: tN("sidebar.reviews"),
           icon: Star,
@@ -156,13 +171,7 @@ export function useNavSections(): NavSection[] {
               icon: Gift,
               scope: "offers:read",
             },
-            {
-              kind: "leaf",
-              href: "/landing-pages",
-              label: tN("sidebar.landing_pages"),
-              icon: Megaphone,
-              scope: "landing_pages:read",
-            },
+
           ],
         },
         {

@@ -9,7 +9,11 @@ import {
   ExternalLink,
   GripVertical,
   Loader2,
+  Monitor,
   Pencil,
+  RefreshCw,
+  RotateCcw,
+  Smartphone,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -33,7 +37,6 @@ import type { LandingPage, LandingPageImage } from "@/features/landing-pages/typ
 
 const ACCEPTED = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
 const MAX_MB = 10;
-const AUTOSAVE_DELAY_MS = 800;
 const SLUG_PATTERN = /^[a-z0-9-]{3,60}$/;
 
 function swapAt<T>(arr: T[], i: number, j: number): T[] {
@@ -62,6 +65,23 @@ function measureImage(file: File): Promise<{ width: number; height: number } | n
 }
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+type PreviewDevice = "mobile" | "desktop";
+
+function SettingSection({ title, children, open = false }: {
+  title: string;
+  children: React.ReactNode;
+  open?: boolean;
+}) {
+  return (
+    <details open={open} className="group border-b border-border bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 text-sm font-bold transition-colors hover:bg-muted/60 [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-4 px-4 pb-5">{children}</div>
+    </details>
+  );
+}
 
 function SaveIndicator({ state, label }: { state: SaveState; label: string }) {
   return (
@@ -124,7 +144,7 @@ function StudioShell({
           <SaveIndicator state={saveState} label={saveLabel} />
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
-          <div className="grid h-full grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_240px]">
+          <div className="grid h-full grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
             {children}
           </div>
         </div>
@@ -148,6 +168,15 @@ function Gated({ landingPageId }: { landingPageId: string }) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [name, setName] = useState("");
   const [imageGap, setImageGap] = useState(0);
+  const [design, setDesign] = useState({
+    sidePadding: 0, contentMaxWidth: 0,
+    showImages: true, showOrderForm: true, showStickyCta: true,
+    backgroundColor: "#ffffff", buttonColor: "#7c3aed",
+    buttonTextColor: "#ffffff", buttonRadius: 12,
+  });
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("mobile");
+  const [previewZoom, setPreviewZoom] = useState(85);
+  const [previewRevision, setPreviewRevision] = useState(0);
 
   // Slug editing: committed value (autosaved) + in-flight draft while editing
   const [slugDraft, setSlugDraft] = useState<string | null>(null);
@@ -156,7 +185,6 @@ function Gated({ landingPageId }: { landingPageId: string }) {
 
   const [publishOpen, setPublishOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const saveTimer = useRef<number | null>(null);
 
   const canManage = canScope(identity, SCOPES.LANDING_PAGES_MANAGE);
   const canRead = canScope(identity, SCOPES.LANDING_PAGES_READ);
@@ -168,6 +196,13 @@ function Gated({ landingPageId }: { landingPageId: string }) {
       setLp(data);
       setName(data.name);
       setImageGap(data.imageGap);
+      setDesign({
+        sidePadding: data.sidePadding, contentMaxWidth: data.contentMaxWidth,
+        showImages: data.showImages, showOrderForm: data.showOrderForm,
+        showStickyCta: data.showStickyCta, backgroundColor: data.backgroundColor,
+        buttonColor: data.buttonColor, buttonTextColor: data.buttonTextColor,
+        buttonRadius: data.buttonRadius,
+      });
       setSlugDraft(null);
       setSaveState("idle");
     } catch (cause) {
@@ -179,34 +214,53 @@ function Gated({ landingPageId }: { landingPageId: string }) {
     if (canRead) void load();
   }, [canRead, load, identity?.role, identity?.scopes.join(",")]);
 
-  // Debounced autosave: name + gap persist 800ms after the last edit.
-  useEffect(() => {
-    if (!lp || !canManage) return;
-    const drifted =
-      (name.trim() !== "" && name !== lp.name) || imageGap !== lp.imageGap;
-    if (!drifted) return;
+  const baseline = lp;
+  const isDirty = baseline !== null && (
+    (name.trim() !== "" && name !== baseline.name) ||
+    imageGap !== baseline.imageGap ||
+    (Object.keys(design) as Array<keyof typeof design>).some((key) => design[key] !== baseline[key])
+  );
 
+  // Edits stay entirely local until the merchant explicitly saves everything.
+  // This prevents network responses, loading overlays, and page repainting while typing.
+  const saveAll = useCallback(async () => {
+    if (!lp || !canManage || !isDirty || saveState === "saving") return;
     setSaveState("saving");
-    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const updated = await updateLandingPage(landingPageId, {
-            ...(name.trim() !== "" && name !== lp.name ? { name: name.trim() } : {}),
-            ...(imageGap !== lp.imageGap ? { imageGap } : {}),
-          });
-          setLp(updated.data);
-          setSaveState("saved");
-        } catch (cause) {
-          setSaveState("error");
-          notify.error(landingPageErrorMessage(cause, t));
-        }
-      })();
-    }, AUTOSAVE_DELAY_MS);
-    return () => {
-      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    try {
+      const updated = await updateLandingPage(landingPageId, {
+        ...(name.trim() !== "" ? { name: name.trim() } : {}),
+        imageGap,
+        ...design,
+      });
+      setLp(updated.data);
+      setName(updated.data.name);
+      setPreviewRevision((revision) => revision + 1);
+      setSaveState("saved");
+      notify.success(t("studio.saved"));
+    } catch (cause) {
+      setSaveState("error");
+      notify.error(landingPageErrorMessage(cause, t));
+    }
+  }, [lp, canManage, isDirty, saveState, landingPageId, name, imageGap, design, t]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveAll();
+      }
     };
-  }, [lp, name, imageGap, canManage, landingPageId, t]);
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [isDirty, saveAll]);
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -356,7 +410,9 @@ function Gated({ landingPageId }: { landingPageId: string }) {
       ? t("studio.saving")
       : saveState === "error"
         ? t("error_generic")
-        : t("studio.saved");
+        : isDirty
+          ? t("studio.unsaved")
+          : t("studio.saved");
 
   if (!canRead)
     return (
@@ -480,13 +536,26 @@ function Gated({ landingPageId }: { landingPageId: string }) {
         </>
       )}
 
+      {canManage && (
+        <Button
+          type="button"
+          onClick={() => void saveAll()}
+          disabled={!isDirty || saveState === "saving"}
+          className="h-8 px-3 text-xs"
+        >
+          {saveState === "saving" ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+          {t("studio.save_all")}
+        </Button>
+      )}
+
       {/* Publish toggle */}
       {canManage && (
         <div className="relative">
           <button
             type="button"
             onClick={() => setPublishOpen((open) => !open)}
-            disabled={publishing}
+            disabled={publishing || isDirty}
+            title={isDirty ? t("studio.save_before_publish") : undefined}
             className="flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-60"
           >
             {publishing ? <Loader2 size={13} className="animate-spin" /> : null}
@@ -495,10 +564,9 @@ function Gated({ landingPageId }: { landingPageId: string }) {
           </button>
           {publishOpen && (
             <>
-              <button
-                type="button"
-                className="fixed inset-0 z-10 cursor-default"
-                aria-label={common("cancel")}
+              <div
+                className="fixed inset-0 z-10 bg-transparent"
+                aria-hidden="true"
                 onClick={() => setPublishOpen(false)}
               />
               <div className="absolute end-0 top-9 z-20 w-52 rounded-xl border border-border bg-popover p-1.5 shadow-lg">
@@ -523,7 +591,7 @@ function Gated({ landingPageId }: { landingPageId: string }) {
   );
 
   return (
-    <StudioShell title={lp.name} saveState={saveState} saveLabel={saveLabel} toolbar={toolbar}>
+    <StudioShell title={lp.name} saveState={isDirty ? "idle" : saveState} saveLabel={saveLabel} toolbar={toolbar}>
       {actionError && (
         <div className="col-span-full px-4 pt-3">
           <Alert role="alert" tone="critical">
@@ -658,81 +726,172 @@ function Gated({ landingPageId }: { landingPageId: string }) {
         </div>
       </aside>
 
-      {/* CENTER — Live phone-width preview */}
-      <section className="flex min-h-0 items-start justify-center overflow-y-auto bg-muted/40 p-4 sm:p-6">
-        <div className="w-[390px] max-w-full shrink-0 overflow-hidden rounded-[2rem] border-8 border-foreground/10 bg-background shadow-lg">
-          <div className="flex h-6 items-center justify-center border-b border-border/40">
-            <span className="h-1.5 w-16 rounded-full bg-foreground/15" />
+      {/* CENTER — the real deployed landing page, not a simulated canvas */}
+      <section className="relative flex min-h-[520px] min-w-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_center,hsl(var(--muted))_1px,transparent_1px)] [background-size:20px_20px]">
+        <div className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur">
+          <div className="flex rounded-lg border border-border bg-background p-0.5">
+            <button type="button" onClick={() => setPreviewDevice("mobile")}
+              className={`grid size-8 place-items-center rounded-md ${previewDevice === "mobile" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              title={t("studio.mobile_preview")}><Smartphone size={15} /></button>
+            <button type="button" onClick={() => setPreviewDevice("desktop")}
+              className={`grid size-8 place-items-center rounded-md ${previewDevice === "desktop" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              title={t("studio.desktop_preview")}><Monitor size={15} /></button>
           </div>
-          {lp.images.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-xs text-muted-foreground">
-              {t("studio.no_images")}
+          <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <input type="range" min={50} max={100} step={5} value={previewZoom}
+              onChange={(event) => setPreviewZoom(Number(event.currentTarget.value))}
+              className="w-20 accent-primary" />
+            {previewZoom}%
+          </label>
+          <button type="button" onClick={() => setPreviewRevision((revision) => revision + 1)}
+            className="grid size-8 place-items-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+            title={t("studio.refresh_preview")}><RefreshCw size={14} /></button>
+          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-700">
+            {t("studio.real_page_preview")}
+          </span>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-6">
+          {isPublished ? (
+            <div
+              className={`mx-auto overflow-hidden bg-white shadow-2xl transition-[width,border-radius] duration-300 ${previewDevice === "mobile" ? "rounded-[2rem] border-[7px] border-slate-800" : "rounded-lg border border-border"}`}
+              style={{
+                width: previewDevice === "mobile" ? 390 : 1100,
+                height: previewDevice === "mobile" ? 760 : 800,
+                maxWidth: previewDevice === "mobile" ? "100%" : "none",
+                transform: `scale(${previewZoom / 100})`,
+                transformOrigin: "top center",
+              }}
+            >
+              {previewDevice === "mobile" && (
+                <div className="flex h-6 items-center justify-center bg-slate-800">
+                  <span className="h-1.5 w-16 rounded-full bg-white/30" />
+                </div>
+              )}
+              <iframe
+                key={previewRevision}
+                src={`${publicUrl}${publicUrl.includes("?") ? "&" : "?"}studioPreview=${previewRevision}`}
+                title={t("studio.real_page_preview")}
+                className="h-full w-full border-0 bg-white"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+              />
             </div>
           ) : (
-            lp.images.map((image, index) => (
-              <img
-                key={image.id}
-                src={image.src}
-                alt={image.altText ?? ""}
-                loading={index === 0 ? "eager" : "lazy"}
-                className="block w-full"
-                style={index === 0 ? undefined : { marginTop: `${imageGap}px` }}
-              />
-            ))
+            <div className="mx-auto flex min-h-96 max-w-lg flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
+              <Monitor size={32} className="text-muted-foreground/50" />
+              <h2 className="mt-4 text-base font-bold">{t("studio.preview_requires_publish")}</h2>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">{t("studio.preview_requires_publish_hint")}</p>
+            </div>
           )}
-          {/* Form stand-in — the real form renders on the storefront page */}
-          <div className="m-4 rounded-xl border border-border bg-muted/30 p-5 text-center">
-            <span className="block text-xs font-bold text-muted-foreground">
-              {lp.product?.name ?? ""}
-            </span>
-            <span className="mt-2 block h-10 rounded-lg bg-brand/10 text-[0.7rem] leading-10 font-bold text-brand">
-              {t("studio.preview_title")} — COD
-            </span>
-          </div>
         </div>
       </section>
 
-      {/* RIGHT — the only spacing setting */}
-      <aside className="flex min-h-0 flex-col overflow-y-auto border-s border-border p-4">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {t("studio.right_title")}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">{t("studio.gap_hint")}</p>
-        <div className="mt-4">
+      {/* RIGHT — Shopify-style grouped settings inspector */}
+      <aside className="flex min-h-0 flex-col overflow-y-auto border-s border-border bg-card">
+        <div className="sticky top-0 z-10 border-b border-border bg-card px-4 py-3">
+          <p className="text-sm font-bold">{t("studio.settings_title")}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{t("studio.instant_preview_hint")}</p>
+        </div>
+
+        <SettingSection title={t("studio.elements_section")} open>
+          {(["showImages", "showOrderForm", "showStickyCta"] as const).map((key) => (
+            <label key={key} className="flex items-center justify-between gap-3 text-xs font-semibold">
+              <span>{t(`studio.${key}`)}</span>
+              <span className={`relative h-6 w-11 rounded-full transition-colors ${design[key] ? "bg-primary" : "bg-muted"}`}>
+                <input type="checkbox" checked={design[key]} disabled={!canManage}
+                  onChange={(e) => setDesign((v) => ({ ...v, [key]: e.currentTarget.checked }))}
+                  className="peer sr-only" />
+                <span className={`absolute top-1 size-4 rounded-full bg-white shadow transition-transform ${design[key] ? "start-6" : "start-1"}`} />
+              </span>
+            </label>
+          ))}
+        </SettingSection>
+
+        <SettingSection title={t("studio.layout_section")} open>
+          {(["imageGap", "sidePadding", "contentMaxWidth"] as const).map((key) => {
+            const value = key === "imageGap" ? imageGap : design[key];
+            const max = key === "contentMaxWidth" ? 1200 : 96;
+            const setValue = (next: number) => key === "imageGap"
+              ? setImageGap(next)
+              : setDesign((v) => ({ ...v, [key]: next }));
+            return (
+              <label key={key} className="block">
+                <span className="mb-2 flex items-center justify-between text-xs font-semibold">
+                  {t(`studio.${key}`)}
+                  <input type="number" min={0} max={max} value={value} disabled={!canManage}
+                    onChange={(e) => setValue(Math.max(0, Math.min(max, Number(e.currentTarget.value))))}
+                    className="h-7 w-20 rounded-md border border-border bg-background px-2 text-end text-xs tabular-nums" />
+                </span>
+                <input type="range" min={0} max={max} value={value} disabled={!canManage}
+                  onChange={(e) => setValue(Number(e.currentTarget.value))}
+                  className="w-full accent-primary" />
+              </label>
+            );
+          })}
+        </SettingSection>
+
+        <SettingSection title={t("studio.colors_section")}>
+          {(["backgroundColor", "buttonColor", "buttonTextColor"] as const).map((key) => (
+            <label key={key} className="flex items-center justify-between gap-3 text-xs font-semibold">
+              <span>{t(`studio.${key}`)}</span>
+              <span className="flex items-center gap-2 rounded-lg border border-border bg-background p-1.5">
+                <input type="color" value={design[key]} disabled={!canManage}
+                  onChange={(e) => setDesign((v) => ({ ...v, [key]: e.currentTarget.value }))}
+                  className="size-6 cursor-pointer rounded border-0 bg-transparent p-0" />
+                <span className="w-[4.5rem] font-mono text-[10px] uppercase text-muted-foreground">{design[key]}</span>
+              </span>
+            </label>
+          ))}
+        </SettingSection>
+
+        <SettingSection title={t("studio.button_section")}>
           <label className="block">
             <span className="mb-2 flex items-center justify-between text-xs font-semibold">
-              {t("studio.image_gap")}
-              <span className="tabular-nums text-muted-foreground">{imageGap}px</span>
+              {t("studio.buttonRadius")}
+              <span className="tabular-nums text-muted-foreground">{design.buttonRadius}px</span>
             </span>
-            <input
-              type="range"
-              min={0}
-              max={64}
-              value={imageGap}
-              disabled={!canManage}
-              onChange={(event) => setImageGap(Number(event.currentTarget.value))}
-              className="w-full accent-primary"
-            />
+            <input type="range" min={0} max={50} value={design.buttonRadius} disabled={!canManage}
+              onChange={(e) => setDesign((v) => ({ ...v, buttonRadius: Number(e.currentTarget.value) }))}
+              className="w-full accent-primary" />
           </label>
-        </div>
-        <div className="mt-auto pt-4">
-          <div className="rounded-xl border border-border p-3">
-            <p className="text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground">
-              {t("page_title")}
-            </p>
-            <dl className="mt-2 space-y-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">{t("list.views")}</dt>
-                <dd className="font-bold tabular-nums">{lp.views.toLocaleString()}</dd>
+          <div className="h-10 text-center text-xs font-bold leading-10 shadow-sm"
+            style={{ backgroundColor: design.buttonColor, color: design.buttonTextColor, borderRadius: design.buttonRadius }}>
+            {t("studio.order_button_preview")}
+          </div>
+        </SettingSection>
+
+        <SettingSection title={t("studio.page_health")}>
+          <div className="space-y-2 text-xs">
+            {[
+              [lp.images.length > 0, t("studio.health_images")],
+              [Boolean(lp.product), t("studio.health_product")],
+              [Boolean(lp.metaTitle), t("studio.health_seo")],
+              [isPublished, t("studio.health_published")],
+            ].map(([done, label]) => (
+              <div key={String(label)} className="flex items-center gap-2">
+                <span className={`grid size-5 place-items-center rounded-full ${done ? "bg-emerald-500/15 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
+                  {done ? <Check size={12} /> : <span className="size-1.5 rounded-full bg-current" />}
+                </span>
+                <span className={done ? "font-semibold" : "text-muted-foreground"}>{String(label)}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">{t("list.orders")}</dt>
-                <dd className="font-bold tabular-nums">{lp.stats.orders.toLocaleString()}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">{t("list.revenue")}</dt>
-                <dd className="font-bold tabular-nums">{lp.stats.revenue.toLocaleString()}</dd>
-              </div>
+            ))}
+          </div>
+        </SettingSection>
+
+        <div className="mt-auto space-y-3 border-t border-border p-4">
+          <Button type="button" variant="secondary" className="w-full" disabled={!canManage}
+            onClick={() => {
+              setImageGap(0);
+              setDesign({ sidePadding: 0, contentMaxWidth: 0, showImages: true, showOrderForm: true,
+                showStickyCta: true, backgroundColor: "#ffffff", buttonColor: "#7c3aed",
+                buttonTextColor: "#ffffff", buttonRadius: 12 });
+            }}>
+            <RotateCcw size={14} /> {t("studio.reset_design")}
+          </Button>
+          <div className="rounded-xl border border-border bg-muted/30 p-3">
+            <dl className="space-y-1.5 text-xs">
+              <div className="flex justify-between"><dt className="text-muted-foreground">{t("list.views")}</dt><dd className="font-bold tabular-nums">{lp.views.toLocaleString()}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted-foreground">{t("list.orders")}</dt><dd className="font-bold tabular-nums">{lp.stats.orders.toLocaleString()}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted-foreground">{t("list.revenue")}</dt><dd className="font-bold tabular-nums">{lp.stats.revenue.toLocaleString()}</dd></div>
             </dl>
           </div>
         </div>

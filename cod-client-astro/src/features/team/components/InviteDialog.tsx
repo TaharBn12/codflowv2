@@ -3,7 +3,7 @@ import { Check, ChevronDown, ChevronUp, Copy, KeyRound, MailCheck, MailWarning, 
 import { Button, Dialog, Field, Input, Select } from "@/components/ui";
 import { useT } from "@/i18n/react";
 import { notify } from "@/lib/notify";
-import { SCOPE_CATEGORIES } from "../../../../../cod-shared/rbac/scopes";
+import { SCOPE_CATEGORIES, defaultScopesForRole } from "../../../../../cod-shared/rbac/scopes";
 import { createTeamMember } from "@/features/team/api";
 import { teamErrorMessage } from "@/features/team/model";
 import type { TeamMemberFormValues, TeamRole } from "@/features/team/types";
@@ -69,6 +69,7 @@ export function InviteDialog({ open, onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = form.role === "admin";
+  const hasAutomaticPermissions = form.role === "confirmer" || form.role === "driver";
 
   useEffect(() => {
     if (open) {
@@ -304,12 +305,18 @@ export function InviteDialog({ open, onClose, onSuccess }: Props) {
             <Select
               value={form.role}
               onChange={(event) => {
-                update("role", event.currentTarget.value as TeamRole);
-                if (event.currentTarget.value === "admin") update("scopes", []);
+                const role = event.currentTarget.value as TeamRole;
+                update("role", role);
+                if (role === "admin") update("scopes", []);
+                if (role === "confirmer" || role === "driver") {
+                  update("scopes", [...defaultScopesForRole(role)]);
+                }
               }}
               disabled={loading}
             >
               <option value="staff">{common("roles.staff")}</option>
+              <option value="confirmer">{common("roles.confirmer")}</option>
+              <option value="driver">{common("roles.driver")}</option>
               <option value="admin">{common("roles.admin")}</option>
             </Select>
           </Field>
@@ -330,6 +337,13 @@ export function InviteDialog({ open, onClose, onSuccess }: Props) {
               <KeyRound size={16} className="mt-0.5 shrink-0 text-yellow-600" />
               <p className="text-xs text-muted-foreground">
                 {t("invite_dialog_extra.admin_full_access")}
+              </p>
+            </div>
+          ) : hasAutomaticPermissions ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <KeyRound size={16} className="mt-0.5 shrink-0 text-primary" />
+              <p className="text-xs text-muted-foreground">
+                {t("invite_dialog_extra.automatic_role_permissions")}
               </p>
             </div>
           ) : (

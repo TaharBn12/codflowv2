@@ -9,7 +9,7 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
-  role: text("role", { enum: ["admin", "staff"] })
+  role: text("role", { enum: ["admin", "staff", "confirmer", "driver"] })
     .notNull()
     .default("staff"),
   status: text("status", { enum: ["active", "inactive"] })
@@ -529,6 +529,134 @@ export const orders = sqliteTable("orders", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const adminApprovalRequests = sqliteTable("admin_approval_requests", {
+  id: text("id").primaryKey(),
+  action: text("action").notNull(),
+  title: text("title").notNull(),
+  payload: text("payload").notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected", "expired", "failed"] }).notNull().default("pending"),
+  requestedBy: text("requested_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestedByName: text("requested_by_name").notNull(),
+  decidedByTelegramId: text("decided_by_telegram_id"),
+  decisionNote: text("decision_note"),
+  telegramMessageId: text("telegram_message_id"),
+  expiresAt: text("expires_at").notNull(),
+  decidedAt: text("decided_at"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({ statusExpiryIdx: index("admin_approvals_status_expiry_idx").on(t.status, t.expiresAt) }));
+
+export const orderConfirmationAssignments = sqliteTable("order_confirmation_assignments", {
+  orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
+  assigneeId: text("assignee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assignedBy: text("assigned_by").references(() => users.id, { onDelete: "set null" }),
+  assignedAt: text("assigned_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({ assigneeIdx: index("order_confirmation_assignee_idx").on(t.assigneeId, t.assignedAt) }));
+
+export const operationAutomationSettings = sqliteTable("operation_automation_settings", {
+  id: text("id").primaryKey().default("default"),
+  autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const operationAgentSettings = sqliteTable("operation_agent_settings", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),
+  maxOpenOrders: integer("max_open_orders").notNull().default(25),
+  maxDailyOrders: integer("max_daily_orders").notNull().default(50),
+  commissionType: text("commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
+  commissionValue: real("commission_value").notNull().default(0),
+  confirmationCommissionType: text("confirmation_commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
+  confirmationCommissionValue: real("confirmation_commission_value").notNull().default(0),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const operationTasks = sqliteTable("operation_tasks", {
+  id: text("id").primaryKey(), title: text("title").notNull(), description: text("description"),
+  type: text("type", { enum: ["confirmation", "callback", "address_review", "shipment_follow_up", "follow_up"] }).notNull().default("follow_up"),
+  status: text("status", { enum: ["open", "in_progress", "completed", "cancelled"] }).notNull().default("open"),
+  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"),
+  orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  assigneeId: text("assignee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  dueAt: text("due_at"), completedAt: text("completed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ assigneeStatusDueIdx: index("operation_tasks_assignee_status_due_idx").on(t.assigneeId, t.status, t.dueAt), orderIdx: index("operation_tasks_order_idx").on(t.orderId) }));
+
+export const staffCommissions = sqliteTable("staff_commission_events", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  category: text("category", { enum: ["confirmation", "follow_up"] }).notNull(),
+  amount: real("amount").notNull(),
+  rateType: text("rate_type", { enum: ["fixed", "percentage"] }).notNull(),
+  rateValue: real("rate_value").notNull(),
+  status: text("status", { enum: ["pending", "earned", "paid", "reversed"] }).notNull().default("pending"),
+  earnedAt: text("earned_at"), paidAt: text("paid_at"), reversedAt: text("reversed_at"),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({
+  orderCategoryIdx: uniqueIndex("staff_commission_events_order_category_idx").on(t.orderId, t.category),
+  userStatusIdx: index("staff_commission_events_user_status_idx").on(t.userId, t.status, t.createdAt),
+}));
+
+export const telegramApprovalConfig = sqliteTable("telegram_approval_config", {
+  id: text("id").primaryKey().default("default"),
+  botToken: text("bot_token").notNull(), chatId: text("chat_id").notNull(), webhookSecret: text("webhook_secret").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+});
+
+export const telegramApprovalPolicies = sqliteTable("telegram_approval_policies", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.action] }),
+  userIdx: index("telegram_approval_policies_user_idx").on(t.userId, t.enabled),
+}));
+
+export const supportChannels = sqliteTable("support_channels", {
+  id: text("id").primaryKey(), type: text("type", { enum: ["whatsapp", "email"] }).notNull(), name: text("name").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), provider: text("provider").notNull(), senderId: text("sender_id"),
+  accessToken: text("access_token"), verifyToken: text("verify_token"), appSecret: text("app_secret"), webhookSecret: text("webhook_secret"),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ typeIdx: uniqueIndex("support_channels_type_idx").on(t.type) }));
+
+export const supportConversations = sqliteTable("support_conversations", {
+  id: text("id").primaryKey(), channelId: text("channel_id").notNull().references(() => supportChannels.id, { onDelete: "cascade" }),
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }), orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+  contact: text("contact").notNull(), contactName: text("contact_name"), subject: text("subject"),
+  status: text("status", { enum: ["open", "pending", "resolved", "closed"] }).notNull().default("open"),
+  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"),
+  assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }), unreadCount: integer("unread_count").notNull().default(0),
+  lastMessageAt: text("last_message_at").notNull(), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ statusLastIdx: index("support_conversations_status_last_idx").on(t.status, t.lastMessageAt), assigneeIdx: index("support_conversations_assignee_idx").on(t.assigneeId, t.status), contactIdx: index("support_conversations_contact_idx").on(t.contact) }));
+
+export const supportMessages = sqliteTable("support_messages", {
+  id: text("id").primaryKey(), conversationId: text("conversation_id").notNull().references(() => supportConversations.id, { onDelete: "cascade" }),
+  direction: text("direction", { enum: ["inbound", "outbound", "internal"] }).notNull(), channelType: text("channel_type", { enum: ["whatsapp", "email"] }).notNull(),
+  senderId: text("sender_id").references(() => users.id, { onDelete: "set null" }), body: text("body").notNull(), externalId: text("external_id"),
+  deliveryStatus: text("delivery_status", { enum: ["queued", "sent", "delivered", "read", "failed", "received"] }).notNull().default("queued"), errorCode: text("error_code"), createdAt: text("created_at").notNull(),
+}, (t) => ({ externalIdx: uniqueIndex("support_messages_external_idx").on(t.channelType, t.externalId), conversationIdx: index("support_messages_conversation_idx").on(t.conversationId, t.createdAt) }));
+
+export const supportTickets = sqliteTable("support_tickets", {
+  id: text("id").primaryKey(), ticketNumber: text("ticket_number").notNull().unique(), conversationId: text("conversation_id").references(() => supportConversations.id, { onDelete: "set null" }),
+  customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }), orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+  subject: text("subject").notNull(), description: text("description"), status: text("status", { enum: ["open", "in_progress", "waiting_customer", "resolved", "closed"] }).notNull().default("open"),
+  priority: text("priority", { enum: ["low", "normal", "high", "urgent"] }).notNull().default("normal"), assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+  createdBy: text("created_by").notNull().references(() => users.id), dueAt: text("due_at"), resolvedAt: text("resolved_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => ({ statusPriorityIdx: index("support_tickets_status_priority_idx").on(t.status, t.priority, t.createdAt), assigneeIdx: index("support_tickets_assignee_idx").on(t.assigneeId, t.status) }));
+
+export const customerOrderLinks = sqliteTable("customer_order_links", {
+  id: text("id").primaryKey(), orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }), tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: text("expires_at").notNull(), revokedAt: text("revoked_at"), lastViewedAt: text("last_viewed_at"), createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }), createdAt: text("created_at").notNull(),
+}, (t) => ({ orderIdx: index("customer_order_links_order_idx").on(t.orderId, t.expiresAt) }));
+
 export const orderAssignments = sqliteTable("order_assignments", {
   id: text("id").primaryKey(),
   orderId: text("order_id")
@@ -922,7 +1050,7 @@ export const activityLogs = sqliteTable("activity_logs", {
   actorId: text("actor_id").notNull(),
   /** Denormalised name — preserved even if user is later deleted. */
   actorName: text("actor_name").notNull(),
-  actorRole: text("actor_role", { enum: ["admin", "staff"] }).notNull(),
+  actorRole: text("actor_role", { enum: ["admin", "staff", "confirmer", "driver"] }).notNull(),
   /** Dot-notation action: "order.created", "user.role_changed", etc. */
   action: text("action").notNull(),
   /** Entity category: "order", "customer", "driver", "product", "user". */
@@ -1135,6 +1263,15 @@ export const landingPages = sqliteTable("landing_pages", {
   sidePadding: integer("side_padding").notNull().default(0),
   /** Max content width in pixels. 0 = full width (mobile-first default). */
   contentMaxWidth: integer("content_max_width").notNull().default(0),
+
+  // ── Visibility and presentation controls ─────────────────────────────────
+  showImages: integer("show_images", { mode: "boolean" }).notNull().default(true),
+  showOrderForm: integer("show_order_form", { mode: "boolean" }).notNull().default(true),
+  showStickyCta: integer("show_sticky_cta", { mode: "boolean" }).notNull().default(true),
+  backgroundColor: text("background_color").notNull().default("#ffffff"),
+  buttonColor: text("button_color").notNull().default("#7c3aed"),
+  buttonTextColor: text("button_text_color").notNull().default("#ffffff"),
+  buttonRadius: integer("button_radius").notNull().default(12),
 
   // ── SEO ───────────────────────────────────────────────────────────────────
   metaTitle: text("meta_title"),

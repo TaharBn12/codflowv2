@@ -15,6 +15,11 @@ import {
   drivers,
   driverCompensations,
   users,
+  operationAgentSettings,
+  operationAutomationSettings,
+  orderConfirmationAssignments,
+  operationTasks,
+  staffCommissions,
   wilayas,
   communes,
   stockMovements,
@@ -49,6 +54,8 @@ export interface OrderFilters {
    * before (createdAt, id). Takes precedence over offset when set.
    */
   cursor?: string;
+  confirmationAssignment?: "assigned" | "unassigned" | "all";
+  confirmerId?: string;
 }
 
 export function encodeOrderCursor(createdAt: string, id: string): string {
@@ -91,6 +98,14 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
     conditions.push(eq(orders.wilayaId, filters.wilayaId));
   }
 
+  if (filters.confirmerId) {
+    conditions.push(sql`EXISTS (SELECT 1 FROM order_confirmation_assignments ca WHERE ca.order_id = ${orders.id} AND ca.assignee_id = ${filters.confirmerId})`);
+  } else if (filters.confirmationAssignment === "assigned") {
+    conditions.push(sql`EXISTS (SELECT 1 FROM order_confirmation_assignments ca WHERE ca.order_id = ${orders.id})`);
+  } else if (filters.confirmationAssignment === "unassigned") {
+    conditions.push(sql`NOT EXISTS (SELECT 1 FROM order_confirmation_assignments ca WHERE ca.order_id = ${orders.id})`);
+  }
+
   if (filters.search) {
     const term = `%${safeLikeTerm(filters.search)}%`;
     conditions.push(
@@ -125,6 +140,8 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
       lastUpdatedBy: sql<
         string | null
       >`(SELECT by FROM order_status_history WHERE order_id = orders.id ORDER BY timestamp DESC LIMIT 1)`,
+      confirmationAssigneeId: sql<string | null>`(SELECT assignee_id FROM order_confirmation_assignments WHERE order_id = orders.id LIMIT 1)`,
+      confirmationAssigneeName: sql<string | null>`(SELECT u.name FROM order_confirmation_assignments ca JOIN users u ON u.id = ca.assignee_id WHERE ca.order_id = orders.id LIMIT 1)`,
     })
     .from(orders)
     .leftJoin(wilayas, eq(orders.wilayaId, wilayas.id))
@@ -147,6 +164,8 @@ export async function getOrderById(db: AppDb, orderId: string) {
         string | null
       >`CASE WHEN ${driversAlias.firstName} IS NOT NULL THEN ${driversAlias.firstName} || ' ' || ${driversAlias.lastName} ELSE NULL END`,
       labelUrl: companyShipments.labelUrl,
+      confirmationAssigneeId: sql<string | null>`(SELECT assignee_id FROM order_confirmation_assignments WHERE order_id = orders.id LIMIT 1)`,
+      confirmationAssigneeName: sql<string | null>`(SELECT u.name FROM order_confirmation_assignments ca JOIN users u ON u.id = ca.assignee_id WHERE ca.order_id = orders.id LIMIT 1)`,
     })
     .from(orders)
     .leftJoin(wilayas, eq(orders.wilayaId, wilayas.id))
@@ -189,6 +208,24 @@ export async function getOrderById(db: AppDb, orderId: string) {
   };
 }
 
+export async function isAutomaticConfirmationAssignmentEnabled(db: AppDb) {
+  const setting = await db.select({ enabled: operationAutomationSettings.autoAssignEnabled })
+    .from(operationAutomationSettings).where(eq(operationAutomationSettings.id, "default")).get();
+  return setting?.enabled ?? true;
+}
+
+export async function chooseLeastLoadedConfirmer(db: AppDb) {
+  const candidates = await db.select({ id: users.id, name: users.name,
+    maxOpenOrders: sql<number>`coalesce(${operationAgentSettings.maxOpenOrders}, 25)`,
+    maxDailyOrders: sql<number>`coalesce(${operationAgentSettings.maxDailyOrders}, 50)`,
+    assignedToday: sql<number>`(SELECT COUNT(*) FROM order_confirmation_assignments today_ca WHERE today_ca.assignee_id = ${users.id} AND date(today_ca.assigned_at, '+1 hour') = date('now', '+1 hour'))`,
+    openOrders: sql<number>`(SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders assigned_orders ON assigned_orders.id = ca.order_id WHERE ca.assignee_id = ${users.id} AND assigned_orders.status IN ('new','confirmed','unreachable'))`,
+  }).from(users).leftJoin(operationAgentSettings, eq(operationAgentSettings.userId, users.id))
+    .where(and(eq(users.role, "confirmer"), eq(users.status, "active"), sql`coalesce(${operationAgentSettings.autoAssignEnabled}, 1) = 1`))
+    .orderBy(sql`(SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders ao ON ao.id = ca.order_id WHERE ca.assignee_id = ${users.id} AND ao.status IN ('new','confirmed','unreachable')) ASC`, users.createdAt).all();
+  return candidates.find((candidate) => candidate.openOrders < candidate.maxOpenOrders && candidate.assignedToday < candidate.maxDailyOrders) ?? null;
+}
+
 export async function createOrder(
   db: AppDb,
   orderData: typeof orders.$inferInsert,
@@ -196,10 +233,22 @@ export async function createOrder(
   actor?: { id: string; name: string } | null,
 ) {
   const now = orderData.createdAt ?? new Date().toISOString();
-
-  const statements: BatchStatement[] = [
-    db.insert(orders).values(orderData),
-  ];
+  const confirmer = orderData.status === "new" && (await isAutomaticConfirmationAssignmentEnabled(db))
+    ? await chooseLeastLoadedConfirmer(db)
+    : null;
+  const statements: BatchStatement[] = [db.insert(orders).values(orderData)];
+  if (confirmer) {
+    statements.push(db.insert(orderConfirmationAssignments).values({
+      orderId: orderData.id!, assigneeId: confirmer.id, assignedBy: actor?.id ?? null,
+      assignedAt: now, updatedAt: now,
+    }));
+    statements.push(db.insert(operationTasks).values({
+    id: crypto.randomUUID(), title: `Confirm order ${orderData.orderNumber}`,
+    description: `Contact ${orderData.customerName} to confirm the order and delivery details.`, type: "confirmation", status: "open", priority: "normal",
+    orderId: orderData.id!, customerId: orderData.customerId, assigneeId: confirmer.id, createdBy: actor?.id ?? null,
+    dueAt: new Date(Date.parse(now) + 30 * 60 * 1000).toISOString(), createdAt: now, updatedAt: now,
+    }));
+  }
 
   if (productsData.length > 0) {
     statements.push(db.insert(orderProducts).values(productsData));
@@ -315,6 +364,45 @@ export async function createOrder(
 
   return orderData.id;
 }
+
+export async function createStaffCommissionStages(db: AppDb, orderId: string, earnConfirmation = true) {
+  const row = await db.select({ assigneeId: orderConfirmationAssignments.assigneeId, price: orders.price,
+    followType: operationAgentSettings.commissionType, followValue: operationAgentSettings.commissionValue,
+    confirmationType: operationAgentSettings.confirmationCommissionType, confirmationValue: operationAgentSettings.confirmationCommissionValue,
+  }).from(orders).leftJoin(orderConfirmationAssignments, eq(orders.id, orderConfirmationAssignments.orderId))
+    .leftJoin(operationAgentSettings, eq(orderConfirmationAssignments.assigneeId, operationAgentSettings.userId)).where(eq(orders.id, orderId)).get();
+  if (!row?.assigneeId) return;
+  const now = new Date().toISOString();
+  const stages = [
+    { category: "confirmation" as const, type: row.confirmationType, value: row.confirmationValue, status: earnConfirmation ? "earned" as const : "pending" as const },
+    ...(earnConfirmation ? [{ category: "follow_up" as const, type: row.followType, value: row.followValue, status: "pending" as const }] : []),
+  ];
+  for (const stage of stages) {
+    if (!stage.type || !stage.value || stage.value <= 0) continue;
+    const amount = stage.type === "percentage" ? Math.round(row.price * stage.value) / 100 : stage.value;
+    await db.insert(staffCommissions).values({ id: crypto.randomUUID(), orderId, userId: row.assigneeId,
+      category: stage.category, amount, rateType: stage.type, rateValue: stage.value, status: stage.status,
+      earnedAt: stage.status === "earned" ? now : null, createdAt: now, updatedAt: now,
+    }).onConflictDoNothing({ target: [staffCommissions.orderId, staffCommissions.category] });
+    if (stage.status === "pending") {
+      await db.update(staffCommissions).set({ userId: row.assigneeId, amount, rateType: stage.type, rateValue: stage.value, updatedAt: now })
+        .where(and(eq(staffCommissions.orderId, orderId), eq(staffCommissions.category, stage.category), eq(staffCommissions.status, "pending")));
+    }
+  }
+  if (earnConfirmation) {
+    await db.update(staffCommissions).set({ status: "earned", earnedAt: now, updatedAt: now })
+      .where(and(eq(staffCommissions.orderId, orderId), eq(staffCommissions.category, "confirmation"), eq(staffCommissions.status, "pending")));
+  }
+}
+
+export async function settleFollowUpCommission(db: AppDb, orderId: string, outcome: "delivered" | "reversed") {
+  const now = new Date().toISOString();
+  await db.update(staffCommissions).set(outcome === "delivered"
+    ? { status: "earned", earnedAt: now, updatedAt: now }
+    : { status: "reversed", reversedAt: now, updatedAt: now })
+    .where(and(eq(staffCommissions.orderId, orderId), eq(staffCommissions.category, "follow_up"), eq(staffCommissions.status, "pending")));
+}
+
 
 export async function updateOrderStatus(
   db: AppDb,
@@ -484,6 +572,19 @@ export async function updateOrderStatus(
   // wasAlreadyTerminal guard then blocked every retry, permanently losing
   // the inventory.
   await db.batch(statements as [BatchStatement, ...BatchStatement[]]);
+
+  // Commission state follows every status source (dashboard, shipment actions,
+  // and carrier webhooks), not only the manual status endpoint.
+  if (newStatus === "confirmed") await createStaffCommissionStages(db, orderId);
+  if (newStatus === "delivered") await settleFollowUpCommission(db, orderId, "delivered");
+  if (newStatus === "returned" || newStatus === "cancelled") await settleFollowUpCommission(db, orderId, "reversed");
+  if (newStatus === "confirmed") {
+    await db.update(operationTasks).set({ status: "completed", completedAt: now, updatedAt: now })
+      .where(and(eq(operationTasks.orderId, orderId), eq(operationTasks.type, "confirmation"), sql`${operationTasks.status} IN ('open','in_progress')`));
+  } else if (newStatus === "cancelled" || newStatus === "returned") {
+    await db.update(operationTasks).set({ status: "cancelled", updatedAt: now })
+      .where(and(eq(operationTasks.orderId, orderId), sql`${operationTasks.status} IN ('open','in_progress')`));
+  }
 
   return true;
 }

@@ -36,7 +36,7 @@ export function ReviewsSettings({
           aria-checked={reviewsEnabled}
           onClick={() => setReviewsEnabled((current) => !current)}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-            reviewsEnabled ? "bg-primary" : "bg-muted-foreground/30"
+            reviewsEnabled ? "bg-brand" : "bg-muted-foreground/35"
           }`}
         >
           <span

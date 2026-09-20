@@ -83,7 +83,8 @@
       "products": "Produits",
       "team": "Équipe",
       "reviews": "Avis",
-      "type": "Type"
+      "type": "Type",
+      "operations": "Opérations"
     },
     "stats": {
       "actions": "actions",
@@ -115,7 +116,9 @@
       "user.api_key_revoked": "A révoqué une clé API",
       "review.approved": "A approuvé un avis",
       "review.rejected": "A rejeté un avis",
-      "review.deleted": "A supprimé un avis"
+      "review.deleted": "A supprimé un avis",
+      "operations.settings_changed": "A modifié les paramètres des opérations",
+      "operations.assignment_changed": "A modifié l’affectation des commandes"
     },
     "table": {
       "action": "Action",
@@ -153,7 +156,8 @@
     "abandonedOrders": "Commandes abandonnées",
     "landingPages": "Pages d'atterrissage",
     "mcp": "Agents IA (MCP)",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "operations": "Opérations et tâches"
   },
   "scope_actions": {
     "view": "Voir",
@@ -184,7 +188,8 @@
     "email_failed": "L'e-mail d'invitation n'a pas pu être envoyé.",
     "email_not_configured": "L'envoi d'e-mails n'est pas configuré.",
     "email_share_manually": "Partagez le mot de passe temporaire avec le membre manuellement.",
-    "email_language_label": "Langue de l'e-mail d'invitation"
+    "email_language_label": "Langue de l'e-mail d'invitation",
+    "automatic_role_permissions": "Les autorisations sont attribuées automatiquement à ce rôle et appliquées par le serveur."
   },
   "error_member_not_found": "Membre de l’équipe introuvable",
   "error_duplicate_email": "Un utilisateur avec cet e-mail existe déjà",

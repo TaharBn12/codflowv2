@@ -44,6 +44,8 @@ export interface OrderFilters {
   delivery: string;
   wilaya: string;
   type: string;
+  confirmationAssignment?: string;
+  confirmerId?: string;
 }
 
 export type DetailStatusAction = {
@@ -286,6 +288,21 @@ export function filterOrders(
       return false;
     if (filters.type !== "all" && order.orderType !== filters.type)
       return false;
+    if (
+      filters.confirmationAssignment === "assigned" &&
+      !order.confirmationAssigneeId
+    )
+      return false;
+    if (
+      filters.confirmationAssignment === "unassigned" &&
+      order.confirmationAssigneeId
+    )
+      return false;
+    if (
+      filters.confirmerId !== "all" &&
+      order.confirmationAssigneeId !== filters.confirmerId
+    )
+      return false;
     if (filters.wilaya !== "all" && order.wilaya !== filters.wilaya)
       return false;
     if (
@@ -393,8 +410,7 @@ export function filterAbandonedOrders(
     ) {
       return false;
     }
-    if (filters.status !== "all" && row.status !== filters.status)
-      return false;
+    if (filters.status !== "all" && row.status !== filters.status) return false;
     return true;
   });
 }

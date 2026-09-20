@@ -30,7 +30,9 @@ function readScopeToolNames(): Set<string> {
   const out = new Set<string>();
   for (const entry of TOOL_REGISTRY) {
     if (entry.requires.every((s) => s.endsWith(":read"))) {
-      for (const name of Object.keys(entry.build({} as never, {} as never, {} as never))) {
+      for (const name of Object.keys(
+        entry.build({} as never, {} as never, {} as never),
+      )) {
         out.add(name);
       }
     }
@@ -45,14 +47,20 @@ describe("TOOL_ANNOTATIONS", () => {
 
   it("every confirmation-gated (dangerous) tool claims destructiveHint: true", () => {
     for (const name of DANGEROUS_TOOLS) {
-      expect(TOOL_ANNOTATIONS[name]?.destructiveHint, `${name} is dangerous`).toBe(true);
+      expect(
+        TOOL_ANNOTATIONS[name]?.destructiveHint,
+        `${name} is dangerous`,
+      ).toBe(true);
     }
   });
 
   it("no non-dangerous tool claims destructiveHint: true", () => {
     for (const name of TOOL_NAMES) {
       if (!DANGEROUS_TOOLS.has(name)) {
-        expect(TOOL_ANNOTATIONS[name]?.destructiveHint, `${name} is not dangerous`).toBe(false);
+        expect(
+          TOOL_ANNOTATIONS[name]?.destructiveHint,
+          `${name} is not dangerous`,
+        ).toBe(false);
       }
     }
   });
@@ -61,7 +69,10 @@ describe("TOOL_ANNOTATIONS", () => {
     const reads = readScopeToolNames();
     expect(reads.size).toBeGreaterThan(0);
     for (const name of reads) {
-      expect(TOOL_ANNOTATIONS[name]?.readOnlyHint, `${name} is read-scoped`).toBe(true);
+      expect(
+        TOOL_ANNOTATIONS[name]?.readOnlyHint,
+        `${name} is read-scoped`,
+      ).toBe(true);
     }
   });
 
@@ -70,42 +81,40 @@ describe("TOOL_ANNOTATIONS", () => {
     for (const name of TOOL_NAMES) {
       if (TOOL_ANNOTATIONS[name]?.readOnlyHint === true) {
         const justified = reads.has(name) || READ_ONLY_OVERRIDES.has(name);
-        expect(justified, `${name} claims readOnly without justification`).toBe(true);
+        expect(justified, `${name} claims readOnly without justification`).toBe(
+          true,
+        );
       }
     }
   });
 
   it("write tools claim readOnlyHint: false", () => {
-    expect(TOOL_ANNOTATIONS["createLandingPage"]?.readOnlyHint).toBe(false);
-    expect(TOOL_ANNOTATIONS["uploadLandingPageImage"]?.readOnlyHint).toBe(false);
     expect(TOOL_ANNOTATIONS["updateOrderStatus"]?.readOnlyHint).toBe(false);
   });
 
-  it("the upload tool is the only open-world tool (it fetches public image URLs)", () => {
-    expect(TOOL_ANNOTATIONS["uploadLandingPageImage"]?.openWorldHint).toBe(true);
+  it("all registered tools operate inside the merchant workspace", () => {
     for (const name of TOOL_NAMES) {
       if (!OPEN_WORLD_TOOLS.has(name)) {
-        expect(TOOL_ANNOTATIONS[name]?.openWorldHint, `${name} is not open-world`).toBe(false);
+        expect(
+          TOOL_ANNOTATIONS[name]?.openWorldHint,
+          `${name} is not open-world`,
+        ).toBe(false);
       }
     }
   });
 
   it("read tools are idempotent; writes are not unless documented as such", () => {
     expect(TOOL_ANNOTATIONS["listCustomers"]?.idempotentHint).toBe(true);
-    expect(TOOL_ANNOTATIONS["getLandingPageImageUploadStatus"]?.idempotentHint).toBe(true);
     expect(TOOL_ANNOTATIONS["createOrder"]?.idempotentHint).toBe(false);
-    expect(TOOL_ANNOTATIONS["deleteLandingPage"]?.idempotentHint).toBe(false);
 
     // The membership tools are documented idempotent (onConflictDoNothing).
     for (const name of IDEMPOTENT_WRITE_TOOLS) {
-      expect(TOOL_ANNOTATIONS[name]?.idempotentHint, `${name} is documented idempotent`).toBe(true);
+      expect(
+        TOOL_ANNOTATIONS[name]?.idempotentHint,
+        `${name} is documented idempotent`,
+      ).toBe(true);
       expect(TOOL_ANNOTATIONS[name]?.readOnlyHint).toBe(false);
     }
-  });
-
-  it("the manage-gated status poll is overridden to read-only", () => {
-    expect(TOOL_ANNOTATIONS["getLandingPageImageUploadStatus"]?.readOnlyHint).toBe(true);
-    expect(TOOL_ANNOTATIONS["getLandingPageImageUploadStatus"]?.destructiveHint).toBe(false);
   });
 });
 

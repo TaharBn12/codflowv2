@@ -31,7 +31,7 @@ export async function createUser(
     id: string;
     email: string;
     name: string;
-    role: "admin" | "staff";
+    role: "admin" | "staff" | "confirmer" | "driver";
     status: "active" | "inactive";
     apiKey: string;
     passwordHash: string;
@@ -94,7 +94,7 @@ export async function updateUser(
   updates: {
     email?: string;
     name?: string;
-    role?: "admin" | "staff";
+    role?: "admin" | "staff" | "confirmer" | "driver";
     status?: "active" | "inactive";
   }
 ) {
@@ -116,6 +116,23 @@ export async function updateUser(
 /**
  * Grant scope to user
  */
+export async function replaceUserScopes(
+  db: Database,
+  userId: string,
+  scopes: readonly string[],
+  grantedBy: string,
+) {
+  await db.delete(userScopes).where(eq(userScopes.userId, userId));
+  if (scopes.length > 0) {
+    const grantedAt = new Date().toISOString();
+    await db.insert(userScopes).values(scopes.map((scope) => ({
+      id: crypto.randomUUID(), userId, scope, grantedBy, grantedAt,
+    })));
+  }
+  clearScopeCache(userId);
+  return getUserById(db, userId);
+}
+
 export async function grantScope(
   db: Database,
   userId: string,

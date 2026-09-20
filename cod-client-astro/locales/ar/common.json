@@ -8,7 +8,9 @@
   "move_down": "تحريك للأسفل",
   "roles": {
     "admin": "مشرف",
-    "staff": "موظف"
+    "staff": "موظف",
+    "confirmer": "مؤكد الطلبات",
+    "driver": "سائق التوصيل"
   },
   "time": {
     "moments_ago": "منذ لحظات",

@@ -12,7 +12,6 @@ import ProductDetailPageApp from "@/features/products/components/ProductDetailPa
 import ProductFormPageApp from "@/features/products/components/ProductFormPageApp";
 import ProductGroupFormPageApp from "@/features/product-groups/components/ProductGroupFormPageApp";
 import OfferFormPageApp from "@/features/offers/components/OfferFormPageApp";
-import LandingPageStudioApp from "@/features/landing-pages/components/LandingPageStudioApp";
 import DriverProfilePageApp from "@/features/delivery/components/DriverProfilePageApp";
 import DriverFormPageApp from "@/features/delivery/components/DriverFormPageApp";
 import DriverCompensationsPageApp from "@/features/delivery/components/DriverCompensationsPageApp";
@@ -22,15 +21,16 @@ import CompanyStopDesksPageApp from "@/features/delivery/components/CompanyStopD
 import ShippingProfileDetailPageApp from "@/features/delivery/components/ShippingProfileDetailPageApp";
 import ShippingProfileFormPageApp from "@/features/delivery/components/ShippingProfileFormPageApp";
 import TeamMemberPageApp from "@/features/team/components/TeamMemberPageApp";
+import OperationAgentDetailPageApp from "@/features/operations/components/OperationAgentDetailPageApp";
 import { parseCustomerRoute } from "@/features/customers/model";
 import { parseCustomerGroupRoute } from "@/features/customer-groups/model";
 import { parseCustomerTagRoute } from "@/features/customer-tags/model";
 import { parseProductRoute } from "@/features/products/model";
 import { parseProductGroupRoute } from "@/features/product-groups/model";
 import { parseOfferRoute } from "@/features/offers/model";
-import { parseLandingPageRoute } from "@/features/landing-pages/model";
 import { parseDriverRoute, parseDeliveryCompanyRoute, parseShippingProfileRoute } from "@/features/delivery/model";
 import { parseTeamRoute } from "@/features/team/model";
+import { parseOperationAgentRoute } from "@/features/operations/model";
 
 /** Public root: routes visitors to the dashboard or sign-in. Silent. */
 export function RootGate() {
@@ -46,11 +46,11 @@ export function RootGate() {
   const companyRoute = parseDeliveryCompanyRoute(pathname);
   const shippingProfileRoute = parseShippingProfileRoute(pathname);
   const teamRoute = parseTeamRoute(pathname);
-  const landingPageRoute = parseLandingPageRoute(pathname);
+  const operationAgentRoute = parseOperationAgentRoute(pathname);
   const orderId = pathname.startsWith("/orders/") && pathname !== "/orders/new" && pathname !== "/orders/abandoned"
     ? pathname.slice("/orders/".length)
     : null;
-  const dynamicRoute = orderId || customerRoute.kind === "detail" || customerRoute.kind === "edit" || customerGroupRoute.kind === "detail" || customerGroupRoute.kind === "edit" || customerTagRoute.kind === "detail" || customerTagRoute.kind === "edit" || productRoute.kind === "detail" || productRoute.kind === "edit" || productGroupRoute.kind === "edit" || offerRoute.kind === "edit" || driverRoute.kind === "detail" || driverRoute.kind === "edit" || driverRoute.kind === "compensations" || companyRoute.kind === "detail" || companyRoute.kind === "credentials" || companyRoute.kind === "stopDesks" || shippingProfileRoute.kind === "detail" || shippingProfileRoute.kind === "edit" || teamRoute.kind === "detail" || landingPageRoute.kind === "studio";
+  const dynamicRoute = orderId || customerRoute.kind === "detail" || customerRoute.kind === "edit" || customerGroupRoute.kind === "detail" || customerGroupRoute.kind === "edit" || customerTagRoute.kind === "detail" || customerTagRoute.kind === "edit" || productRoute.kind === "detail" || productRoute.kind === "edit" || productGroupRoute.kind === "edit" || offerRoute.kind === "edit" || driverRoute.kind === "detail" || driverRoute.kind === "edit" || driverRoute.kind === "compensations" || companyRoute.kind === "detail" || companyRoute.kind === "credentials" || companyRoute.kind === "stopDesks" || shippingProfileRoute.kind === "detail" || shippingProfileRoute.kind === "edit" || teamRoute.kind === "detail" || operationAgentRoute.kind === "detail";
 
   useEffect(() => {
     if (dynamicRoute) return;
@@ -85,7 +85,7 @@ export function RootGate() {
   if (shippingProfileRoute.kind === "detail") return <ShippingProfileDetailPageApp profileId={shippingProfileRoute.id} />;
   if (shippingProfileRoute.kind === "edit") return <ShippingProfileFormPageApp profileId={shippingProfileRoute.id} />;
   if (teamRoute.kind === "detail") return <TeamMemberPageApp memberId={teamRoute.id} />;
-  if (landingPageRoute.kind === "studio") return <LandingPageStudioApp landingPageId={landingPageRoute.id} />;
+  if (operationAgentRoute.kind === "detail") return <OperationAgentDetailPageApp agentId={operationAgentRoute.id} />;
   return (
     <div data-auth-state={done ? "routing" : "pending"} className="flex justify-center py-24" aria-busy="true">
       <span className="font-display text-2xl font-bold tracking-tight text-foreground">CodFlow</span>

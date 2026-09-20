@@ -1,12 +1,10 @@
 import { betterAuth } from "better-auth";
 import { withCloudflare } from "better-auth-cloudflare";
-import { customSession, jwt } from "better-auth/plugins";
+import { jwt } from "better-auth/plugins";
 import { getDb } from "../../../../cod-shared/db/client";
-import { userScopes } from "../../../../cod-shared/db/schema";
 import { getStore } from "../../../../cod-shared/queries/stores";
 import { renderPasswordResetEmail } from "../../../../cod-shared/lib/email-templates";
 import { sendTransactionalEmail } from "../../../../cod-shared/lib/transactional-email";
-import { eq } from "drizzle-orm";
 
 export interface AuthEnv {
   DB: D1Database;
@@ -92,12 +90,20 @@ export function createAuth(env: AuthEnv, cloudflare?: AuthCloudflareContext) {
         disabledPaths: ["/token"],
         session: {
           storeSessionInDatabase: true,
-          cookieCache: {
-            enabled: true,
-            maxAge: 5 * 60,
-          },
+          // Do not combine Better Auth's signed cookie cache with customSession.
+          // Upstream joins/decodes the two Set-Cookie values incorrectly on
+          // Workers, so sign-in succeeds but get-session returns 500 and the UI
+          // immediately redirects back to /sign-in. D1 is the source of truth.
         },
         advanced: {
+          // Version the cookie namespace so browsers ignore malformed legacy
+          // `better-auth.session_data` cookies left by the old configuration.
+          cookiePrefix: "codflow",
+          defaultCookieAttributes: {
+            secure: true,
+            sameSite: "lax",
+            path: "/",
+          },
           ipAddress: {
             ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"],
           },
@@ -170,27 +176,19 @@ export function createAuth(env: AuthEnv, cloudflare?: AuthCloudflareContext) {
           },
         },
         plugins: [
-          // Attaches real scopes (user_scopes join) to every session response so
-          // the Identity contract is truthful end-to-end. Not added to the JWT
-          // payload — scopes stay server-resolved per request.
-          customSession(async ({ user, session }) => {
-            const rows = await db
-              .select({ scope: userScopes.scope })
-              .from(userScopes)
-              .where(eq(userScopes.userId, user.id));
-            
-            // Strip sensitive fields from user object before sending to browser
-            const { apiKey, ...safeUser } = user as typeof user & { apiKey?: string };
-            
-            return {
-              user: safeUser,
-              session,
-              scopes: (user as { role?: string }).role === "admin"
-                ? ["*"]
-                : rows.map((r) => r.scope),
-            };
-          }),
+          // Keep get-session on Better Auth's native response path. The
+          // customSession plugin currently throws on Cloudflare Workers after
+          // a successful sign-in, producing the dashboard redirect loop. Admin
+          // authorization remains server-enforced; staff scopes are loaded by
+          // protected API endpoints rather than embedded in this response.
           jwt({
+            jwks: {
+              // GitHub recovery deployments cannot read an existing Worker
+              // secret back from Cloudflare. Keeping the JWK unencrypted
+              // prevents a secret rotation from making get-session return 500;
+              // D1 and Worker access remain account-protected.
+              disablePrivateKeyEncryption: true,
+            },
             jwt: {
               // Tokens are issued FOR the API resource, matching cod-server's
               // sessionAuth audience check (docs: "Modify Issuer, Audience…").

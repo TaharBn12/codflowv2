@@ -15,6 +15,7 @@ import { ERROR_CODES } from "../../../../cod-shared/errors/codes";
 import { scryptAsync } from "@noble/hashes/scrypt.js";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { sendInviteEmail } from "./invite-email";
+import { defaultScopesForRole } from "../../../../cod-shared/rbac/scopes";
 
 /**
  * GET /users
@@ -117,7 +118,9 @@ export async function createUser(c: Context<AppContext>) {
       passwordHash,
       language: validated.language,
     },
-    validated.scopes,
+    validated.role === "admin"
+      ? []
+      : [...new Set([...defaultScopesForRole(validated.role), ...validated.scopes])],
     actor.id,
   );
 
@@ -180,13 +183,19 @@ export async function updateUserRole(c: Context<AppContext>) {
   const jsonBody: any = (c.req as any).valid?.("json");
   const body = jsonBody ?? validation.updateUserRoleSchema.parse(await c.req.json());
   const { role } = body;
-  const user = await queries.updateUser(db, id, { role });
+  let user = await queries.updateUser(db, id, { role });
   
   if (!user) {
     throw new NotFoundError("User", id);
   }
-  
+
   const actor = c.get("user");
+  user = (await queries.replaceUserScopes(
+    db,
+    id,
+    role === "admin" || role === "staff" ? [] : defaultScopesForRole(role),
+    actor.id,
+  )) ?? user;
   await logActivity(db, actor, ACTIONS.USER_ROLE_CHANGED, {
     type: "user", id, label: user.name ?? undefined,
   }, { role });

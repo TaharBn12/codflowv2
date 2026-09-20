@@ -11,15 +11,15 @@ export const ActivityLogSchema = z
     id: z.string(),
     actorId: z.string(),
     actorName: z.string().openapi({ example: "Ahmed Benali" }),
-    actorRole: z.enum(["admin", "staff"]),
+    actorRole: z.enum(["admin", "staff", "confirmer", "driver"]),
     action: z.string().openapi({
       description:
-        'Dot-notation action identifier. Valid values: `order.created`, `order.status_changed`, `order.driver_assigned`, `order.dispatched`, `order.deleted`, `customer.created`, `customer.updated`, `customer.deleted`, `customer_group.created`, `customer_group.updated`, `customer_group.deleted`, `customer_group.member_added`, `customer_group.member_removed`, `customer_tag.created`, `customer_tag.updated`, `customer_tag.deleted`, `customer_tag.assigned`, `customer_tag.unassigned`, `driver.created`, `driver.updated`, `driver.status_changed`, `driver.deleted`, `product.created`, `product.updated`, `product.status_changed`, `product.deleted`, `review.approved`, `review.rejected`, `review.deleted`, `user.created`, `user.updated`, `user.role_changed`, `user.scope_granted`, `user.scope_revoked`, `user.api_key_generated`, `user.api_key_revoked`',
+        'Dot-notation action identifier. Valid values: `order.created`, `order.status_changed`, `order.driver_assigned`, `order.dispatched`, `order.deleted`, `customer.created`, `customer.updated`, `customer.deleted`, `customer_group.created`, `customer_group.updated`, `customer_group.deleted`, `customer_group.member_added`, `customer_group.member_removed`, `customer_tag.created`, `customer_tag.updated`, `customer_tag.deleted`, `customer_tag.assigned`, `customer_tag.unassigned`, `driver.created`, `driver.updated`, `driver.status_changed`, `driver.deleted`, `product.created`, `product.updated`, `product.status_changed`, `product.deleted`, `review.approved`, `review.rejected`, `review.deleted`, `user.created`, `user.updated`, `user.role_changed`, `user.scope_granted`, `user.scope_revoked`, `operations.settings_changed`, `operations.assignment_changed`',
       example: "order.created",
     }),
     entityType: z.string().openapi({
       description:
-        'Entity category the action applies to. Valid values: `order`, `customer`, `customer_group`, `customer_tag`, `driver`, `product`, `review`, `user`',
+        'Entity category the action applies to. Valid values: `order`, `customer`, `customer_group`, `customer_tag`, `driver`, `product`, `review`, `user`, `operations`',
       example: "order",
     }),
     entityId: z.string(),

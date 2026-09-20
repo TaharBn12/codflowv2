@@ -20,5 +20,5 @@ export interface McpConnection {
 export interface McpConfig {
   mcpUrl: string;
   currentUserId: string;
-  currentUserRole: "admin" | "staff";
+  currentUserRole: "admin" | "staff" | "confirmer" | "driver";
 }

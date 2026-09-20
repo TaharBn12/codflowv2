@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const seam = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock("@/lib/api", () => ({ apiFetch: seam.apiFetch }));
 
-import { getMyStore, getPixelConfig, getEmailConfig, saveEmailConfig, savePixelConfig, testEmailConnection, updateMyStore, getTurnstileConfig, saveTurnstileConfig } from "./api";
+import { getApprovalPolicies, getMyStore, getPixelConfig, getEmailConfig, saveAllApprovalPolicies, saveApprovalPolicy, saveEmailConfig, savePixelConfig, testEmailConnection, updateMyStore, getTurnstileConfig, saveTurnstileConfig, getTelegramConfig, saveTelegramConfig } from "./api";
 
 describe("settings API adapters", () => {
   beforeEach(() => {
@@ -68,6 +68,27 @@ describe("settings API adapters", () => {
       method: "POST",
       body: JSON.stringify({ apiKey: "sk_live_new", fromEmail: "noreply@acme.com", fromName: "Acme", enabled: true }),
     }));
+  });
+
+  it("reads and saves only masked Telegram configuration responses", async () => {
+    const config = { configured: true, source: "dashboard" as const, chatId: "-1001", enabled: true, botTokenMasked: "••••secret" };
+    seam.apiFetch.mockResolvedValue({ success: true, data: config });
+    await expect(getTelegramConfig()).resolves.toEqual(config);
+    expect(seam.apiFetch).toHaveBeenCalledWith("/api/operations/telegram/config");
+    await expect(saveTelegramConfig({ botToken: "raw-input", chatId: "-1001", enabled: true })).resolves.toEqual(config);
+    expect(seam.apiFetch).toHaveBeenCalledWith("/api/operations/telegram/config", expect.objectContaining({ method: "PUT", body: JSON.stringify({ botToken: "raw-input", chatId: "-1001", enabled: true }) }));
+    expect(config).not.toHaveProperty("botToken");
+    expect(config).not.toHaveProperty("webhookSecret");
+  });
+
+  it("reads and updates per-person Telegram approval policies", async () => {
+    const overview = { actions: [], members: [], policies: [], primaryAdminId: "a1", canManage: true };
+    seam.apiFetch.mockResolvedValue({ success: true, data: overview });
+    await expect(getApprovalPolicies()).resolves.toEqual(overview);
+    await saveApprovalPolicy("user/1", "orders.delete", true);
+    expect(seam.apiFetch).toHaveBeenLastCalledWith("/api/operations/telegram/approval-policies/user%2F1/orders.delete", expect.objectContaining({ method: "PUT", body: JSON.stringify({ enabled: true }) }));
+    await saveAllApprovalPolicies("user/1", false);
+    expect(seam.apiFetch).toHaveBeenLastCalledWith("/api/operations/telegram/approval-policies/user%2F1", expect.objectContaining({ method: "PUT", body: JSON.stringify({ enabled: false }) }));
   });
 
   it("tests the email connection, sending the key only when present", async () => {

@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import type {
+  ApprovalPoliciesOverview,
   EmailConfig,
   EmailConnectionCheck,
   OtpConfig,
@@ -11,6 +12,8 @@ import type {
   SaveTurnstileConfigData,
   StoreConfig,
   TurnstileConfig,
+  TelegramConfig,
+  SaveTelegramConfigData,
   UpdateStoreData,
 } from "./types";
 
@@ -73,4 +76,24 @@ export async function saveEmailConfig(data: SaveEmailConfigData) {
 
 export async function testEmailConnection(apiKey?: string) {
   return (await apiFetch<DataEnvelope<EmailConnectionCheck>>("/api/stores/email-config/test", json({ method: "POST", body: JSON.stringify(apiKey ? { apiKey } : {}) }))).data;
+}
+
+export async function getTelegramConfig() {
+  return (await apiFetch<DataEnvelope<TelegramConfig>>("/api/operations/telegram/config")).data;
+}
+
+export async function saveTelegramConfig(data: SaveTelegramConfigData) {
+  return (await apiFetch<DataEnvelope<TelegramConfig>>("/api/operations/telegram/config", json({ method: "PUT", body: JSON.stringify(data) }))).data;
+}
+
+export async function getApprovalPolicies() {
+  return (await apiFetch<DataEnvelope<ApprovalPoliciesOverview>>("/api/operations/telegram/approval-policies")).data;
+}
+
+export async function saveApprovalPolicy(userId: string, action: string, enabled: boolean) {
+  return apiFetch(`/api/operations/telegram/approval-policies/${encodeURIComponent(userId)}/${encodeURIComponent(action)}`, json({ method: "PUT", body: JSON.stringify({ enabled }) }));
+}
+
+export async function saveAllApprovalPolicies(userId: string, enabled: boolean) {
+  return apiFetch(`/api/operations/telegram/approval-policies/${encodeURIComponent(userId)}`, json({ method: "PUT", body: JSON.stringify({ enabled }) }));
 }

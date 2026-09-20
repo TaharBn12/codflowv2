@@ -17,6 +17,8 @@ import { TrackingSettings } from "@/features/settings/components/TrackingSetting
 import { VerificationSettings } from "@/features/settings/components/VerificationSettings";
 import { TurnstileSettings } from "@/features/settings/components/TurnstileSettings";
 import { EmailSettings } from "@/features/settings/components/EmailSettings";
+import { TelegramSettings } from "@/features/settings/components/TelegramSettings";
+import { ApprovalPoliciesSettings } from "@/features/settings/components/ApprovalPoliciesSettings";
 import { ApiSettings } from "@/features/settings/components/ApiSettings";
 
 function SettingsContent() {
@@ -108,6 +110,10 @@ function SettingsContent() {
         return <EmailSettings />;
       case "api":
         return <ApiSettings storeConfig={storeConfig} />;
+      case "telegram":
+        return <TelegramSettings />;
+      case "approvals":
+        return <ApprovalPoliciesSettings />;
       default:
         return null;
     }

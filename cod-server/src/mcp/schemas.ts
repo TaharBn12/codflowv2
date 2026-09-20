@@ -5,11 +5,6 @@ import { DRIVER_PAYMENT_TOOL_SCHEMAS, DRIVER_PAYMENT_TOOL_OUTPUT_SCHEMAS } from 
 import { PRODUCT_TOOL_SCHEMAS, PRODUCT_TOOL_OUTPUT_SCHEMAS } from "@/endpoints/products/ai-tools";
 import { PRODUCT_GROUP_TOOL_SCHEMAS, PRODUCT_GROUP_TOOL_OUTPUT_SCHEMAS } from "@/endpoints/product-groups/ai-tools";
 import { OFFER_TOOL_SCHEMAS, OFFER_TOOL_OUTPUT_SCHEMAS } from "@/endpoints/offers/ai-tools";
-import {
-  LANDING_PAGE_TOOL_SCHEMAS,
-  LANDING_PAGE_TOOL_META,
-  LANDING_PAGE_TOOL_OUTPUT_SCHEMAS,
-} from "@/endpoints/landing-pages/ai-tools";
 import { VARIANT_TOOL_SCHEMAS, VARIANT_TOOL_OUTPUT_SCHEMAS } from "@/endpoints/variants/ai-tools";
 import { WILAYA_TOOL_SCHEMAS, WILAYA_TOOL_OUTPUT_SCHEMAS } from "@/endpoints/wilayas/ai-tools";
 import { STOCK_TOOL_SCHEMAS, STOCK_TOOL_OUTPUT_SCHEMAS } from "@/endpoints/stock/ai-tools";
@@ -33,7 +28,6 @@ const SCHEMA_SOURCES: Record<string, z.ZodRawShape>[] = [
   PRODUCT_TOOL_SCHEMAS,
   PRODUCT_GROUP_TOOL_SCHEMAS,
   OFFER_TOOL_SCHEMAS,
-  LANDING_PAGE_TOOL_SCHEMAS,
   VARIANT_TOOL_SCHEMAS,
   WILAYA_TOOL_SCHEMAS,
   STOCK_TOOL_SCHEMAS,
@@ -66,7 +60,6 @@ const OUTPUT_SCHEMA_SOURCES: Record<string, z.ZodType>[] = [
   PRODUCT_TOOL_OUTPUT_SCHEMAS,
   PRODUCT_GROUP_TOOL_OUTPUT_SCHEMAS,
   OFFER_TOOL_OUTPUT_SCHEMAS,
-  LANDING_PAGE_TOOL_OUTPUT_SCHEMAS,
   VARIANT_TOOL_OUTPUT_SCHEMAS,
   WILAYA_TOOL_OUTPUT_SCHEMAS,
   STOCK_TOOL_OUTPUT_SCHEMAS,
@@ -93,7 +86,7 @@ export const TOOL_OUTPUT_SCHEMAS: Record<string, z.ZodType> = Object.assign(
  * tool call, since arguments are model-generated JSON and can never carry
  * image bytes.
  */
-const META_SOURCES: Record<string, Record<string, unknown>>[] = [LANDING_PAGE_TOOL_META];
+const META_SOURCES: Record<string, Record<string, unknown>>[] = [];
 
 export const TOOL_META: Record<string, Record<string, unknown>> = Object.assign(
   {},

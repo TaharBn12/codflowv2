@@ -20,13 +20,21 @@ export interface OrderStatusStat {
  * Only statuses that have at least one order are returned.
  * The caller is responsible for filling in zeros for absent statuses.
  */
-export async function getOrderStatusStats(db: AppDb): Promise<OrderStatusStat[]> {
+export async function getOrderStatusStats(
+  db: AppDb,
+  confirmerId?: string,
+): Promise<OrderStatusStat[]> {
   const rows = await db
     .select({
       status: orders.status,
       count: sql<number>`count(*)`,
     })
     .from(orders)
+    .where(
+      confirmerId
+        ? sql`EXISTS (SELECT 1 FROM order_confirmation_assignments ca WHERE ca.order_id = ${orders.id} AND ca.assignee_id = ${confirmerId})`
+        : undefined,
+    )
     .groupBy(orders.status)
     .all();
 

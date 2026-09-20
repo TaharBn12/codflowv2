@@ -1,7 +1,22 @@
 import { useDeferredValue, useEffect, useState } from "react";
-import { AlertCircle, Filter, PackageOpen, X } from "lucide-react";
+import {
+  AlertCircle,
+  Filter,
+  PackageOpen,
+  WandSparkles,
+  X,
+} from "lucide-react";
 import { canScope, useIdentity } from "@/features/auth/components/RequireAuth";
 import { useT } from "@/i18n/react";
+import {
+  autoAssignNewOrders,
+  bulkAssignConfirmationOrders,
+  getAutomationSettings,
+  saveAutomationSettings,
+  listOperationAgents,
+  type OperationAgent,
+} from "@/features/operations/api";
+import { notify } from "@/lib/notify";
 import { ApiError } from "@/lib/api";
 import {
   listDeliveryCompanies,
@@ -36,7 +51,10 @@ import {
   TableHead,
   SortHeader,
 } from "@/components/ui";
-import { OrderDesktopRow, OrderMobileCard } from "@/features/orders/components/OrderRow";
+import {
+  OrderDesktopRow,
+  OrderMobileCard,
+} from "@/features/orders/components/OrderRow";
 
 const EMPTY_FILTERS: OrderFilters = {
   query: "",
@@ -44,6 +62,8 @@ const EMPTY_FILTERS: OrderFilters = {
   delivery: "all",
   wilaya: "all",
   type: "all",
+  confirmationAssignment: "all",
+  confirmerId: "all",
 };
 
 function OrderSkeleton() {
@@ -104,11 +124,19 @@ function FilterSelect({
 export function OrdersList() {
   const t = useT("orders");
   const common = useT("common");
+  const operations = useT("operations");
   const auth = useT("auth");
   const identity = useIdentity();
   const [orders, setOrders] = useState<OrderListItem[] | null>(null);
   const [companies, setCompanies] = useState<DeliveryCompany[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [agents, setAgents] = useState<OperationAgent[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAgentId, setBulkAgentId] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [autoAssignBusy, setAutoAssignBusy] = useState(false);
+  const [automationEnabled, setAutomationEnabled] = useState(true);
+  const [automationBusy, setAutomationBusy] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | Error | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [filters, setFilters] = useState<OrderFilters>(() => ({
@@ -135,6 +163,14 @@ export function OrdersList() {
       setOrders(orderResponse.data ?? []);
       setCompanies(companyResponse);
       setDrivers(driverResponse);
+      if (identity?.role === "admin") {
+        const [nextAgents, automation] = await Promise.all([
+          listOperationAgents(),
+          getAutomationSettings(),
+        ]);
+        setAgents(nextAgents);
+        setAutomationEnabled(automation.autoAssignEnabled);
+      }
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause : new Error(String(cause)));
     }
@@ -208,7 +244,72 @@ export function OrdersList() {
     companies,
     onChanged: load,
     onError: setActionError,
+    agents,
+    isAdmin: identity?.role === "admin",
   };
+  function selectionProps(orderId: string) {
+    if (identity?.role !== "admin") return {};
+    return {
+      selected: selectedIds.has(orderId),
+      onSelected: (selected: boolean) =>
+        setSelectedIds((current) => {
+          const next = new Set(current);
+          selected ? next.add(orderId) : next.delete(orderId);
+          return next;
+        }),
+    };
+  }
+
+  async function autoAssign() {
+    setAutoAssignBusy(true);
+    try {
+      const result = await autoAssignNewOrders(
+        selectedIds.size ? [...selectedIds] : undefined,
+      );
+      notify.success(`${operations("auto_assigned")}: ${result.data.assigned}`);
+      setSelectedIds(new Set());
+      await load();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setAutoAssignBusy(false);
+    }
+  }
+
+  async function bulkAssign() {
+    if (!bulkAgentId || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      await bulkAssignConfirmationOrders([...selectedIds], bulkAgentId);
+      notify.success(operations("bulk_assigned"));
+      setSelectedIds(new Set());
+      setBulkAgentId("");
+      await load();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function toggleAutomation() {
+    setAutomationBusy(true);
+    try {
+      const result = await saveAutomationSettings(!automationEnabled);
+      setAutomationEnabled(result.autoAssignEnabled);
+      notify.success(
+        operations(
+          result.autoAssignEnabled
+            ? "automation_enabled"
+            : "automation_disabled",
+        ),
+      );
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setAutomationBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -225,6 +326,42 @@ export function OrdersList() {
           </button>
         </Alert>
       )}
+      {identity?.role === "admin" && selectedIds.size > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center">
+          <span className="text-sm font-semibold">
+            {selectedIds.size} {operations("selected_orders")}
+          </span>
+          <Select
+            value={bulkAgentId}
+            onChange={(event) => setBulkAgentId(event.target.value)}
+            className="h-10 min-w-52 rounded-lg border border-input bg-background px-3 text-sm"
+          >
+            <option value="">{operations("select_agent")}</option>
+            {agents
+              .filter((agent) => agent.status === "active")
+              .map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+          </Select>
+          <button
+            type="button"
+            disabled={!bulkAgentId || bulkBusy}
+            onClick={() => void bulkAssign()}
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {operations("assign")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="h-10 px-3 text-sm font-semibold text-muted-foreground"
+          >
+            {common("cancel")}
+          </button>
+        </div>
+      )}
       <Card flush>
         <div className="space-y-3 border-b border-border p-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -236,6 +373,39 @@ export function OrdersList() {
             <span className="shrink-0 text-xs font-medium text-muted-foreground">
               {filteredOrders.length} {t("orders_count")}
             </span>
+            {identity?.role === "admin" && (
+              <>
+                <div className="flex h-10 items-center gap-3 rounded-lg border border-border bg-card px-3">
+                  <span className="text-xs font-semibold text-foreground">
+                    {operations("automatic_distribution")}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={automationEnabled}
+                    aria-label={operations("automatic_distribution")}
+                    disabled={automationBusy}
+                    onClick={() => void toggleAutomation()}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${automationEnabled ? "bg-brand" : "bg-muted-foreground/35"}`}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 size-4 rounded-full shadow-sm transition-transform ${automationEnabled ? "translate-x-5 bg-brand-foreground" : "translate-x-0 bg-background"}`}
+                    />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  disabled={autoAssignBusy}
+                  onClick={() => void autoAssign()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  <WandSparkles size={16} />
+                  {autoAssignBusy
+                    ? operations("assigning")
+                    : operations("auto_assign_new")}
+                </button>
+              </>
+            )}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <FilterSelect
@@ -250,6 +420,37 @@ export function OrdersList() {
                 </option>
               ))}
             </FilterSelect>
+            {identity?.role === "admin" && (
+              <>
+                <FilterSelect
+                  label={t("filters.confirmation_assignment")}
+                  value={filters.confirmationAssignment ?? "all"}
+                  onChange={(value) =>
+                    setFilter("confirmationAssignment", value)
+                  }
+                >
+                  <option value="all">{t("filters.all_assignments")}</option>
+                  <option value="assigned">
+                    {t("filters.assigned_confirmation")}
+                  </option>
+                  <option value="unassigned">
+                    {t("filters.unassigned_confirmation")}
+                  </option>
+                </FilterSelect>
+                <FilterSelect
+                  label={t("filters.confirmer")}
+                  value={filters.confirmerId ?? "all"}
+                  onChange={(value) => setFilter("confirmerId", value)}
+                >
+                  <option value="all">{t("filters.all_confirmers")}</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name}
+                    </option>
+                  ))}
+                </FilterSelect>
+              </>
+            )}
             <FilterSelect
               label={t("filters.delivery_method")}
               value={filters.delivery}
@@ -314,7 +515,12 @@ export function OrdersList() {
           <>
             <div className="divide-y divide-border md:hidden">
               {visibleOrders.map((order) => (
-                <OrderMobileCard key={order.id} order={order} {...rowProps} />
+                <OrderMobileCard
+                  key={order.id}
+                  order={order}
+                  {...rowProps}
+                  {...selectionProps(order.id)}
+                />
               ))}
             </div>
 
@@ -322,6 +528,31 @@ export function OrdersList() {
               <Table className="min-w-[940px]">
                 <TableHeader>
                   <TableRow className="text-xs font-semibold text-muted-foreground">
+                    {identity?.role === "admin" && (
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          checked={
+                            visibleOrders.length > 0 &&
+                            visibleOrders.every((order) =>
+                              selectedIds.has(order.id),
+                            )
+                          }
+                          onChange={(event) =>
+                            setSelectedIds((current) => {
+                              const next = new Set(current);
+                              visibleOrders.forEach((order) =>
+                                event.target.checked
+                                  ? next.add(order.id)
+                                  : next.delete(order.id),
+                              );
+                              return next;
+                            })
+                          }
+                          aria-label="Select visible orders"
+                        />
+                      </TableHead>
+                    )}
                     <SortHeader
                       label={t("table.order_number")}
                       sortKey="orderNumber"
@@ -346,6 +577,9 @@ export function OrdersList() {
                       direction={sortDirection}
                       onSort={handleSort}
                     />
+                    <TableHead className="text-start">
+                      {t("table.confirmation_assignment")}
+                    </TableHead>
                     <SortHeader
                       label={t("table.wilaya")}
                       sortKey="wilaya"
@@ -371,7 +605,12 @@ export function OrdersList() {
                 </TableHeader>
                 <TableBody>
                   {visibleOrders.map((order) => (
-                    <OrderDesktopRow key={order.id} order={order} {...rowProps} />
+                    <OrderDesktopRow
+                      key={order.id}
+                      order={order}
+                      {...rowProps}
+                      {...selectionProps(order.id)}
+                    />
                   ))}
                 </TableBody>
               </Table>

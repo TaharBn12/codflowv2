@@ -17,7 +17,8 @@
     "driver": "Driver",
     "date": "Date",
     "not_assigned": "Not Assigned",
-    "total": "Total"
+    "total": "Total",
+    "confirmation_assignment": "Confirmation / follow-up"
   },
   "actions": {
     "view": "View",
@@ -26,7 +27,9 @@
     "view_details": "View Details",
     "assign_driver": "Assign Driver",
     "dispatch_to_company": "Dispatch to Company",
-    "update_status": "Update Status"
+    "update_status": "Update Status",
+    "customer_link": "Customer tracking link",
+    "customer_link_copied": "Customer tracking link copied"
   },
   "assign_driver_dialog": {
     "title": "Assign Driver",
@@ -71,7 +74,13 @@
     "company": "Company",
     "unassigned": "Unassigned",
     "wilaya": "Wilaya",
-    "all_wilayas": "All Wilayas"
+    "all_wilayas": "All Wilayas",
+    "confirmation_assignment": "Confirmation assignment",
+    "all_assignments": "All assignments",
+    "assigned_confirmation": "Assigned",
+    "unassigned_confirmation": "Without confirmer",
+    "confirmer": "Confirmer",
+    "all_confirmers": "All confirmers"
   },
   "type": {
     "online": "Online",
@@ -297,5 +306,10 @@
       "description": "Shoppers who start an order but don't finish it will appear here as recovery leads."
     },
     "recovered_order": "Order {number}"
+  },
+  "assignment": {
+    "confirmation_agent": "Confirmation agent",
+    "follow_up_agent": "Follow-up agent",
+    "unassigned": "Unassigned"
   }
 }

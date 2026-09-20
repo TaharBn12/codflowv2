@@ -9,7 +9,7 @@ import { z } from "zod";
 export const createUserSchema = z.object({
   email: z.string().email("Invalid email format"),
   name: z.string().min(1, "Name is required"),
-  role: z.enum(["admin", "staff"]).default("staff"),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]).default("staff"),
   scopes: z.array(z.string()).default([]),
   /** Invite-email language. Falls back to the users.language column default ("en"). */
   language: z.enum(["ar", "en"]).optional(),
@@ -18,12 +18,12 @@ export const createUserSchema = z.object({
 export const updateUserSchema = z.object({
   email: z.string().email("Invalid email format").optional(),
   name: z.string().min(1, "Name is required").optional(),
-  role: z.enum(["admin", "staff"]).optional(),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
 });
 
 export const updateUserRoleSchema = z.object({
-  role: z.enum(["admin", "staff"]),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]),
 });
 
 export const grantScopeSchema = z.object({
@@ -31,7 +31,7 @@ export const grantScopeSchema = z.object({
 });
 
 export const userFiltersSchema = z.object({
-  role: z.enum(["admin", "staff"]).optional(),
+  role: z.enum(["admin", "staff", "confirmer", "driver"]).optional(),
   status: z.enum(["active", "inactive"]).optional(),
   search: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).default(50),

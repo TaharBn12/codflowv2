@@ -31,7 +31,7 @@ export function consentLang(acceptLanguage: string | undefined): Lang {
  * does not possess — the consent UI is presentation, this is the boundary.
  */
 export function computeGrantableScopes(
-  role: "admin" | "staff",
+  role: "admin" | "staff" | "confirmer" | "driver",
   userScopes: readonly string[],
   requestedScopes: readonly string[],
 ): string[] {

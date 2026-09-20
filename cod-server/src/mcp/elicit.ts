@@ -33,13 +33,6 @@ export const DANGEROUS_TOOLS: ReadonlySet<string> = new Set<string>([
   // Offers — destructive
   "deleteOffer",
 
-  // Landing pages — destructive (refuses with attributed orders, but still irreversible without)
-  "deleteLandingPage",
-  // Landing pages — destructive (storage object removed on last reference; restore = re-upload)
-  "removeLandingPageImage",
-  // Landing pages — lifecycle exit (retires the link; the safe alternative to delete)
-  "archiveLandingPage",
-
   // Variants — destructive
   "deleteProductVariant",
 

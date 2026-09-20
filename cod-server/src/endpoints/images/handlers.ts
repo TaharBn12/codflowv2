@@ -106,8 +106,17 @@ export async function uploadImage(c: Context<AppContext>) {
  * Uses writeHttpMetadata() per R2 docs for correct Content-Type passthrough.
  */
 export async function serveImage(c: Context<AppContext>) {
+  return serveImageKey(c, c.req.param("key"));
+}
+
+/** Serve `https://<MEDIA_DOMAIN>/<r2-key>` through the Worker's R2 binding. */
+export async function serveMediaImage(c: Context<AppContext>) {
+  const key = decodeURIComponent(new URL(c.req.url).pathname.replace(/^\/+/, ""));
+  return serveImageKey(c, key);
+}
+
+async function serveImageKey(c: Context<AppContext>, key: string | undefined) {
   const bucket = c.env.IMAGES;
-  const key = c.req.param("key");
 
   if (!key) {
     throw new ValidationError(

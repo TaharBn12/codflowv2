@@ -1,0 +1,11 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import GateSpinner from "@/features/auth/components/GateSpinner";
+import SupportPageApp from "@/features/support/components/SupportPageApp";
+---
+<BaseLayout title="CodFlow Support">
+  <main class="min-h-screen">
+    <div data-gate-spinner="required" class="flex min-h-screen items-center justify-center" aria-busy="true"><GateSpinner branded /></div>
+    <div data-auth-gate="required" hidden><SupportPageApp client:only="react" /></div>
+  </main>
+</BaseLayout>

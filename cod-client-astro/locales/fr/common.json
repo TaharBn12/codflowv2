@@ -8,7 +8,9 @@
   "move_down": "Descendre",
   "roles": {
     "admin": "Admin",
-    "staff": "Personnel"
+    "staff": "Personnel",
+    "confirmer": "Confirmateur de commandes",
+    "driver": "Livreur"
   },
   "time": {
     "moments_ago": "il y a quelques instants",

@@ -51,22 +51,6 @@ export const TOOL_TITLES: Record<string, string> = {
   updateOffer: "Update offer",
   deleteOffer: "Delete offer",
 
-  // ─── Landing pages ────────────────────────────────────────────────────────
-  listLandingPages: "List landing pages",
-  getLandingPageDetails: "Get landing page details",
-  getLandingPageStats: "Get landing page stats",
-  createLandingPage: "Create landing page",
-  updateLandingPage: "Update landing page",
-  publishLandingPage: "Publish landing page",
-  unpublishLandingPage: "Unpublish landing page",
-  archiveLandingPage: "Archive landing page",
-  duplicateLandingPage: "Duplicate landing page",
-  deleteLandingPage: "Delete landing page",
-  uploadLandingPageImage: "Upload landing page image",
-  getLandingPageImageUploadStatus: "Get image upload status",
-  removeLandingPageImage: "Remove landing page image",
-  reorderLandingPageImages: "Reorder landing page images",
-
   // ─── Variants ─────────────────────────────────────────────────────────────
   listProductVariants: "List product variants",
   getVariantDetails: "Get variant details",

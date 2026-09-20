@@ -23,10 +23,12 @@
     "system": "النظام",
     "reviews": "التقييمات",
     "offers": "العروض",
-    "landing_pages": "صفحات الهبوط",
+    "landing_pages": "صفحة الهبوط",
     "stock_management": "إدارة المخزون",
     "api_reference": "مرجع API",
-    "mcp": "وكلاء الذكاء الاصطناعي"
+    "mcp": "وكلاء الذكاء الاصطناعي",
+    "operations": "العمليات والمهام",
+    "support": "دعم العملاء"
   },
   "navbar": {
     "search_placeholder": "البحث عن طلبات، عملاء...",
