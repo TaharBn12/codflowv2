@@ -72,6 +72,7 @@
   "view_agent": "عرض تفاصيل الموظف",
   "loading_agent": "جارٍ تحميل بيانات الموظف…",
   "back_to_operations": "العودة إلى العمليات",
+  "view_agent_activity": "عرض نشاط المؤكد",
   "active_agent": "موظف نشط",
   "inactive_agent": "موظف غير نشط",
   "distribution_active": "التوزيع مفعّل",

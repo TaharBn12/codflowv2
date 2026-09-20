@@ -72,6 +72,7 @@
   "view_agent": "View agent details",
   "loading_agent": "Loading agent details…",
   "back_to_operations": "Back to operations",
+  "view_agent_activity": "View confirmer activity",
   "active_agent": "Active employee",
   "inactive_agent": "Inactive employee",
   "distribution_active": "Distribution active",

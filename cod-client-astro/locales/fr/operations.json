@@ -72,6 +72,7 @@
   "view_agent": "Voir l’agent",
   "loading_agent": "Chargement de l’agent…",
   "back_to_operations": "Retour aux opérations",
+  "view_agent_activity": "Voir l’activité du confirmateur",
   "active_agent": "Employé actif",
   "inactive_agent": "Employé inactif",
   "distribution_active": "Distribution active",

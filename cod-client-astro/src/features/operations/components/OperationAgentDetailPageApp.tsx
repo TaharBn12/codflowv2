@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ClipboardCheck,
+  History,
   PackageCheck,
   PackageOpen,
   RotateCcw,
@@ -131,13 +132,22 @@ function Gated({ agentId }: { agentId: string }) {
         title={agent.name}
         subtitle={agent.email}
         actions={
-          <a
-            href="/operations"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold hover:bg-muted"
-          >
-            <ArrowRight size={16} />
-            {t("back_to_operations")}
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`/team/${agent.id}`}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <History size={16} />
+              {t("view_agent_activity")}
+            </a>
+            <a
+              href="/operations"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold hover:bg-muted"
+            >
+              <ArrowRight size={16} />
+              {t("back_to_operations")}
+            </a>
+          </div>
         }
       />
       <div className="mb-4 flex items-center gap-2">
