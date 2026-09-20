@@ -52,10 +52,10 @@ export function TelegramSettings() {
           role="switch"
           aria-checked={enabled}
           onClick={() => setEnabled((v) => !v)}
-          className={`relative inline-flex h-6 w-11 rounded-full ${enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+          className={`relative inline-flex h-6 w-11 rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring ${enabled ? "bg-brand" : "bg-muted-foreground/35"}`}
         >
           <span
-            className={`m-1 h-4 w-4 rounded-full bg-white transition-transform ${enabled ? "translate-x-5 rtl:-translate-x-5" : ""}`}
+            className={`absolute left-0.5 top-0.5 size-4 rounded-full shadow-sm transition-transform ${enabled ? "translate-x-5 bg-brand-foreground" : "translate-x-0 bg-background"}`}
           />
         </button>
       </div>

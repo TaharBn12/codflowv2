@@ -40,10 +40,12 @@ function Switch({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -51,11 +53,12 @@ function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${checked ? "bg-primary" : "bg-muted-foreground/30"}`}
+      className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60 ${checked ? "bg-brand" : "bg-muted-foreground/35"}`}
     >
       <span
-        className={`pointer-events-none block size-5 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-5 rtl:-translate-x-5" : "translate-x-0.5"}`}
+        className={`pointer-events-none absolute left-0.5 top-0.5 block size-5 rounded-full shadow-sm transition-transform ${checked ? "translate-x-5 bg-brand-foreground" : "translate-x-0 bg-background"}`}
       />
     </button>
   );
@@ -68,6 +71,7 @@ function Gated({ agentId }: { agentId: string }) {
   const [agent, setAgent] = useState<AgentOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [togglingAutomation, setTogglingAutomation] = useState(false);
 
   async function load() {
     try {
@@ -80,6 +84,24 @@ function Gated({ agentId }: { agentId: string }) {
   useEffect(() => {
     if (identity?.role === "admin") void load();
   }, [identity?.role, agentId]);
+
+  async function toggleAutomaticDistribution(enabled: boolean) {
+    if (!agent || togglingAutomation) return;
+    const previous = agent;
+    const next = { ...agent, autoAssignEnabled: enabled };
+    setAgent(next);
+    setTogglingAutomation(true);
+    try {
+      await saveOperationAgentSettings(next);
+      notify.success(t("agent_settings_saved"));
+      await load();
+    } catch (cause) {
+      setAgent(previous);
+      notify.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setTogglingAutomation(false);
+    }
+  }
 
   async function save() {
     if (!agent) return;
@@ -232,8 +254,9 @@ function Gated({ agentId }: { agentId: string }) {
             </div>
             <Switch
               checked={Boolean(agent.autoAssignEnabled)}
-              onChange={(value) => update("autoAssignEnabled", value)}
+              onChange={(value) => void toggleAutomaticDistribution(value)}
               label={t("auto_assign")}
+              disabled={togglingAutomation}
             />
           </div>
           <div className="grid gap-4 md:grid-cols-2">

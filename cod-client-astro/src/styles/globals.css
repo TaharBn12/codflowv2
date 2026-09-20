@@ -214,6 +214,10 @@ html[lang="ar"] body {
     -moz-osx-font-smoothing: grayscale;
   }
 
+  input[type="checkbox"] {
+    accent-color: var(--brand);
+  }
+
   ::selection {
     background: color-mix(in srgb, var(--link) 22%, transparent);
     color: var(--foreground);

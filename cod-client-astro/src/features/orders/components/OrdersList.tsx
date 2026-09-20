@@ -386,10 +386,10 @@ export function OrdersList() {
                     aria-label={operations("automatic_distribution")}
                     disabled={automationBusy}
                     onClick={() => void toggleAutomation()}
-                    className={`relative h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${automationEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${automationEnabled ? "bg-brand" : "bg-muted-foreground/35"}`}
                   >
                     <span
-                      className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform ${automationEnabled ? "translate-x-5" : "translate-x-0"}`}
+                      className={`absolute left-0.5 top-0.5 size-4 rounded-full shadow-sm transition-transform ${automationEnabled ? "translate-x-5 bg-brand-foreground" : "translate-x-0 bg-background"}`}
                     />
                   </button>
                 </div>
