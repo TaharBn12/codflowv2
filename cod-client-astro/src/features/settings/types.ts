@@ -147,3 +147,15 @@ export interface TelegramConfig {
   botTokenMasked: string;
 }
 export interface SaveTelegramConfigData { botToken?: string; chatId: string; enabled: boolean; }
+
+export type ApprovalMemberRole = "admin" | "staff" | "confirmer" | "driver";
+export interface ApprovalAction { key: string; category: string; roles: ApprovalMemberRole[]; }
+export interface ApprovalMember { id: string; name: string; email: string; role: ApprovalMemberRole; status: "active" | "inactive"; }
+export interface ApprovalPolicy { userId: string; action: string; enabled: boolean | number; }
+export interface ApprovalPoliciesOverview {
+  actions: ApprovalAction[];
+  members: ApprovalMember[];
+  policies: ApprovalPolicy[];
+  primaryAdminId: string | null;
+  canManage: boolean;
+}

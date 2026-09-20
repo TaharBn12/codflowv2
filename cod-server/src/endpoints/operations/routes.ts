@@ -9,6 +9,7 @@ import {
   orders,
   staffCommissions,
   telegramApprovalConfig,
+  telegramApprovalPolicies,
   users,
 } from "@/db/schema";
 import type { AppContext } from "@/types";
@@ -18,8 +19,10 @@ import { SCOPES } from "../../../../cod-shared/rbac/scopes";
 import { logActivity, ACTIONS } from "@/lib/activity";
 import { chooseLeastLoadedConfirmer, createStaffCommissionStages } from "../../../../cod-shared/queries/orders";
 import {
+  APPROVAL_ACTIONS,
   configureTelegramWebhook,
   requestCommissionPayoutApproval,
+  requiresTelegramApproval,
   resolveTelegramConfig,
 } from "@/endpoints/telegram-approvals/service";
 
@@ -533,7 +536,8 @@ routes.post("/commissions/mark-paid", async (c) => {
     )
     .all();
   const telegramConfig = await resolveTelegramConfig(c.env);
-  if (telegramConfig) {
+  const approvalRequired = await requiresTelegramApproval(db, c.get("user").id, "commissions.mark_paid");
+  if (telegramConfig && approvalRequired) {
     const approval = await requestCommissionPayoutApproval(
       c.env,
       c.get("user"),
@@ -666,6 +670,52 @@ routes.post("/telegram/setup", async (c) => {
   if (!isAdmin(c)) return forbidden(c);
   const webhookUrl = await configureTelegramWebhook(c.env);
   return c.json({ success: true, data: { webhookUrl } });
+});
+
+async function primaryAdminId(db: ReturnType<typeof getDb>) {
+  return (await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).orderBy(users.createdAt, users.id).get())?.id ?? null;
+}
+
+routes.get("/telegram/approval-policies", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const db = getDb(c.env.DB);
+  const [members, policies, ownerId] = await Promise.all([
+    db.select({ id: users.id, name: users.name, email: users.email, role: users.role, status: users.status }).from(users).orderBy(users.role, users.name).all(),
+    db.select({ userId: telegramApprovalPolicies.userId, action: telegramApprovalPolicies.action, enabled: telegramApprovalPolicies.enabled }).from(telegramApprovalPolicies).all(),
+    primaryAdminId(db),
+  ]);
+  return c.json({ success: true, data: { actions: APPROVAL_ACTIONS, members, policies, primaryAdminId: ownerId, canManage: ownerId === c.get("user").id } });
+});
+
+routes.put("/telegram/approval-policies/:userId/:action", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const db = getDb(c.env.DB);
+  if (await primaryAdminId(db) !== c.get("user").id) return c.json({ success: false, code: "PRIMARY_ADMIN_REQUIRED", error: "Only the primary administrator can change approval policies" }, 403);
+  const action = decodeURIComponent(c.req.param("action"));
+  if (!APPROVAL_ACTIONS.some((item) => item.key === action)) return c.json({ success: false, code: "VALIDATION_FAILED", error: "Unknown approval action" }, 400);
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  const member = await db.select({ id: users.id }).from(users).where(eq(users.id, c.req.param("userId"))).get();
+  if (!member) return c.json({ success: false, code: "NOT_FOUND", error: "Team member not found" }, 404);
+  const now = new Date().toISOString();
+  await db.insert(telegramApprovalPolicies).values({ userId: member.id, action, enabled: parsed.data.enabled, updatedBy: c.get("user").id, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: [telegramApprovalPolicies.userId, telegramApprovalPolicies.action], set: { enabled: parsed.data.enabled, updatedBy: c.get("user").id, updatedAt: now } });
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, { type: "operations", id: member.id, label: "Telegram approval policy" }, { setting: "telegramApprovalPolicy", action, value: parsed.data.enabled });
+  return c.json({ success: true, data: { userId: member.id, action, enabled: parsed.data.enabled } });
+});
+
+routes.put("/telegram/approval-policies/:userId", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const db = getDb(c.env.DB);
+  if (await primaryAdminId(db) !== c.get("user").id) return c.json({ success: false, code: "PRIMARY_ADMIN_REQUIRED", error: "Only the primary administrator can change approval policies" }, 403);
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  const member = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, c.req.param("userId"))).get();
+  if (!member) return c.json({ success: false, code: "NOT_FOUND", error: "Team member not found" }, 404);
+  const actions = APPROVAL_ACTIONS.filter((item) => (item.roles as readonly string[]).includes(member.role));
+  const now = new Date().toISOString();
+  for (const item of actions) await db.insert(telegramApprovalPolicies).values({ userId: member.id, action: item.key, enabled: parsed.data.enabled, updatedBy: c.get("user").id, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: [telegramApprovalPolicies.userId, telegramApprovalPolicies.action], set: { enabled: parsed.data.enabled, updatedBy: c.get("user").id, updatedAt: now } });
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, { type: "operations", id: member.id, label: "Telegram approval policies" }, { setting: "telegramApprovalPolicies", value: parsed.data.enabled, count: actions.length });
+  return c.json({ success: true, data: { userId: member.id, enabled: parsed.data.enabled, count: actions.length } });
 });
 
 routes.get("/automation-settings", async (c) => {

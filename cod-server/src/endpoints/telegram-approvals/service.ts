@@ -4,8 +4,40 @@ import {
   adminApprovalRequests,
   staffCommissions,
   telegramApprovalConfig,
+  telegramApprovalPolicies,
 } from "@/db/schema";
 import type { Env, AuthUser } from "@/types";
+
+export const APPROVAL_ACTIONS = [
+  { key: "orders.status_change", category: "orders", roles: ["admin", "staff", "confirmer"] },
+  { key: "orders.edit", category: "orders", roles: ["admin", "staff", "confirmer"] },
+  { key: "orders.delete", category: "orders", roles: ["admin", "staff"] },
+  { key: "orders.assign_confirmer", category: "orders", roles: ["admin", "staff"] },
+  { key: "orders.assign_driver", category: "orders", roles: ["admin", "staff"] },
+  { key: "orders.dispatch", category: "orders", roles: ["admin", "staff"] },
+  { key: "orders.return", category: "orders", roles: ["admin", "staff", "driver"] },
+  { key: "commissions.mark_paid", category: "finance", roles: ["admin"] },
+  { key: "drivers.record_payment", category: "finance", roles: ["admin", "staff"] },
+  { key: "inventory.adjust", category: "inventory", roles: ["admin", "staff"] },
+  { key: "products.delete", category: "catalog", roles: ["admin", "staff"] },
+  { key: "customers.delete", category: "customers", roles: ["admin", "staff"] },
+  { key: "team.create", category: "team", roles: ["admin"] },
+  { key: "team.permissions", category: "team", roles: ["admin"] },
+  { key: "team.disable", category: "team", roles: ["admin"] },
+  { key: "settings.operations", category: "settings", roles: ["admin"] },
+  { key: "settings.integrations", category: "settings", roles: ["admin"] },
+  { key: "landing_pages.publish", category: "marketing", roles: ["admin", "staff"] },
+  { key: "landing_pages.delete", category: "marketing", roles: ["admin", "staff"] },
+] as const;
+
+export type ApprovalActionKey = (typeof APPROVAL_ACTIONS)[number]["key"];
+
+export async function requiresTelegramApproval(db: ReturnType<typeof getDb>, userId: string, action: ApprovalActionKey) {
+  const row = await db.select({ action: telegramApprovalPolicies.action, enabled: telegramApprovalPolicies.enabled }).from(telegramApprovalPolicies)
+    .where(eq(telegramApprovalPolicies.userId, userId)).all();
+  const policy = row.find((item: any) => item.action === action);
+  return policy?.enabled ?? action === "commissions.mark_paid";
+}
 
 export type ResolvedTelegramConfig = {
   botToken: string;

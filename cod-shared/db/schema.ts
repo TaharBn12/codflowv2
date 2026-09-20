@@ -608,6 +608,18 @@ export const telegramApprovalConfig = sqliteTable("telegram_approval_config", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
 });
 
+export const telegramApprovalPolicies = sqliteTable("telegram_approval_policies", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.action] }),
+  userIdx: index("telegram_approval_policies_user_idx").on(t.userId, t.enabled),
+}));
+
 export const supportChannels = sqliteTable("support_channels", {
   id: text("id").primaryKey(), type: text("type", { enum: ["whatsapp", "email"] }).notNull(), name: text("name").notNull(),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), provider: text("provider").notNull(), senderId: text("sender_id"),
