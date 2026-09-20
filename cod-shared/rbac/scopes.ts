@@ -12,6 +12,8 @@ export const SCOPES = {
   // Dashboard
   /** View dashboard overview and statistics */
   DASHBOARD_VIEW: "dashboard:view",
+  /** View revenue, profit & loss, ROAS, and record business expenses (ad spend, carrier invoices…) */
+  ANALYTICS_FINANCE: "analytics:finance",
 
   // Operations & tasks
   /** View the operations dashboard, assigned tasks and personal commissions */
@@ -186,7 +188,7 @@ export function defaultScopesForRole(role: TeamRole): readonly Scope[] {
 export const SCOPE_CATEGORIES = {
   dashboard: {
     label: "Dashboard",
-    scopes: [SCOPES.DASHBOARD_VIEW],
+    scopes: [SCOPES.DASHBOARD_VIEW, SCOPES.ANALYTICS_FINANCE],
   },
   operations: {
     label: "Operations & Tasks",

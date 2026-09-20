@@ -47,6 +47,7 @@ import storeAbandonedRoutes from "@/endpoints/abandoned-orders/store-routes";
 import storeOtpRoutes from "@/endpoints/store-otp/store-routes";
 
 import { sweepAbandonedOrders } from "@/cron/sweep-abandoned-orders";
+import { runDailyReport } from "@/cron/daily-report";
 
 // MCP remote server (remote Model Context Protocol endpoint for Claude / AI agents).
 // The OAuthProvider owns OAuth (discovery, client registration, tokens, revocation)
@@ -224,6 +225,7 @@ export default {
     ctx: ExecutionContext,
   ): Promise<void> {
     ctx.waitUntil(sweepAbandonedOrders(env));
+    ctx.waitUntil(runDailyReport(env));
     ctx.waitUntil(
       getOAuthProvider(env).purgeExpiredData(env, { batchSize: 50 }),
     );

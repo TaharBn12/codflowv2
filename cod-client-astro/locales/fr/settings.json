@@ -193,7 +193,8 @@
     "approval_action_settings_operations": "Modifier les paramètres opérations",
     "approval_action_settings_integrations": "Modifier les intégrations et secrets",
     "approval_action_landing_pages_publish": "Publier une landing page",
-    "approval_action_landing_pages_delete": "Supprimer une landing page"
+    "approval_action_landing_pages_delete": "Supprimer une landing page",
+    "reports_title": "Rapports quotidiens"
   },
   "shipping": {
     "title": "Tarifs de livraison",
@@ -266,5 +267,31 @@
     "toggle_on": "Activé",
     "toggle_off": "Désactivé",
     "bulk_fill_success": "Tarifs appliqués à toutes les wilayas"
+  },
+  "reports": {
+    "title": "Rapport quotidien automatique",
+    "subtitle": "Un résumé des KPI (commandes, taux de livraison, revenu, meilleurs produits, alertes) envoyé chaque jour sur Telegram et/ou par email.",
+    "enabled": "Envoyer un rapport quotidien",
+    "enabled_hint": "Une fois activé, CodFlow envoie le rapport une fois par jour à l'heure choisie.",
+    "send_hour": "Envoyer à",
+    "send_hour_hint": "Heure locale — 20h00 donne une image quasi complète de la journée.",
+    "timezone": "Fuseau horaire",
+    "timezone_hint": "Sert à calculer la journée locale et l'heure d'envoi.",
+    "telegram": "Telegram",
+    "telegram_ready": "Utilise le bot configuré dans les approbations Telegram.",
+    "telegram_missing": "Configurez d'abord le bot et le chat Telegram (section Approbations Telegram).",
+    "email": "Email",
+    "email_ready": "Utilise votre fournisseur d'emails transactionnels.",
+    "email_missing": "Configurez et activez d'abord l'envoi d'emails (section Email).",
+    "recipients": "Destinataires",
+    "recipients_hint": "Adresses email séparées par des virgules.",
+    "recipients_required": "Ajoutez au moins un destinataire ou désactivez l'envoi par email.",
+    "recipients_invalid": "L'une des adresses email est invalide.",
+    "send_now": "Envoyer maintenant",
+    "send_now_hint": "Envoie immédiatement le rapport du jour via les canaux activés — pratique pour tester la configuration.",
+    "last_sent": "Dernier envoi",
+    "sent_success": "Rapport envoyé.",
+    "sent_not_configured": "Aucun canal configuré — configurez d'abord Telegram ou l'email.",
+    "sent_failed": "Le rapport n'a pas pu être envoyé."
   }
 }

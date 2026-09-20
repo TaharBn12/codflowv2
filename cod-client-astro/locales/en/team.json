@@ -118,7 +118,12 @@
       "review.rejected": "Rejected a review",
       "review.deleted": "Deleted a review",
       "operations.settings_changed": "Changed operations settings",
-      "operations.assignment_changed": "Changed order assignment"
+      "operations.assignment_changed": "Changed order assignment",
+      "expense.created": "Recorded an expense",
+      "expense.updated": "Updated an expense",
+      "expense.deleted": "Deleted an expense",
+      "daily_report.settings_changed": "Changed daily report settings",
+      "daily_report.sent": "Sent the daily report"
     },
     "table": {
       "action": "Action",
@@ -172,7 +177,8 @@
     "integrations": "Integrations",
     "notifications": "Notifications",
     "email": "Email Sending",
-    "verification": "Verification"
+    "verification": "Verification",
+    "finance": "Finance"
   },
   "invite_dialog_extra": {
     "permissions_label": "Permissions",

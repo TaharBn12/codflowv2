@@ -50,5 +50,300 @@
     "delivered": "Order was successfully delivered to the customer",
     "returned": "Customer refused or returned the order at the door",
     "cancelled": "Order was cancelled and will not be processed"
+  },
+  "customize": {
+    "label": "Customize",
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "show": "Show",
+    "hide": "Hide",
+    "hidden_hint": "This widget is hidden. Use “Show” to bring it back.",
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "save": "Save layout",
+    "saved": "Layout saved",
+    "save_error": "Could not save the layout",
+    "hint": "Drag widgets by their header (or use the arrows) to reorder them, hide the ones you don't need, then save. The layout is saved for your account only."
+  },
+  "actions": {
+    "refresh": "Refresh"
+  },
+  "export": {
+    "label": "Export CSV",
+    "exporting": "Exporting…",
+    "range_hint": "Current range · {days} days",
+    "format_hint": "UTF-8 CSV with BOM — opens directly in Excel and Google Sheets.",
+    "error": "Export failed",
+    "reports": {
+      "overview": "KPI overview",
+      "timeseries": "Orders & revenue over time",
+      "wilayas": "Wilayas",
+      "products": "Products",
+      "carriers": "Carriers",
+      "pnl": "Profit & loss",
+      "roas": "Ad spend & ROAS",
+      "expenses": "Expenses"
+    }
+  },
+  "range": {
+    "label": "Period",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+    "this_month": "This month",
+    "last_month": "Last month",
+    "custom": "Custom…",
+    "from": "From",
+    "to": "To"
+  },
+  "kpis": {
+    "title": "Key indicators",
+    "subtitle": "Orders created in the period, compared with the previous period of the same length",
+    "no_previous": "No previous data",
+    "pts": "pts",
+    "vs_previous": "vs previous period",
+    "total_orders": "Orders",
+    "confirmation_rate": "Confirmation rate",
+    "confirmation_rate_hint": "Confirmed (or further) orders ÷ all orders created in the period",
+    "delivery_rate": "Delivery rate",
+    "delivery_rate_hint": "Delivered ÷ (delivered + returned)",
+    "return_rate": "Return rate",
+    "return_rate_hint": "Returned ÷ (delivered + returned)",
+    "revenue_delivered": "Collected revenue",
+    "revenue_delivered_hint": "Sum of delivered orders (COD collected)",
+    "revenue_pending": "Pending revenue",
+    "revenue_pending_hint": "Value of orders still in progress",
+    "aov": "Average order value",
+    "aov_hint": "Average order value excluding cancelled orders",
+    "in_transit": "In transit",
+    "in_transit_hint": "Assigned, dispatched or out for delivery",
+    "pending_confirmation": "Awaiting confirmation"
+  },
+  "timeseries": {
+    "title": "Orders & revenue over time",
+    "subtitle": "Buckets follow your local day",
+    "mode": "Metric",
+    "mode_orders": "Orders",
+    "mode_revenue": "Revenue",
+    "granularity": "Granularity",
+    "day": "Daily",
+    "week": "Weekly",
+    "month": "Monthly",
+    "orders": "Orders",
+    "delivered": "Delivered",
+    "returned": "Returned",
+    "confirmed": "Confirmed",
+    "revenue_delivered": "Collected revenue",
+    "revenue_pending": "Pending revenue"
+  },
+  "empty": {
+    "no_data": "No data for this period"
+  },
+  "wilayas": {
+    "title": "Wilaya heatmap",
+    "subtitle": "Where your orders come from and where they get delivered",
+    "metric": "Metric",
+    "metric_orders": "Orders",
+    "metric_deliveryRate": "Delivery rate",
+    "metric_returnRate": "Return rate",
+    "metric_revenueDelivered": "Collected revenue",
+    "map_label": "Map of Algeria's 58 wilayas coloured by the selected metric",
+    "legend_low": "Low",
+    "legend_high": "High",
+    "hover_hint": "Hover or tap a wilaya for details.",
+    "top_by": "Top wilayas by",
+    "unknown": "{count} orders without a wilaya are not shown on the map."
+  },
+  "products": {
+    "title": "Product performance",
+    "subtitle": "Best sellers, return-prone products and gross profit",
+    "view": "View",
+    "view_best": "Best sellers",
+    "view_worst": "Most returned",
+    "view_profit": "Gross profit",
+    "no_cost_price": "Add a cost price to your products to see gross profit.",
+    "orders": "orders",
+    "delivered": "delivered",
+    "return_rate": "returns",
+    "cogs": "COGS",
+    "missing_cost_price": "{count} products have no cost price and are excluded."
+  },
+  "carriers": {
+    "title": "Carrier performance",
+    "subtitle": "Delivery companies vs in-house drivers",
+    "in_house": "In-house drivers",
+    "delivery_rate": "Delivery rate",
+    "return_rate": "Return rate",
+    "carrier": "Carrier",
+    "orders": "Orders",
+    "avg_days": "Avg. days",
+    "revenue": "Collected",
+    "in_transit": "in transit",
+    "attempts": "avg. attempts"
+  },
+  "alerts": {
+    "title": "Smart alerts",
+    "subtitle": "What needs attention right now",
+    "empty_title": "All clear",
+    "empty_description": "No alerts — nothing is stuck, late or running out.",
+    "show_details": "Show details",
+    "hide_details": "Hide details",
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "items": {
+      "unconfirmed_orders": {
+        "title": "{count} orders unconfirmed for more than 24h",
+        "hint": "New orders waiting for a confirmation call for over a day."
+      },
+      "unreachable_orders": {
+        "title": "{count} unreachable orders to retry",
+        "hint": "Customers who could not be reached — schedule another attempt."
+      },
+      "stuck_out_for_delivery": {
+        "title": "{count} shipments out for delivery for 5+ days",
+        "hint": "Chase the carrier or the driver before they become returns."
+      },
+      "stuck_dispatched": {
+        "title": "{count} shipments without carrier update for 7+ days",
+        "hint": "Dispatched to a company but no status change — check the tracking."
+      },
+      "confirmed_not_shipped": {
+        "title": "{count} confirmed orders not shipped for 48h",
+        "hint": "Confirmed but still not prepared or handed to a carrier."
+      },
+      "low_stock": {
+        "title": "{count} products at or below their low-stock threshold",
+        "hint": "Restock before orders start failing."
+      },
+      "stock_runway": {
+        "title": "{count} products will run out within a week",
+        "hint": "Based on the last 14 days of delivered units."
+      },
+      "driver_cash": {
+        "title": "{count} drivers holding unsettled cash",
+        "hint": "Collect COD cash from drivers with a large pending balance."
+      },
+      "webhook_errors": {
+        "title": "{count} carrier webhook errors in the last 24h",
+        "hint": "Tracking updates may be failing — check the delivery company integration."
+      },
+      "overdue_tasks": {
+        "title": "{count} overdue tasks",
+        "hint": "Operations tasks past their due date."
+      },
+      "pending_approvals": {
+        "title": "{count} approvals waiting for you",
+        "hint": "Sensitive actions requested by your team via Telegram."
+      },
+      "overdue_tickets": {
+        "title": "{count} support tickets past their deadline",
+        "hint": "Customer tickets that missed their target response time."
+      },
+      "unread_support": {
+        "title": "{count} unread support messages",
+        "hint": "Conversations with new customer messages."
+      },
+      "abandoned_24h": {
+        "title": "{count} abandoned carts in the last 24h",
+        "hint": "Visitors who started an order without finishing it — call them back."
+      }
+    }
+  },
+  "today": {
+    "title": "Today",
+    "subtitle": "Your work queue and today's numbers",
+    "to_confirm": "To confirm",
+    "to_retry": "To retry",
+    "to_prepare": "To prepare",
+    "to_ship": "Ready to ship",
+    "in_transit": "In transit",
+    "late_shipments": "Late shipments",
+    "orders_today": "Orders today",
+    "delivered_today": "Delivered today",
+    "returned_today": "Returned today",
+    "revenue_today": "Collected today",
+    "my_open_tasks": "My open tasks",
+    "overdue_tasks": "My overdue tasks",
+    "pending_approvals": "Pending approvals",
+    "drivers_cash": "Drivers with cash",
+    "open_conversations": "Open conversations"
+  },
+  "roas": {
+    "title": "Ad spend & ROAS",
+    "subtitle": "Daily ad spend versus delivered revenue",
+    "add_spend": "Add ad spend",
+    "empty_title": "No ad spend recorded",
+    "empty_description": "Enter what you spend on Meta, TikTok or Google each day to see your real return on ad spend.",
+    "spend": "Ad spend",
+    "revenue_delivered": "Collected revenue",
+    "roas": "ROAS",
+    "cost_per_order": "Cost / order",
+    "cost_per_confirmed": "Cost / confirmed",
+    "cost_per_delivered": "Cost / delivered",
+    "orders": "Orders",
+    "delivered": "Delivered",
+    "by_platform": "By platform",
+    "by_landing_page": "By landing page",
+    "unattributed": "Not attributed to a landing page"
+  },
+  "pnl": {
+    "title": "Profit & loss",
+    "subtitle": "Collected revenue minus product costs, delivery, commissions and expenses",
+    "revenue_delivered": "Collected revenue",
+    "delivered_orders": "delivered orders",
+    "delivery_fees": "Delivery fees collected",
+    "cogs": "Cost of goods (cost price)",
+    "missing_cost": "{count} products have no cost price — COGS is underestimated.",
+    "driver_fees": "Driver fees",
+    "gross_profit": "Gross profit",
+    "commissions": "Staff commissions",
+    "net_profit": "Net profit",
+    "net_margin": "Net margin",
+    "profit_per_order": "Profit per delivered order",
+    "revenue_lost_returns": "Revenue lost to returns",
+    "cost_breakdown": "Cost breakdown",
+    "no_costs": "No costs recorded in this period."
+  },
+  "expenses": {
+    "title": "Expenses",
+    "add": "Add expense",
+    "edit": "Edit",
+    "edit_title": "Edit expense",
+    "add_title": "Add expense",
+    "dialog_description": "Expenses feed the profit & loss; ad spend also powers the ROAS widget.",
+    "date": "Date",
+    "amount": "Amount (DA)",
+    "category": "Category",
+    "platform": "Platform",
+    "landing_page": "Landing page",
+    "landing_page_hint": "Optional — attribute this spend to a landing page to compare campaigns.",
+    "all_landing_pages": "Whole store",
+    "note": "Note",
+    "save": "Save",
+    "saved": "Expense saved",
+    "deleted": "Expense deleted",
+    "invalid_amount": "Enter a valid date and a positive amount.",
+    "empty": "No expenses in this period.",
+    "loading": "Loading…",
+    "categories": {
+      "ads": "Advertising",
+      "carrier": "Carrier invoices",
+      "packaging": "Packaging",
+      "salaries": "Salaries",
+      "rent": "Rent",
+      "other": "Other"
+    },
+    "platforms": {
+      "meta": "Meta (Facebook / Instagram)",
+      "tiktok": "TikTok",
+      "google": "Google",
+      "snapchat": "Snapchat",
+      "other": "Other"
+    }
   }
 }
