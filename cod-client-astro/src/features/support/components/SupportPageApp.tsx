@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, Mail, MessageCircle, Plus, RefreshCw, Send, TicketCheck } from "lucide-react";
+import { CheckCircle2, Copy, Eye, EyeOff, Loader2, Mail, MessageCircle, Plus, RefreshCw, Send, TicketCheck } from "lucide-react";
 import { DashboardChrome } from "@/components/layout/chrome";
 import { Alert, Button, Card, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { RequireAuth, useIdentity } from "@/features/auth/components/RequireAuth";
@@ -30,5 +30,83 @@ function SupportContent() {
     {tab === "channels" && <div className="grid gap-4 lg:grid-cols-2">{channels.map((channel) => <ChannelCard key={channel.id} value={channel} onSaved={(next) => setChannels((all) => all.map((v) => v.id === next.id ? next : v))} />)}{channels.length < 2 && isAdmin && (["whatsapp", "email"] as const).filter((type) => !channels.some((v) => v.type === type)).map((type) => <ChannelCard key={type} value={{ id: type, type, name: type === "whatsapp" ? "WhatsApp" : "Email", provider: type === "whatsapp" ? "meta_cloud" : "sendili", enabled: false, senderId: null, accessTokenMasked: "", verifyTokenMasked: "", appSecretMasked: "", webhookSecretMasked: "", updatedAt: "", webhookUrl: "" }} onSaved={(next) => setChannels((all) => [...all, next])}/>)}</div>}
   </div>;
 }
-function ChannelCard({ value, onSaved }: { value: SupportChannel; onSaved: (value: SupportChannel) => void }) { const t = useT("support"); const [form, setForm] = useState({ name: value.name, provider: value.provider, senderId: value.senderId ?? "", enabled: value.enabled, accessToken: "", verifyToken: "", appSecret: "", webhookSecret: "" }); async function save() { const next = await saveChannel(value.type, form); onSaved(next); setForm((v) => ({ ...v, accessToken: "", verifyToken: "", appSecret: "", webhookSecret: "" })); notify.success(t("channel_saved")); } return <Card className="space-y-4 p-5"><div className="flex items-center gap-3">{value.type === "whatsapp" ? <Bot className="text-emerald-600"/> : <Mail className="text-blue-600"/>}<div className="flex-1"><b>{value.name}</b><p className="text-xs text-muted-foreground">{value.provider}</p></div><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.currentTarget.checked })}/></div><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.currentTarget.value })} placeholder={t("channel_name")}/>{value.type === "whatsapp" && <><Input dir="ltr" value={form.senderId} onChange={(e) => setForm({ ...form, senderId: e.currentTarget.value })} placeholder={t("phone_number_id")}/><Input type="password" dir="ltr" value={form.accessToken} onChange={(e) => setForm({ ...form, accessToken: e.currentTarget.value })} placeholder={value.accessTokenMasked || t("access_token")}/><Input type="password" dir="ltr" value={form.verifyToken} onChange={(e) => setForm({ ...form, verifyToken: e.currentTarget.value })} placeholder={value.verifyTokenMasked || t("verify_token")}/><Input type="password" dir="ltr" value={form.appSecret} onChange={(e) => setForm({ ...form, appSecret: e.currentTarget.value })} placeholder={value.appSecretMasked || t("app_secret")}/></>}{value.type === "email" && <Input type="password" dir="ltr" value={form.webhookSecret} onChange={(e) => setForm({ ...form, webhookSecret: e.currentTarget.value })} placeholder={value.webhookSecretMasked || t("webhook_secret")}/>}{value.webhookUrl && <div className="rounded-md bg-muted p-3"><p className="text-xs font-semibold">{t("webhook_url")}</p><code dir="ltr" className="mt-1 block break-all text-xs">{value.webhookUrl}</code></div>}<Button onClick={() => void save()}>{t("save_channel")}</Button></Card>; }
+function ChannelSwitch({ checked, disabled, label, onChange }: { checked: boolean; disabled?: boolean; label: string; onChange: (value: boolean) => void }) {
+  return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange(!checked)} className={`relative h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${checked ? "bg-brand" : "bg-muted-foreground/35"}`}><span className={`absolute left-0.5 top-0.5 size-5 rounded-full shadow-sm transition-transform ${checked ? "translate-x-5 bg-brand-foreground" : "translate-x-0 bg-background"}`} /></button>;
+}
+
+function ChannelCard({ value, onSaved }: { value: SupportChannel; onSaved: (value: SupportChannel) => void }) {
+  const t = useT("support");
+  const isWhatsApp = value.type === "whatsapp";
+  const [form, setForm] = useState({
+    name: value.name,
+    provider: value.provider,
+    senderId: value.senderId ?? "",
+    enabled: value.enabled,
+    accessToken: "",
+    verifyToken: value.verifyTokenMasked ? "" : crypto.randomUUID().replaceAll("-", ""),
+    appSecret: "",
+    webhookSecret: "",
+  });
+  const [showSecrets, setShowSecrets] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const configured = isWhatsApp
+    ? Boolean(form.senderId && (form.accessToken || value.accessTokenMasked) && (form.appSecret || value.appSecretMasked) && (form.verifyToken || value.verifyTokenMasked))
+    : Boolean(form.webhookSecret || value.webhookSecretMasked);
+
+  async function copy(text: string) {
+    await navigator.clipboard.writeText(text);
+    notify.success(t("copied"));
+  }
+
+  async function save() {
+    if (form.enabled && !configured) {
+      notify.error(t(isWhatsApp ? "whatsapp_required" : "email_required"));
+      return;
+    }
+    setSaving(true);
+    try {
+      const next = await saveChannel(value.type, form);
+      onSaved(next);
+      setForm((current) => ({ ...current, accessToken: "", appSecret: "", webhookSecret: "" }));
+      notify.success(t("channel_saved"));
+    } catch (cause) {
+      notify.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Card className="overflow-hidden p-0">
+    <div className="flex items-center gap-3 border-b border-border p-5">
+      <span className={`grid size-10 place-items-center rounded-xl ${isWhatsApp ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"}`}>
+        {isWhatsApp ? <MessageCircle size={20} /> : <Mail size={20} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2"><b>{isWhatsApp ? "WhatsApp" : t("email_channel")}</b><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${form.enabled ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>{t(form.enabled ? "connected" : "disabled")}</span></div>
+        <p className="text-xs text-muted-foreground">{t(isWhatsApp ? "whatsapp_setup_hint" : "email_setup_hint")}</p>
+      </div>
+      <ChannelSwitch checked={form.enabled} disabled={saving} label={t("enable_channel")} onChange={(enabled) => setForm((current) => ({ ...current, enabled }))} />
+    </div>
+
+    <div className="space-y-4 p-5">
+      {isWhatsApp ? <>
+        <div className="rounded-lg border border-brand/20 bg-brand/5 p-3 text-xs text-muted-foreground">
+          <p className="font-bold text-foreground">{t("whatsapp_quick_setup")}</p>
+          <ol className="mt-2 list-decimal space-y-1 ps-5"><li>{t("whatsapp_step_credentials")}</li><li>{t("whatsapp_step_save")}</li><li>{t("whatsapp_step_webhook")}</li></ol>
+        </div>
+        <label className="space-y-1.5"><span className="text-xs font-semibold">{t("phone_number_id")}</span><Input dir="ltr" value={form.senderId} onChange={(e) => setForm({ ...form, senderId: e.currentTarget.value })} placeholder="123456789012345" /></label>
+        <label className="space-y-1.5"><span className="text-xs font-semibold">{t("access_token")}</span><div className="relative"><Input type={showSecrets ? "text" : "password"} dir="ltr" value={form.accessToken} onChange={(e) => setForm({ ...form, accessToken: e.currentTarget.value })} placeholder={value.accessTokenMasked || t("access_token")} className="pe-10" /><button type="button" onClick={() => setShowSecrets((current) => !current)} className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground">{showSecrets ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></label>
+        <label className="space-y-1.5"><span className="text-xs font-semibold">{t("app_secret")}</span><Input type={showSecrets ? "text" : "password"} dir="ltr" value={form.appSecret} onChange={(e) => setForm({ ...form, appSecret: e.currentTarget.value })} placeholder={value.appSecretMasked || t("app_secret")} /></label>
+        <label className="space-y-1.5"><span className="text-xs font-semibold">{t("verify_token")}</span><div className="flex gap-2"><Input dir="ltr" value={form.verifyToken} onChange={(e) => setForm({ ...form, verifyToken: e.currentTarget.value })} placeholder={value.verifyTokenMasked || t("verify_token")} /><Button type="button" variant="secondary" size="sm" disabled={!form.verifyToken} onClick={() => void copy(form.verifyToken)}><Copy size={14} /></Button></div><span className="block text-[11px] text-muted-foreground">{t("verify_token_hint")}</span></label>
+      </> : <>
+        <label className="space-y-1.5"><span className="text-xs font-semibold">{t("channel_name")}</span><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.currentTarget.value })} /></label>
+        <label className="space-y-1.5"><span className="text-xs font-semibold">{t("webhook_secret")}</span><Input type={showSecrets ? "text" : "password"} dir="ltr" value={form.webhookSecret} onChange={(e) => setForm({ ...form, webhookSecret: e.currentTarget.value })} placeholder={value.webhookSecretMasked || t("webhook_secret")} /></label>
+      </>}
+
+      {value.webhookUrl && <div className="rounded-lg bg-muted p-3"><p className="text-xs font-semibold">{t("webhook_url")}</p><div className="mt-2 flex items-center gap-2"><code dir="ltr" className="min-w-0 flex-1 break-all text-xs">{value.webhookUrl}</code><button type="button" onClick={() => void copy(value.webhookUrl)} className="text-muted-foreground hover:text-foreground"><Copy size={15} /></button></div></div>}
+      <Button className="w-full" onClick={() => void save()} disabled={saving}>{saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}{saving ? t("saving_channel") : t(form.enabled ? "save_and_activate" : "save_channel")}</Button>
+    </div>
+  </Card>;
+}
 export default function SupportPageApp() { return <RequireAuth><DashboardChrome currentPath="/support"><SupportContent/></DashboardChrome></RequireAuth>; }

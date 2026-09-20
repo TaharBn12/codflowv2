@@ -39,5 +39,21 @@
   "app_secret": "Secret de l’application Meta",
   "webhook_secret": "Secret webhook e-mail entrant",
   "save_channel": "Enregistrer le canal",
-  "webhook_url": "URL du webhook"
+  "webhook_url": "URL du webhook",
+  "email_channel": "E-mail",
+  "connected": "Activé",
+  "disabled": "Désactivé",
+  "enable_channel": "Activer le canal",
+  "whatsapp_setup_hint": "Connectez Meta Cloud API en trois étapes claires",
+  "email_setup_hint": "Recevez et gérez les e-mails clients dans la boîte unifiée",
+  "whatsapp_quick_setup": "Configuration rapide",
+  "whatsapp_step_credentials": "Collez les trois valeurs depuis votre application Meta.",
+  "whatsapp_step_save": "Activez le canal, puis enregistrez et activez.",
+  "whatsapp_step_webhook": "Copiez l’URL Webhook et le jeton de vérification dans Meta.",
+  "verify_token_hint": "Généré automatiquement pour les nouvelles connexions. Copiez la même valeur dans Meta.",
+  "whatsapp_required": "Complétez l’identifiant du numéro, le jeton d’accès, le secret Meta et le jeton de vérification.",
+  "email_required": "Saisissez d’abord le secret Webhook e-mail.",
+  "copied": "Copié",
+  "saving_channel": "Enregistrement…",
+  "save_and_activate": "Enregistrer et activer"
 }

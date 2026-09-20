@@ -39,5 +39,21 @@
   "app_secret": "سر تطبيق Meta",
   "webhook_secret": "سر Webhook للبريد الوارد",
   "save_channel": "حفظ القناة",
-  "webhook_url": "رابط Webhook"
+  "webhook_url": "رابط Webhook",
+  "email_channel": "البريد الإلكتروني",
+  "connected": "مفعّلة",
+  "disabled": "غير مفعّلة",
+  "enable_channel": "تفعيل القناة",
+  "whatsapp_setup_hint": "اربط Meta Cloud API في ثلاث خطوات واضحة",
+  "email_setup_hint": "استقبل رسائل العملاء وأدرها من صندوق الوارد الموحد",
+  "whatsapp_quick_setup": "إعداد سريع",
+  "whatsapp_step_credentials": "ألصق القيم الثلاث من تطبيق Meta.",
+  "whatsapp_step_save": "فعّل القناة ثم اضغط حفظ وتفعيل.",
+  "whatsapp_step_webhook": "انسخ رابط Webhook ورمز التحقق إلى Meta.",
+  "verify_token_hint": "يُنشأ تلقائياً للربط الجديد. انسخ نفس القيمة إلى Meta.",
+  "whatsapp_required": "أكمل معرّف رقم الهاتف ورمز الوصول وسر تطبيق Meta ورمز التحقق أولاً.",
+  "email_required": "أدخل سر Webhook للبريد أولاً.",
+  "copied": "تم النسخ",
+  "saving_channel": "جارٍ الحفظ…",
+  "save_and_activate": "حفظ وتفعيل"
 }

@@ -144,7 +144,13 @@
     "telegram_stored": "Jeton enregistré",
     "telegram_chat_id": "ID du chat approbateur",
     "telegram_chat_hint": "Seuls les retours de ce chat Telegram sont acceptés",
-    "telegram_environment": "Les secrets d’environnement ont actuellement priorité sur les paramètres du tableau de bord."
+    "telegram_environment": "Les secrets d’environnement ont actuellement priorité sur les paramètres du tableau de bord.",
+    "telegram_connected": "Telegram est connecté et activé",
+    "telegram_not_connected": "Telegram n’est pas connecté",
+    "telegram_quick_setup": "Seuls le jeton du bot et l’identifiant du chat sont requis. Le Webhook est configuré automatiquement.",
+    "telegram_step_bot": "Créez un bot avec BotFather et collez son jeton.",
+    "telegram_step_chat": "Envoyez un message au bot, puis saisissez l’identifiant du chat administrateur.",
+    "telegram_step_enable": "Activez le bouton et enregistrez pour terminer la connexion."
   },
   "shipping": {
     "title": "Tarifs de livraison",

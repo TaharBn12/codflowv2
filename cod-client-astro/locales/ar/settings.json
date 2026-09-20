@@ -144,7 +144,13 @@
     "telegram_stored": "الرمز المحفوظ",
     "telegram_chat_id": "معرّف محادثة المسؤول",
     "telegram_chat_hint": "تُقبل الردود من هذه المحادثة فقط",
-    "telegram_environment": "أسرار بيئة الخادم لها الأولوية حاليًا على إعدادات لوحة التحكم."
+    "telegram_environment": "أسرار بيئة الخادم لها الأولوية حاليًا على إعدادات لوحة التحكم.",
+    "telegram_connected": "تيليغرام متصل ومفعّل",
+    "telegram_not_connected": "تيليغرام غير متصل",
+    "telegram_quick_setup": "يلزم رمز البوت ومعرّف المحادثة فقط. يتم إعداد Webhook تلقائياً عند الحفظ.",
+    "telegram_step_bot": "أنشئ بوتاً من BotFather والصق رمز البوت.",
+    "telegram_step_chat": "أرسل رسالة للبوت ثم أدخل معرّف محادثة المسؤول.",
+    "telegram_step_enable": "فعّل السويتش واضغط حفظ لإكمال الربط تلقائياً."
   },
   "shipping": {
     "title": "أسعار التوصيل",

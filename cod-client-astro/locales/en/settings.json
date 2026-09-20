@@ -144,7 +144,13 @@
     "telegram_stored": "Stored token",
     "telegram_chat_id": "Approver chat ID",
     "telegram_chat_hint": "Only callbacks from this Telegram chat are accepted",
-    "telegram_environment": "Environment secrets are currently taking precedence over dashboard settings."
+    "telegram_environment": "Environment secrets are currently taking precedence over dashboard settings.",
+    "telegram_connected": "Telegram is connected and enabled",
+    "telegram_not_connected": "Telegram is not connected",
+    "telegram_quick_setup": "Only the bot token and chat ID are required. The webhook is configured automatically when saved.",
+    "telegram_step_bot": "Create a bot with BotFather and paste its token.",
+    "telegram_step_chat": "Message the bot, then enter the administrator chat ID.",
+    "telegram_step_enable": "Enable the switch and save to complete the connection automatically."
   },
   "shipping": {
     "title": "Shipping Rates",

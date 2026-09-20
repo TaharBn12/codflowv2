@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, Eye, EyeOff } from "lucide-react";
+import { Bot, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui";
 import { useT } from "@/i18n/react";
 import { getTelegramConfig, saveTelegramConfig } from "@/features/settings/api";
@@ -40,6 +40,18 @@ export function TelegramSettings() {
       subtitle={t("store.telegram_subtitle")}
       onSave={save}
     >
+      <div className={`flex items-center gap-3 rounded-lg border p-3 ${enabled && masked && chatId ? "border-emerald-500/25 bg-emerald-500/5" : "border-border bg-muted/30"}`}>
+        <CheckCircle2 className={enabled && masked && chatId ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"} size={18} />
+        <div>
+          <p className="text-sm font-semibold">{t(enabled && masked && chatId ? "store.telegram_connected" : "store.telegram_not_connected")}</p>
+          <p className="text-xs text-muted-foreground">{t("store.telegram_quick_setup")}</p>
+        </div>
+      </div>
+      <ol className="list-decimal space-y-1 rounded-lg border border-brand/20 bg-brand/5 px-4 py-3 ps-9 text-xs text-muted-foreground">
+        <li>{t("store.telegram_step_bot")}</li>
+        <li>{t("store.telegram_step_chat")}</li>
+        <li>{t("store.telegram_step_enable")}</li>
+      </ol>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold">{t("store.telegram_enabled")}</p>

@@ -11,6 +11,12 @@ const routes = new Hono<AppContext>();
 const isAdmin = (c: any) => c.get("user")?.role === "admin";
 const forbidden = (c: any) => c.json({ success: false, code: "FORBIDDEN", error: "Administrator access required" }, 403);
 const mask = (value?: string | null) => value ? `••••${value.slice(-6)}` : "";
+export function enabledChannelConfigurationError(channel: { type: "whatsapp" | "email"; enabled: boolean; senderId?: string | null; accessToken?: string | null; verifyToken?: string | null; appSecret?: string | null; webhookSecret?: string | null }) {
+  if (!channel.enabled) return null;
+  if (channel.type === "whatsapp" && (!channel.senderId || !channel.accessToken || !channel.verifyToken || !channel.appSecret)) return "WhatsApp credentials are required before activation";
+  if (channel.type === "email" && !channel.webhookSecret) return "Email webhook secret is required before activation";
+  return null;
+}
 routes.use("*", async (c, next) => {
   const actor = c.get("user");
   if (actor.role !== "admin" && !hasPermission(actor.scopes, "customers:read")) return c.json({ success: false, code: "FORBIDDEN", error: "Customer read permission required" }, 403);
@@ -29,7 +35,9 @@ routes.put("/channels/:type", async (c) => {
   const body = z.object({ name: z.string().trim().min(1).max(80), enabled: z.boolean(), provider: z.string().trim().min(1).max(40), senderId: z.string().trim().max(160).optional(), accessToken: z.string().trim().optional(), verifyToken: z.string().trim().optional(), appSecret: z.string().trim().optional(), webhookSecret: z.string().trim().optional() }).safeParse(await c.req.json());
   if (!type.success || !body.success) return c.json({ success: false, code: "VALIDATION_FAILED", error: "Invalid channel settings" }, 400);
   const db = getDb(c.env.DB); const existing = await db.select().from(supportChannels).where(eq(supportChannels.type, type.data)).get(); const now = new Date().toISOString();
-  const values = { id: existing?.id ?? crypto.randomUUID(), type: type.data, name: body.data.name, enabled: body.data.enabled, provider: body.data.provider, senderId: body.data.senderId || existing?.senderId || null, accessToken: body.data.accessToken || existing?.accessToken || null, verifyToken: body.data.verifyToken || existing?.verifyToken || null, appSecret: body.data.appSecret || existing?.appSecret || null, webhookSecret: body.data.webhookSecret || existing?.webhookSecret || null, createdAt: existing?.createdAt ?? now, updatedAt: now };
+  const values = { id: existing?.id ?? crypto.randomUUID(), type: type.data, name: body.data.name, enabled: body.data.enabled, provider: body.data.provider, senderId: body.data.senderId || existing?.senderId || null, accessToken: body.data.accessToken || existing?.accessToken || null, verifyToken: body.data.verifyToken || existing?.verifyToken || (type.data === "whatsapp" ? crypto.randomUUID().replaceAll("-", "") : null), appSecret: body.data.appSecret || existing?.appSecret || null, webhookSecret: body.data.webhookSecret || existing?.webhookSecret || null, createdAt: existing?.createdAt ?? now, updatedAt: now };
+  const configurationError = enabledChannelConfigurationError(values);
+  if (configurationError) return c.json({ success: false, code: "CHANNEL_NOT_CONFIGURED", error: configurationError }, 400);
   await db.insert(supportChannels).values(values).onConflictDoUpdate({ target: supportChannels.type, set: { name: values.name, enabled: values.enabled, provider: values.provider, senderId: values.senderId, accessToken: values.accessToken, verifyToken: values.verifyToken, appSecret: values.appSecret, webhookSecret: values.webhookSecret, updatedAt: now } });
   return c.json({ success: true, data: { id: values.id, type: values.type, name: values.name, enabled: values.enabled, provider: values.provider, senderId: values.senderId, accessTokenMasked: mask(values.accessToken), verifyTokenMasked: mask(values.verifyToken), appSecretMasked: mask(values.appSecret), webhookSecretMasked: mask(values.webhookSecret), updatedAt: now, webhookUrl: `${new URL(c.env.WORKER_SELF_URL).origin}/webhooks/support/${values.type}` } });
 });
