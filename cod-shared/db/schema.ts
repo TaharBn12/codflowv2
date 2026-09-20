@@ -566,6 +566,7 @@ export const operationAgentSettings = sqliteTable("operation_agent_settings", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   autoAssignEnabled: integer("auto_assign_enabled", { mode: "boolean" }).notNull().default(true),
   maxOpenOrders: integer("max_open_orders").notNull().default(25),
+  maxDailyOrders: integer("max_daily_orders").notNull().default(50),
   commissionType: text("commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),
   commissionValue: real("commission_value").notNull().default(0),
   confirmationCommissionType: text("confirmation_commission_type", { enum: ["fixed", "percentage"] }).notNull().default("fixed"),

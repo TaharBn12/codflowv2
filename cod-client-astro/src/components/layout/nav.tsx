@@ -128,7 +128,7 @@ export function useNavSections(): NavSection[] {
           href: "/operations",
           label: tN("sidebar.operations"),
           icon: ClipboardCheck,
-          scope: "orders:read",
+          scope: "operations:view",
         },
         {
           kind: "leaf",

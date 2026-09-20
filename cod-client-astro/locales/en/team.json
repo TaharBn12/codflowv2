@@ -83,7 +83,8 @@
       "products": "Products",
       "team": "Team",
       "reviews": "Reviews",
-      "type": "Type"
+      "type": "Type",
+      "operations": "Operations"
     },
     "stats": {
       "actions": "actions",
@@ -115,7 +116,9 @@
       "user.api_key_revoked": "Revoked API key",
       "review.approved": "Approved a review",
       "review.rejected": "Rejected a review",
-      "review.deleted": "Deleted a review"
+      "review.deleted": "Deleted a review",
+      "operations.settings_changed": "Changed operations settings",
+      "operations.assignment_changed": "Changed order assignment"
     },
     "table": {
       "action": "Action",
@@ -153,7 +156,8 @@
     "abandonedOrders": "Abandoned Orders",
     "landingPages": "Landing Pages",
     "mcp": "AI Agents (MCP)",
-    "settings": "Settings"
+    "settings": "Settings",
+    "operations": "Operations & Tasks"
   },
   "scope_actions": {
     "view": "View",

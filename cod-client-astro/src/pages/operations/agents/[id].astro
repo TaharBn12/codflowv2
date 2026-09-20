@@ -1,0 +1,15 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import GateSpinner from "@/features/auth/components/GateSpinner";
+import OperationAgentDetailPageApp from "@/features/operations/components/OperationAgentDetailPageApp";
+
+export const prerender = false;
+
+const agentId = Astro.params.id ?? "";
+---
+<BaseLayout title="CodFlow Operations">
+  <main class="min-h-screen">
+    <div data-gate-spinner="required" class="flex min-h-screen items-center justify-center" aria-busy="true"><GateSpinner branded /></div>
+    <div data-auth-gate="required" hidden><OperationAgentDetailPageApp agentId={agentId} client:only="react" /></div>
+  </main>
+</BaseLayout>

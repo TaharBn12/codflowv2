@@ -97,6 +97,8 @@ export function ActivityMobileCard({
     (log.action === "stock.adjusted" && meta.delta !== undefined) ||
     (["user.scope_granted", "user.scope_revoked"].includes(log.action) && meta.scope) ||
     (log.action === "user.role_changed" && meta.role) ||
+    (log.action === "operations.settings_changed" && meta.setting) ||
+    (log.action === "operations.assignment_changed" && meta.mode) ||
     (["review.approved", "review.rejected", "review.deleted"].includes(log.action) && meta.rating));
   return (
     <article className="border-b border-border p-4 last:border-0">

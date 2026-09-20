@@ -77,6 +77,10 @@ export const ACTIONS = {
   USER_SCOPE_GRANTED:      "user.scope_granted",
   USER_SCOPE_REVOKED:      "user.scope_revoked",
 
+  // Operations settings and assignment administration
+  OPERATIONS_SETTINGS_CHANGED: "operations.settings_changed",
+  OPERATIONS_ASSIGNMENT_CHANGED: "operations.assignment_changed",
+
   // MCP — one row per remote MCP tool call (success or failure),
   // plus one row for user-declined HITL elicitations. Lets ops audit
   // exactly what each AI agent did, and when it was told "no".

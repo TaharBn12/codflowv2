@@ -375,15 +375,24 @@ export function OrdersList() {
             </span>
             {identity?.role === "admin" && (
               <>
-                <button
-                  type="button"
-                  disabled={automationBusy}
-                  onClick={() => void toggleAutomation()}
-                  className={`h-10 rounded-lg border px-3 text-sm font-semibold ${automationEnabled ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700" : "border-border bg-muted text-muted-foreground"}`}
-                >
-                  {operations("automatic_distribution")}:{" "}
-                  {operations(automationEnabled ? "enabled" : "disabled")}
-                </button>
+                <div className="flex h-10 items-center gap-3 rounded-lg border border-border bg-card px-3">
+                  <span className="text-xs font-semibold text-foreground">
+                    {operations("automatic_distribution")}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={automationEnabled}
+                    aria-label={operations("automatic_distribution")}
+                    disabled={automationBusy}
+                    onClick={() => void toggleAutomation()}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${automationEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform ${automationEnabled ? "translate-x-5" : "translate-x-0"}`}
+                    />
+                  </button>
+                </div>
                 <button
                   type="button"
                   disabled={autoAssignBusy}

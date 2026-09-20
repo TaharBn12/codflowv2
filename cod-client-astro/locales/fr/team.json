@@ -83,7 +83,8 @@
       "products": "Produits",
       "team": "Équipe",
       "reviews": "Avis",
-      "type": "Type"
+      "type": "Type",
+      "operations": "Opérations"
     },
     "stats": {
       "actions": "actions",
@@ -115,7 +116,9 @@
       "user.api_key_revoked": "A révoqué une clé API",
       "review.approved": "A approuvé un avis",
       "review.rejected": "A rejeté un avis",
-      "review.deleted": "A supprimé un avis"
+      "review.deleted": "A supprimé un avis",
+      "operations.settings_changed": "A modifié les paramètres des opérations",
+      "operations.assignment_changed": "A modifié l’affectation des commandes"
     },
     "table": {
       "action": "Action",
@@ -153,7 +156,8 @@
     "abandonedOrders": "Commandes abandonnées",
     "landingPages": "Pages d'atterrissage",
     "mcp": "Agents IA (MCP)",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "operations": "Opérations et tâches"
   },
   "scope_actions": {
     "view": "Voir",

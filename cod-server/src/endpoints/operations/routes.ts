@@ -14,6 +14,8 @@ import {
 import type { AppContext } from "@/types";
 import { z } from "zod";
 import { hasPermission } from "../../../../cod-shared/rbac/utils";
+import { SCOPES } from "../../../../cod-shared/rbac/scopes";
+import { logActivity, ACTIONS } from "@/lib/activity";
 import { chooseLeastLoadedConfirmer, createStaffCommissionStages } from "../../../../cod-shared/queries/orders";
 import {
   configureTelegramWebhook,
@@ -26,11 +28,11 @@ const activeOrderStatuses = ["new", "confirmed", "unreachable"] as const;
 
 routes.use("*", async (c, next) => {
   const user = c.get("user");
-  if (user.role !== "admin" && !hasPermission(user.scopes, "orders:read")) {
+  if (user.role !== "admin" && !hasPermission(user.scopes, SCOPES.OPERATIONS_VIEW)) {
     return c.json(
       {
         success: false,
-        error: "Orders read permission required",
+        error: "Operations view permission required",
         code: "FORBIDDEN",
       },
       403,
@@ -339,6 +341,7 @@ routes.post("/orders/auto-assign", async (c) => {
     await createStaffCommissionStages(db, order.id, false);
     assigned += 1;
   }
+  if (assigned) await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_ASSIGNMENT_CHANGED, { type: "operations", id: "auto-assignment", label: "Automatic order assignment" }, { mode: "manual_auto_assign", assigned });
   return c.json({
     success: true,
     data: { assigned, remaining: pending.length - assigned },
@@ -457,6 +460,7 @@ routes.post("/orders/bulk-assign", async (c) => {
       await createStaffCommissionStages(db, order.id, order.status !== "new");
     }
   }
+  if (selected.length) await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_ASSIGNMENT_CHANGED, { type: "operations", id: assignee.id, label: assignee.name }, { mode: "manual_reassignment", orderIds: selected.map((order) => order.id), assigneeId: assignee.id });
   return c.json({
     success: true,
     data: { assigned: selected.length, assignee },
@@ -676,18 +680,21 @@ routes.put("/automation-settings", async (c) => {
   const parsed = z.object({ autoAssignEnabled: z.boolean() }).safeParse(await c.req.json());
   if (!parsed.success) return c.json({ success: false, error: parsed.error.flatten(), code: "VALIDATION_FAILED" }, 400);
   const now = new Date().toISOString();
-  const values = { id: "default", autoAssignEnabled: parsed.data.autoAssignEnabled, updatedBy: c.get("user").id, createdAt: now, updatedAt: now };
   const db = getDb(c.env.DB);
+  const previous = await db.select({ autoAssignEnabled: operationAutomationSettings.autoAssignEnabled }).from(operationAutomationSettings).where(eq(operationAutomationSettings.id, "default")).get();
+  const values = { id: "default", autoAssignEnabled: parsed.data.autoAssignEnabled, updatedBy: c.get("user").id, createdAt: now, updatedAt: now };
   await db.insert(operationAutomationSettings).values(values).onConflictDoUpdate({
     target: operationAutomationSettings.id,
     set: { autoAssignEnabled: values.autoAssignEnabled, updatedBy: values.updatedBy, updatedAt: now },
   });
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, { type: "operations", id: "automatic-distribution", label: "Automatic distribution" }, { setting: "autoAssignEnabled", previous: previous?.autoAssignEnabled ?? true, value: values.autoAssignEnabled });
   return c.json({ success: true, data: { autoAssignEnabled: values.autoAssignEnabled } });
 });
 
 const agentSettingsSchema = z.object({
   autoAssignEnabled: z.boolean(),
   maxOpenOrders: z.number().int().min(1).max(500),
+  maxDailyOrders: z.number().int().min(1).max(1000),
   commissionType: z.enum(["fixed", "percentage"]),
   commissionValue: z.number().min(0).max(1000000),
   confirmationCommissionType: z.enum(["fixed", "percentage"]),
@@ -705,6 +712,7 @@ routes.get("/agents", async (c) => {
       status: users.status,
       autoAssignEnabled: sql<boolean>`coalesce(${operationAgentSettings.autoAssignEnabled}, 1)`,
       maxOpenOrders: sql<number>`coalesce(${operationAgentSettings.maxOpenOrders}, 25)`,
+      maxDailyOrders: sql<number>`coalesce(${operationAgentSettings.maxDailyOrders}, 50)`,
       commissionType: sql<string>`coalesce(${operationAgentSettings.commissionType}, 'fixed')`,
       commissionValue: sql<number>`coalesce(${operationAgentSettings.commissionValue}, 0)`,
       confirmationCommissionType: sql<string>`coalesce(${operationAgentSettings.confirmationCommissionType}, 'fixed')`,
@@ -735,7 +743,7 @@ routes.put("/agents/:id/settings", async (c) => {
     );
   const db = getDb(c.env.DB);
   const agent = await db
-    .select({ id: users.id })
+    .select({ id: users.id, name: users.name })
     .from(users)
     .where(and(eq(users.id, c.req.param("id")), eq(users.role, "confirmer")))
     .get();
@@ -748,6 +756,7 @@ routes.put("/agents/:id/settings", async (c) => {
       },
       404,
     );
+  const previous = await db.select().from(operationAgentSettings).where(eq(operationAgentSettings.userId, agent.id)).get();
   const values = {
     userId: agent.id,
     ...parsed.data,
@@ -760,7 +769,35 @@ routes.put("/agents/:id/settings", async (c) => {
       target: operationAgentSettings.userId,
       set: { ...parsed.data, updatedAt: values.updatedAt },
     });
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, { type: "operations", id: agent.id, label: agent.name }, { setting: "agent", previous: previous ?? null, value: parsed.data });
   return c.json({ success: true, data: values });
+});
+
+routes.get("/agents/:id/overview", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const result = await c.env.DB.prepare(`
+    SELECT u.id, u.name, u.email, u.status,
+      COALESCE(s.auto_assign_enabled, 1) AS autoAssignEnabled,
+      COALESCE(s.max_open_orders, 25) AS maxOpenOrders,
+      COALESCE(s.max_daily_orders, 50) AS maxDailyOrders,
+      COALESCE(s.commission_type, 'fixed') AS commissionType,
+      COALESCE(s.commission_value, 0) AS commissionValue,
+      COALESCE(s.confirmation_commission_type, 'fixed') AS confirmationCommissionType,
+      COALESCE(s.confirmation_commission_value, 0) AS confirmationCommissionValue,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca WHERE ca.assignee_id = u.id) AS totalOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca WHERE ca.assignee_id = u.id AND date(ca.assigned_at, '+1 hour') = date('now', '+1 hour')) AS assignedToday,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('new','confirmed','unreachable')) AS openOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status = 'delivered') AS deliveredOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('returned','cancelled')) AS failedOrders,
+      (SELECT COUNT(*) FROM operation_tasks t WHERE t.assignee_id = u.id AND t.status IN ('open','in_progress')) AS openTasks,
+      (SELECT COUNT(*) FROM operation_tasks t WHERE t.assignee_id = u.id AND t.status = 'completed') AS completedTasks,
+      COALESCE((SELECT SUM(sc.amount) FROM staff_commission_events sc WHERE sc.user_id = u.id AND sc.category = 'confirmation' AND sc.status IN ('earned','paid')), 0) AS confirmationCommission,
+      COALESCE((SELECT SUM(sc.amount) FROM staff_commission_events sc WHERE sc.user_id = u.id AND sc.category = 'follow_up' AND sc.status IN ('earned','paid')), 0) AS followUpCommission
+    FROM users u LEFT JOIN operation_agent_settings s ON s.user_id = u.id
+    WHERE u.id = ? AND u.role = 'confirmer'
+  `).bind(c.req.param("id")).first();
+  if (!result) return c.json({ success: false, error: "Confirmation agent not found", code: "NOT_FOUND" }, 404);
+  return c.json({ success: true, data: result });
 });
 
 routes.get("/performance", async (c) => {
@@ -770,6 +807,8 @@ routes.get("/performance", async (c) => {
     SELECT u.id, u.name,
       COALESCE(s.auto_assign_enabled, 1) AS autoAssignEnabled,
       COALESCE(s.max_open_orders, 25) AS maxOpenOrders,
+      COALESCE(s.max_daily_orders, 50) AS maxDailyOrders,
+      (SELECT COUNT(*) FROM order_confirmation_assignments ca WHERE ca.assignee_id = u.id AND date(ca.assigned_at, '+1 hour') = date('now', '+1 hour')) AS assignedToday,
       (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('new','confirmed','unreachable')) AS openOrders,
       (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status = 'delivered') AS deliveredOrders,
       (SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders o ON o.id = ca.order_id WHERE ca.assignee_id = u.id AND o.status IN ('returned','cancelled')) AS failedOrders,

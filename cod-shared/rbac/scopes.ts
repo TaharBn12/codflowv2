@@ -12,6 +12,10 @@ export const SCOPES = {
   // Dashboard
   /** View dashboard overview and statistics */
   DASHBOARD_VIEW: "dashboard:view",
+
+  // Operations & tasks
+  /** View the operations dashboard, assigned tasks and personal commissions */
+  OPERATIONS_VIEW: "operations:view",
   
   // Orders
   /** View orders list and order details */
@@ -156,6 +160,7 @@ export type TeamRole = "admin" | "staff" | "confirmer" | "driver";
 export const ROLE_DEFAULT_SCOPES: Record<Exclude<TeamRole, "admin" | "staff">, readonly Scope[]> = {
   confirmer: [
     SCOPES.DASHBOARD_VIEW,
+    SCOPES.OPERATIONS_VIEW,
     SCOPES.ORDERS_READ,
     SCOPES.ORDERS_UPDATE,
     SCOPES.CUSTOMERS_READ,
@@ -182,6 +187,10 @@ export const SCOPE_CATEGORIES = {
   dashboard: {
     label: "Dashboard",
     scopes: [SCOPES.DASHBOARD_VIEW],
+  },
+  operations: {
+    label: "Operations & Tasks",
+    scopes: [SCOPES.OPERATIONS_VIEW],
   },
   orders: {
     label: "Orders",

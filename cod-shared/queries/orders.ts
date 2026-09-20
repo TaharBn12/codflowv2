@@ -217,11 +217,13 @@ export async function isAutomaticConfirmationAssignmentEnabled(db: AppDb) {
 export async function chooseLeastLoadedConfirmer(db: AppDb) {
   const candidates = await db.select({ id: users.id, name: users.name,
     maxOpenOrders: sql<number>`coalesce(${operationAgentSettings.maxOpenOrders}, 25)`,
+    maxDailyOrders: sql<number>`coalesce(${operationAgentSettings.maxDailyOrders}, 50)`,
+    assignedToday: sql<number>`(SELECT COUNT(*) FROM order_confirmation_assignments today_ca WHERE today_ca.assignee_id = ${users.id} AND date(today_ca.assigned_at, '+1 hour') = date('now', '+1 hour'))`,
     openOrders: sql<number>`(SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders assigned_orders ON assigned_orders.id = ca.order_id WHERE ca.assignee_id = ${users.id} AND assigned_orders.status IN ('new','confirmed','unreachable'))`,
   }).from(users).leftJoin(operationAgentSettings, eq(operationAgentSettings.userId, users.id))
     .where(and(eq(users.role, "confirmer"), eq(users.status, "active"), sql`coalesce(${operationAgentSettings.autoAssignEnabled}, 1) = 1`))
     .orderBy(sql`(SELECT COUNT(*) FROM order_confirmation_assignments ca JOIN orders ao ON ao.id = ca.order_id WHERE ca.assignee_id = ${users.id} AND ao.status IN ('new','confirmed','unreachable')) ASC`, users.createdAt).all();
-  return candidates.find((candidate) => candidate.openOrders < candidate.maxOpenOrders) ?? null;
+  return candidates.find((candidate) => candidate.openOrders < candidate.maxOpenOrders && candidate.assignedToday < candidate.maxDailyOrders) ?? null;
 }
 
 export async function createOrder(

@@ -33,6 +33,8 @@ export type AgentPerformance = {
   name: string;
   autoAssignEnabled: number;
   maxOpenOrders: number;
+  maxDailyOrders: number;
+  assignedToday: number;
   openOrders: number;
   deliveredOrders: number;
   failedOrders: number;
@@ -79,6 +81,7 @@ export type OperationAgent = {
   status: "active" | "inactive";
   autoAssignEnabled: boolean | number;
   maxOpenOrders: number;
+  maxDailyOrders: number;
   commissionType: "fixed" | "percentage";
   commissionValue: number;
   confirmationCommissionType: "fixed" | "percentage";
@@ -99,6 +102,7 @@ export async function saveOperationAgentSettings(agent: OperationAgent) {
       body: JSON.stringify({
         autoAssignEnabled: Boolean(agent.autoAssignEnabled),
         maxOpenOrders: Number(agent.maxOpenOrders),
+        maxDailyOrders: Number(agent.maxDailyOrders),
         commissionType: agent.commissionType,
         commissionValue: Number(agent.commissionValue),
         confirmationCommissionType: agent.confirmationCommissionType,
@@ -165,13 +169,60 @@ export async function autoAssignNewOrders(orderIds?: string[]) {
 }
 
 export async function getCommissionReport(period: "daily" | "monthly") {
-  return (await apiFetch<Envelope<Array<{ period: string; userId: string; userName: string; category: "confirmation" | "follow_up"; status: StaffCommission["status"]; amount: number; count: number }>>>(`/api/operations/commissions/report?period=${period}`)).data;
+  return (
+    await apiFetch<
+      Envelope<
+        Array<{
+          period: string;
+          userId: string;
+          userName: string;
+          category: "confirmation" | "follow_up";
+          status: StaffCommission["status"];
+          amount: number;
+          count: number;
+        }>
+      >
+    >(`/api/operations/commissions/report?period=${period}`)
+  ).data;
 }
 
 export async function getAutomationSettings() {
-  return (await apiFetch<Envelope<{ autoAssignEnabled: boolean }>>("/api/operations/automation-settings")).data;
+  return (
+    await apiFetch<Envelope<{ autoAssignEnabled: boolean }>>(
+      "/api/operations/automation-settings",
+    )
+  ).data;
 }
 
 export async function saveAutomationSettings(autoAssignEnabled: boolean) {
-  return (await apiFetch<Envelope<{ autoAssignEnabled: boolean }>>("/api/operations/automation-settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ autoAssignEnabled }) })).data;
+  return (
+    await apiFetch<Envelope<{ autoAssignEnabled: boolean }>>(
+      "/api/operations/automation-settings",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ autoAssignEnabled }),
+      },
+    )
+  ).data;
+}
+
+export type AgentOverview = OperationAgent & {
+  totalOrders: number;
+  assignedToday: number;
+  openOrders: number;
+  deliveredOrders: number;
+  failedOrders: number;
+  openTasks: number;
+  completedTasks: number;
+  confirmationCommission: number;
+  followUpCommission: number;
+};
+
+export async function getOperationAgentOverview(id: string) {
+  return (
+    await apiFetch<Envelope<AgentOverview>>(
+      `/api/operations/agents/${encodeURIComponent(id)}/overview`,
+    )
+  ).data;
 }

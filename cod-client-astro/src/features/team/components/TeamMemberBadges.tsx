@@ -23,6 +23,7 @@ export const ENTITY_CONFIG: Record<
   product: { icon: <ShoppingBag size={14} />, color: "text-orange-600", bgColor: "bg-orange-500/10 border-orange-500/20" },
   stock: { icon: <Boxes size={14} />, color: "text-cyan-600", bgColor: "bg-cyan-500/10 border-cyan-500/20" },
   user: { icon: <UserCog size={14} />, color: "text-rose-600", bgColor: "bg-rose-500/10 border-rose-500/20" },
+  operations: { icon: <UserCog size={14} />, color: "text-indigo-600", bgColor: "bg-indigo-500/10 border-indigo-500/20" },
   review: { icon: <Star size={14} />, color: "text-amber-600", bgColor: "bg-amber-500/10 border-amber-500/20" },
 };
 
@@ -104,6 +105,21 @@ export function MetadataHint({
     return (
       <span className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
         {String(meta.scope)}
+      </span>
+    );
+  }
+  if (action === "operations.settings_changed" && meta.setting) {
+    const value = meta.value;
+    return (
+      <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+        {String(meta.setting)}: {typeof value === "object" ? "updated" : String(value)}
+      </span>
+    );
+  }
+  if (action === "operations.assignment_changed" && meta.mode) {
+    return (
+      <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+        {String(meta.mode)}
       </span>
     );
   }

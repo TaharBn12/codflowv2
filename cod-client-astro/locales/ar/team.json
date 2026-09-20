@@ -83,7 +83,8 @@
       "products": "المنتجات",
       "team": "الفريق",
       "reviews": "التقييمات",
-      "type": "النوع"
+      "type": "النوع",
+      "operations": "العمليات"
     },
     "stats": {
       "actions": "إجراء",
@@ -115,7 +116,9 @@
       "user.api_key_revoked": "أبطل مفتاح API",
       "review.approved": "وافق على تقييم",
       "review.rejected": "رفض تقييمًا",
-      "review.deleted": "حذف تقييمًا"
+      "review.deleted": "حذف تقييمًا",
+      "operations.settings_changed": "غيّر إعدادات العمليات",
+      "operations.assignment_changed": "غيّر تعيين الطلبات"
     },
     "table": {
       "action": "الإجراء",
@@ -153,7 +156,8 @@
     "abandonedOrders": "الطلبات المتروكة",
     "landingPages": "صفحات الهبوط",
     "mcp": "وكلاء الذكاء الاصطناعي (MCP)",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "operations": "العمليات والمهام"
   },
   "scope_actions": {
     "view": "عرض",
