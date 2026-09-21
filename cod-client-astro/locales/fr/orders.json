@@ -311,5 +311,75 @@
     "confirmation_agent": "Agent de confirmation",
     "follow_up_agent": "Agent de suivi",
     "unassigned": "Non affecté"
+  },
+  "carrier_sync": {
+    "toolbar_button": "Synchroniser depuis les livreurs",
+    "toolbar_hint": "Récupère les derniers statuts auprès des sociétés de livraison et les applique (avant uniquement)",
+    "bulk_button": "Synchroniser les statuts depuis les livreurs",
+    "syncing": "Synchronisation en cours...",
+    "result": "{updated} commandes mises à jour sur {polled}",
+    "errors": "Certaines commandes ont échoué chez le livreur",
+    "unmapped": "Statuts livreur inconnus",
+    "row_button": "Synchroniser depuis le livreur",
+    "last_status": "Dernier statut livreur",
+    "last_sync": "Dernière synchronisation",
+    "never_synced": "Pas encore synchronisée",
+    "updated_to": "Statut mis à jour vers",
+    "unchanged": "Aucun changement — statut identique",
+    "unmapped_status": "Statut livreur inconnu",
+    "failed": "Livreur injoignable",
+    "fails_count": "tentatives échouées"
+  },
+  "sla": {
+    "label": "SLA",
+    "new_overdue": "Nouvelle depuis {hours} h sans confirmation",
+    "delivery_overdue": "En livraison depuis {days} j",
+    "ok": "Dans les délais"
+  },
+  "quick_contact": {
+    "call": "Appeler",
+    "whatsapp": "WhatsApp",
+    "whatsapp_message": "Bonjour, nous vous contactons au sujet de votre commande {order}.",
+    "no_phone": "Pas de numéro de téléphone"
+  },
+  "export": {
+    "export_button": "Exporter CSV",
+    "export_columns_title": "Choisir les colonnes",
+    "export_run": "Exporter {count} commandes",
+    "export_empty": "Aucune commande à exporter avec les filtres actuels",
+    "columns": {
+      "order_number": "N° de commande",
+      "created_at": "Créée le",
+      "status": "Statut",
+      "customer_name": "Client",
+      "phone": "Téléphone",
+      "wilaya": "Wilaya",
+      "commune": "Commune",
+      "address": "Adresse",
+      "price": "Prix produit",
+      "delivery_fee": "Frais de livraison",
+      "cod_amount": "Montant dû (nombre)",
+      "cod_amount_text": "Montant dû (formaté)",
+      "delivery_type": "Type de livraison",
+      "delivery_method": "Mode de livraison",
+      "driver_name": "Livreur",
+      "tracking_number": "N° de suivi",
+      "station_code": "Code bureau",
+      "delivery_attempts": "Tentatives de livraison",
+      "last_carrier_status": "Dernier statut livreur",
+      "last_tracking_sync_at": "Dernière synchro",
+      "notes": "Notes"
+    }
+  },
+  "bulk": {
+    "status_title": "Changer le statut",
+    "driver_title": "Affecter un livreur",
+    "apply": "Appliquer",
+    "pick_status": "Choisir un statut…",
+    "pick_driver": "Choisir un livreur…",
+    "done_status": "Statut modifié sur {ok} commandes",
+    "done_driver": "{ok} commandes affectées au livreur",
+    "failed": "{count} commandes en échec",
+    "partial": "{ok} réussies, {count} en échec"
   }
 }

@@ -311,5 +311,75 @@
     "confirmation_agent": "موظف التأكيد",
     "follow_up_agent": "موظف المتابعة",
     "unassigned": "غير معيّن"
+  },
+  "carrier_sync": {
+    "toolbar_button": "تحديث من شركة التوصيل",
+    "toolbar_hint": "يسحب آخر الحالات من شركات التوصيل ويطبّقها (للأمام فقط)",
+    "bulk_button": "تحديث الحالات من شركات التوصيل",
+    "syncing": "جاري التحديث من شركات التوصيل...",
+    "result": "تم تحديث {updated} من {polled} طلب",
+    "errors": "بعض الطلبات فشلت عند شركة التوصيل",
+    "unmapped": "حالات غير معروفة",
+    "row_button": "تحديث من شركة التوصيل",
+    "last_status": "آخر حالة لدى الشركة",
+    "last_sync": "آخر مزامنة",
+    "never_synced": "لم تُزامن بعد",
+    "updated_to": "تم تحديث الحالة إلى",
+    "unchanged": "لا تغيير — الحالة مطابقة",
+    "unmapped_status": "حالة غير معروفة لدى الشركة",
+    "failed": "تعذر الوصول إلى شركة التوصيل",
+    "fails_count": "محاولات فاشلة"
+  },
+  "sla": {
+    "label": "مؤشر الالتزام",
+    "new_overdue": "طلب جديد منذ {hours} ساعة دون تأكيد",
+    "delivery_overdue": "في التوصيل منذ {days} يوم",
+    "ok": "ضمن المهلة"
+  },
+  "quick_contact": {
+    "call": "اتصال",
+    "whatsapp": "واتساب",
+    "whatsapp_message": "السلام عليكم، نتصل بك بخصوص طلبكم رقم {order}.",
+    "no_phone": "لا يوجد رقم هاتف"
+  },
+  "export": {
+    "export_button": "تصدير CSV",
+    "export_columns_title": "اختر الأعمدة",
+    "export_run": "تصدير {count} طلب",
+    "export_empty": "لا توجد طلبات للتصدير ضمن الفلاتر الحالية",
+    "columns": {
+      "order_number": "رقم الطلب",
+      "created_at": "تاريخ الإنشاء",
+      "status": "الحالة",
+      "customer_name": "اسم العميل",
+      "phone": "الهاتف",
+      "wilaya": "الولاية",
+      "commune": "البلدية",
+      "address": "العنوان",
+      "price": "سعر المنتج",
+      "delivery_fee": "رسوم التوصيل",
+      "cod_amount": "المبلغ المستحق (رقم)",
+      "cod_amount_text": "المبلغ المستحق (منسّق)",
+      "delivery_type": "نوع التوصيل",
+      "delivery_method": "طريقة التوصيل",
+      "driver_name": "السائق",
+      "tracking_number": "رقم التتبع",
+      "station_code": "رمز المكتب",
+      "delivery_attempts": "محاولات التسليم",
+      "last_carrier_status": "آخر حالة لدى الشركة",
+      "last_tracking_sync_at": "آخر مزامنة",
+      "notes": "ملاحظات"
+    }
+  },
+  "bulk": {
+    "status_title": "تغيير الحالة",
+    "driver_title": "إسناد إلى سائق",
+    "apply": "تطبيق",
+    "pick_status": "اختر الحالة…",
+    "pick_driver": "اختر السائق…",
+    "done_status": "تم تغيير حالة {ok} طلب",
+    "done_driver": "تم إسناد {ok} طلب إلى السائق",
+    "failed": "فشل {count} طلب",
+    "partial": "نجح {ok} وفشل {count} طلب"
   }
 }

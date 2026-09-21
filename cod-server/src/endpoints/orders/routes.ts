@@ -16,6 +16,7 @@ import * as handlers from "./handlers";
 import * as statusTransitions from "./status-transitions";
 import * as dispatch from "./dispatch";
 import * as shipmentOps from "./shipment-operations";
+import * as carrierSync from "./carrier-sync";
 
 import {
   createOrderSchema,
@@ -659,6 +660,139 @@ Provider support: ecotrack ✅ | others ❌ OPERATION_NOT_SUPPORTED.`,
   handler: shipmentOps.confirmReturnReception,
 });
 
+// ─── Carrier status auto-sync ────────────────────────────────────────────────
+
+const CarrierSyncOutcomeSchema = z.object({
+  orderId: z.string(),
+  orderNumber: z.string(),
+  trackingNumber: z.string(),
+  outcome: z.enum(["updated", "unchanged", "unmapped", "error"]),
+  from: z.string(),
+  to: z.string().optional(),
+  carrierStatus: z.string().nullable().optional(),
+  error: z.string().optional(),
+});
+
+const CarrierSyncCountersSchema = z.object({
+  scanned: z.number(),
+  polled: z.number(),
+  updated: z.number(),
+  unchanged: z.number(),
+  unmapped: z.number(),
+  errors: z.number(),
+});
+
+const bulkSyncCarrierRoute = defineRoute({
+  method: "post",
+  path: "/bulk-sync-carrier",
+  auth: { scope: SCOPES.ORDERS_UPDATE },
+  tags: ["Orders"],
+  summary: "Pull order statuses from the delivery companies",
+  description: `Polls the carrier tracking API and applies what it reports through the same
+forward-only rank guard the inbound webhooks use — a sync can never move an
+order backwards.
+
+Two modes:
+- \`orderIds\` given → only those orders are polled (throttle bypassed).
+- no \`orderIds\` → every company with auto-sync enabled is swept, one batch
+  (max 100 orders) per company, respecting each company's
+  \`auto_sync_interval_min\` unless \`force\` is set.
+
+This is the manual twin of the \`*/15 * * * *\` cron trigger.`,
+  operationId: "bulkSyncCarrierStatus",
+  body: z.object({
+    orderIds: z.array(z.string()).max(100).optional().openapi({
+      description: "Explicit selection. Omit to sweep everything currently due.",
+    }),
+    companyId: z.string().optional().openapi({
+      description: "Restrict the sweep to one company (ignored when orderIds is set).",
+    }),
+    force: z.boolean().optional().openapi({
+      description: "Ignore the per-order auto_sync_interval_min throttle.",
+    }),
+    limit: z.number().int().min(1).max(100).optional().openapi({
+      description: "Max orders polled per company (default and maximum: 100).",
+    }),
+  }),
+  responses: {
+    200: {
+      description: "Sync finished — per-company counters plus per-order detail",
+      content: jsonContent(
+        z.object({
+          success: z.boolean().openapi({ example: true }),
+          data: z.object({
+            companies: z.array(
+              z.object({
+                companyId: z.string(),
+                companyCode: z.string(),
+                companyName: z.string(),
+                runId: z.string(),
+                scanned: z.number(),
+                polled: z.number(),
+                updated: z.number(),
+                unchanged: z.number(),
+                unmapped: z.number(),
+                errors: z.number(),
+                unmappedStatuses: z.array(z.string()),
+                error: z.string().nullable(),
+              })
+            ),
+            totals: CarrierSyncCountersSchema,
+            details: z.array(CarrierSyncOutcomeSchema),
+          }),
+        })
+      ),
+    },
+    401: { description: "Unauthorized" },
+    403: { description: "Missing orders:update scope" },
+  },
+  handler: carrierSync.bulkSyncCarrierStatus,
+});
+
+const syncOrderCarrierRoute = defineRoute({
+  method: "post",
+  path: "/{id}/sync-carrier",
+  auth: { scope: SCOPES.ORDERS_UPDATE },
+  tags: ["Orders"],
+  summary: "Sync one order's status from its carrier",
+  description: `Polls the carrier tracking API for this order and applies the newest status it
+reports, through the forward-only rank guard. Bypasses the auto-sync throttle.
+
+Works even when the company's background auto-sync is switched off — an
+explicit operator request only needs working API credentials.
+
+Returns 422 when the order has no tracking number, the company has no
+credentials, or the carrier returned no history for the tracking number.`,
+  operationId: "syncOrderCarrierStatus",
+  params: IdParamSchema,
+  responses: {
+    200: {
+      description: "Sync result for this order",
+      content: jsonContent(
+        z.object({
+          success: z.boolean().openapi({ example: true }),
+          data: z.object({
+            orderId: z.string(),
+            outcome: z.enum(["updated", "unchanged", "unmapped", "error"]),
+            from: z.string(),
+            to: z.string(),
+            carrierStatus: z.string().nullable(),
+            companyId: z.string(),
+            companyCode: z.string(),
+            runId: z.string(),
+          }),
+        })
+      ),
+    },
+    422: {
+      description:
+        "No tracking number, company not connected, or the carrier has no history for this tracking number",
+    },
+    500: { description: "Carrier API error (EXTERNAL_API_ERROR)" },
+  },
+  handler: carrierSync.syncOrderCarrierStatus,
+});
+
 // IMPORTANT: /bulk-dispatch must come before /{id} routes — otherwise
 // "bulk-dispatch" would be captured as an id param.
 const router = new OpenAPIHono<AppContext>();
@@ -678,6 +812,7 @@ router.use("/:id/*", requireConfirmerOwnership);
 
 router.openapi(listOrdersRoute.route, listOrdersRoute.handler);
 router.openapi(bulkDispatchRoute.route, bulkDispatchRoute.handler);
+router.openapi(bulkSyncCarrierRoute.route, bulkSyncCarrierRoute.handler);
 
 router.openapi(getOrderRoute.route, getOrderRoute.handler);
 router.openapi(createOrderRoute.route, createOrderRoute.handler);
@@ -696,5 +831,6 @@ router.openapi(addRemarkRoute.route, addRemarkRoute.handler);
 router.openapi(getRemarksRoute.route, getRemarksRoute.handler);
 router.openapi(getTrackingRoute.route, getTrackingRoute.handler);
 router.openapi(proxyLabelRoute.route, proxyLabelRoute.handler);
+router.openapi(syncOrderCarrierRoute.route, syncOrderCarrierRoute.handler);
 
 export default router;

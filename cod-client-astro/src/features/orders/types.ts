@@ -81,6 +81,10 @@ export interface OrderBase {
   isFragile: boolean | null;
   codPaymentId?: string | null;
   feePaymentId?: string | null;
+  /** Carrier auto-sync bookkeeping (migration 0035). */
+  lastTrackingSyncAt?: string | null;
+  lastCarrierStatus?: string | null;
+  trackingSyncFails?: number | null;
   createdAt: string;
   updatedAt: string;
   confirmationAssigneeId?: string | null;
@@ -119,6 +123,92 @@ export interface DeliveryCompany {
   supportsStopDesk: boolean;
   supportsTracking: boolean;
   autoValidate: boolean | null;
+  /** Poll the carrier tracking API on the cron tick (migration 0035). */
+  autoSyncEnabled?: boolean | null;
+  autoSyncIntervalMin?: number | null;
+}
+
+export interface CarrierSyncCounters {
+  scanned: number;
+  polled: number;
+  updated: number;
+  unchanged: number;
+  unmapped: number;
+  errors: number;
+}
+
+export interface CarrierSyncDetail {
+  orderId: string;
+  orderNumber: string;
+  trackingNumber: string;
+  outcome: "updated" | "unchanged" | "unmapped" | "error";
+  from: string;
+  to?: string;
+  carrierStatus?: string | null;
+  error?: string;
+}
+
+export interface CarrierSyncCompanyResult extends CarrierSyncCounters {
+  companyId: string;
+  companyCode: string;
+  companyName: string;
+  runId: string;
+  unmappedStatuses: string[];
+  error: string | null;
+}
+
+export interface BulkCarrierSyncResult {
+  companies: CarrierSyncCompanyResult[];
+  totals: CarrierSyncCounters;
+  details: CarrierSyncDetail[];
+}
+
+export interface OrderCarrierSyncResult {
+  orderId: string;
+  outcome: "updated" | "unchanged" | "unmapped" | "error";
+  from: string;
+  to: string;
+  carrierStatus: string | null;
+  companyId: string;
+  companyCode: string;
+  runId: string;
+}
+
+/** Result of POST /delivery-companies/:id/sync-statuses. */
+export interface CompanySyncResult extends CarrierSyncCounters {
+  runId: string;
+  companyCode: string;
+  unmappedStatuses: string[];
+  details: CarrierSyncDetail[];
+}
+
+export interface CarrierSyncRun {
+  id: string;
+  trigger: "cron" | "manual" | "company";
+  mode: "poll" | "reconcile";
+  startedAt: string;
+  finishedAt: string | null;
+  scanned: number;
+  polled: number;
+  updated: number;
+  unchanged: number;
+  unmapped: number;
+  errors: number;
+  unmappedStatuses: string[];
+  error: string | null;
+}
+
+export interface CarrierAutoSyncStatus {
+  companyId: string;
+  companyCode: string;
+  companyName: string;
+  autoSyncEnabled: boolean;
+  autoSyncIntervalMin: number;
+  hasCredentials: boolean;
+  hasWebhookSecret: boolean;
+  shippedOrders: number;
+  failingOrders: number;
+  lastRun: (CarrierSyncRun & { id: string }) | null;
 }
 
 export interface StopDesk {

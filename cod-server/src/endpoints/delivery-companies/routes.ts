@@ -75,6 +75,16 @@ const createBodySchema = z.object({
       "When true, orders are auto-validated on dispatch (locked at carrier). " +
       "When false, orders stay editable. If omitted, a safe default is derived per provider.",
   }),
+  autoSyncEnabled: z.boolean().optional().openapi({
+    description:
+      "Poll this company's tracking API on the cron tick and apply carrier status " +
+      "changes through the forward-only rank guard. Default true.",
+    example: true,
+  }),
+  autoSyncIntervalMin: z.number().int().min(5).max(1440).optional().openapi({
+    description: "Minimum minutes between two polls of the same order (5–1440). Default 30.",
+    example: 30,
+  }),
   notes: z.string().optional().nullable(),
 });
 
@@ -95,6 +105,13 @@ const updateBodySchema = z.object({
   supportsStopDesk: z.boolean().optional(),
   supportsTracking: z.boolean().optional(),
   autoValidate: z.boolean().optional(),
+  autoSyncEnabled: z.boolean().optional().openapi({
+    description: "Toggle carrier status auto-sync (tracking polling).",
+  }),
+  autoSyncIntervalMin: z.number().int().min(5).max(1440).optional().openapi({
+    description: "Minimum minutes between two polls of the same order (5–1440).",
+    example: 30,
+  }),
   notes: z.string().optional().nullable(),
 });
 
@@ -573,6 +590,169 @@ const listWebhookEventsRoute = defineRoute({
   handler: handlers.listWebhookEvents,
 });
 
+// ─── Carrier Status Auto-Sync ────────────────────────────────────────────────
+
+const autoSyncStatusRoute = defineRoute({
+  method: "get",
+  path: "/{id}/auto-sync/status",
+  auth: "api-key",
+  tags: ["Delivery Companies"],
+  summary: "Carrier status auto-sync state for a company",
+  description:
+    "Reports how automatic status updates stand for this company: the switches " +
+    "(autoSyncEnabled / autoSyncIntervalMin), whether credentials and a webhook secret are set, " +
+    "how many shipped orders are waiting on the carrier, how many are stuck failing, and the " +
+    "outcome of the most recent sync run.",
+  params: idParams,
+  responses: {
+    200: {
+      description: "Auto-sync state",
+      content: jsonContent(
+        z.object({
+          success: z.boolean(),
+          data: z.object({
+            companyId: z.string(),
+            companyCode: z.string().openapi({ example: "yalidine" }),
+            companyName: z.string(),
+            autoSyncEnabled: z.boolean(),
+            autoSyncIntervalMin: z.number().int(),
+            hasCredentials: z.boolean(),
+            hasWebhookSecret: z.boolean(),
+            shippedOrders: z.number().int().openapi({ description: "Non-terminal orders with a tracking number" }),
+            failingOrders: z.number().int().openapi({ description: "Orders whose last carrier poll failed" }),
+            lastRun: z
+              .object({
+                id: z.string(),
+                trigger: z.enum(["cron", "manual", "company"]),
+                mode: z.enum(["poll", "reconcile"]),
+                startedAt: z.string(),
+                finishedAt: z.string().nullable(),
+                scanned: z.number().int(),
+                polled: z.number().int(),
+                updated: z.number().int(),
+                unchanged: z.number().int(),
+                unmapped: z.number().int(),
+                errors: z.number().int(),
+                unmappedStatuses: z.array(z.string()),
+                error: z.string().nullable(),
+              })
+              .nullable(),
+          }),
+        })
+      ),
+    },
+    404: { description: "Company not found" },
+  },
+  handler: handlers.getCompanyAutoSyncStatus,
+});
+
+const triggerStatusSyncRoute = defineRoute({
+  method: "post",
+  path: "/{id}/sync-statuses",
+  auth: "api-key",
+  tags: ["Delivery Companies"],
+  summary: "Sync this company's order statuses now",
+  description:
+    "Runs the carrier status auto-sync for one company immediately — the manual twin of the " +
+    "`*/15 * * * *` cron trigger. EcoTrack-family carriers are refreshed through the platform's " +
+    "order-list endpoint (one call ≈ 40 orders); every other carrier is polled one tracking " +
+    "number at a time, capped at 100 orders per run. Status changes go through the shared " +
+    "forward-only rank guard, so nothing can move backwards. Unmapped carrier statuses are " +
+    "reported verbatim, never guessed.",
+  params: idParams,
+  query: z.object({
+    force: z.enum(["true", "false"]).optional().openapi({
+      description: "Ignore the per-order auto_sync_interval_min throttle",
+    }),
+    limit: z.coerce.number().int().min(1).max(100).optional().openapi({
+      description: "Max orders polled in this run (default 100)",
+      example: 100,
+    }),
+  }),
+  responses: {
+    200: {
+      description: "Sync run result",
+      content: jsonContent(
+        z.object({
+          success: z.boolean(),
+          data: z.object({
+            runId: z.string(),
+            companyCode: z.string(),
+            scanned: z.number().int(),
+            polled: z.number().int(),
+            updated: z.number().int(),
+            unchanged: z.number().int(),
+            unmapped: z.number().int(),
+            errors: z.number().int(),
+            unmappedStatuses: z.array(z.string()),
+            details: z.array(
+              z.object({
+                orderId: z.string(),
+                orderNumber: z.string(),
+                trackingNumber: z.string(),
+                outcome: z.enum(["updated", "unchanged", "unmapped", "error"]),
+                from: z.string(),
+                to: z.string().optional(),
+                carrierStatus: z.string().nullable().optional(),
+                error: z.string().optional(),
+              })
+            ),
+          }),
+        })
+      ),
+    },
+    404: { description: "Company not found" },
+    422: { description: "Company not connected (MISSING_API_CREDENTIALS) or provider unsupported" },
+  },
+  handler: handlers.triggerCompanyStatusSync,
+});
+
+const listSyncRunsRoute = defineRoute({
+  method: "get",
+  path: "/{id}/sync-runs",
+  auth: "api-key",
+  tags: ["Delivery Companies"],
+  summary: "List this company's carrier sync runs",
+  description:
+    "Sync history, newest first: one row per cron tick / manual trigger with its counters and " +
+    "the distinct carrier status strings that had no mapping (the list to extend the mapping with).",
+  params: idParams,
+  query: z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(30).openapi({ example: 30 }),
+  }),
+  responses: {
+    200: {
+      description: "Sync runs",
+      content: jsonContent(
+        z.object({
+          success: z.boolean(),
+          data: z.object({
+            runs: z.array(
+              z.object({
+                id: z.string(),
+                trigger: z.enum(["cron", "manual", "company"]),
+                mode: z.enum(["poll", "reconcile"]),
+                startedAt: z.string(),
+                finishedAt: z.string().nullable(),
+                scanned: z.number().int(),
+                polled: z.number().int(),
+                updated: z.number().int(),
+                unchanged: z.number().int(),
+                unmapped: z.number().int(),
+                errors: z.number().int(),
+                unmappedStatuses: z.array(z.string()),
+                error: z.string().nullable(),
+              })
+            ),
+          }),
+        })
+      ),
+    },
+    404: { description: "Company not found" },
+  },
+  handler: handlers.listCompanySyncRuns,
+});
+
 // ─── Route Registrations ───────────────────────────────────────────────────────
 
 // Apply RBAC middleware to all routes
@@ -587,6 +767,9 @@ deliveryCompaniesRouter.use("/:id/webhook/register", requireScope(SCOPES.DELIVER
 deliveryCompaniesRouter.use("/:id/webhook/secret", requireScope(SCOPES.DELIVERY_MANAGE));
 deliveryCompaniesRouter.use("/:id/webhook/mapping", requireScope(SCOPES.DELIVERY_MANAGE));
 deliveryCompaniesRouter.use("/:id/webhook/events", requireScope(SCOPES.DELIVERY_READ));
+deliveryCompaniesRouter.use("/:id/auto-sync/status", requireScope(SCOPES.DELIVERY_READ));
+deliveryCompaniesRouter.use("/:id/sync-statuses", requireScope(SCOPES.DELIVERY_MANAGE));
+deliveryCompaniesRouter.use("/:id/sync-runs", requireScope(SCOPES.DELIVERY_READ));
 
 // GET /delivery-companies — list all companies
 deliveryCompaniesRouter.openapi(listRoute.route, listRoute.handler);
@@ -608,6 +791,11 @@ deliveryCompaniesRouter.openapi(testConnectionRoute.route, testConnectionRoute.h
 
 // POST /delivery-companies/:id/reconcile-orders — pull-based status drift repair (EcoTrack only)
 deliveryCompaniesRouter.openapi(reconcileOrdersRoute.route, reconcileOrdersRoute.handler);
+
+// ── Carrier status auto-sync ─────────────────────────────────────────────────
+deliveryCompaniesRouter.openapi(autoSyncStatusRoute.route, autoSyncStatusRoute.handler);
+deliveryCompaniesRouter.openapi(triggerStatusSyncRoute.route, triggerStatusSyncRoute.handler);
+deliveryCompaniesRouter.openapi(listSyncRunsRoute.route, listSyncRunsRoute.handler);
 
 // PATCH /delivery-companies/:id/stop-desks/:code/toggle — toggle admin active flag
 deliveryCompaniesRouter.openapi(toggleStopDeskRoute.route, toggleStopDeskRoute.handler);

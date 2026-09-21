@@ -1,8 +1,14 @@
-import { MapPin, PackageOpen, Star } from "lucide-react";
+import { Clock, MapPin, MessageCircle, PackageOpen, Phone, Star } from "lucide-react";
 import { useState } from "react";
 import { useLocale, useT } from "@/i18n/react";
 import { Select, TableCell, TableRow } from "@/components/ui";
-import { formatMoney, orderTotal } from "@/features/orders/model";
+import {
+  formatMoney,
+  orderSla,
+  orderTotal,
+  telLink,
+  whatsappLink,
+} from "@/features/orders/model";
 import type {
   DeliveryCompany,
   Driver,
@@ -88,6 +94,76 @@ function ConfirmationAssignment({
   );
 }
 
+
+/** Red/amber dot when an order sits too long in a state the merchant owns. */
+export function OrderSlaBadge({ order }: { order: OrderListItem }) {
+  const t = useT("orders");
+  const sla = orderSla(order);
+  if (sla.level === "ok") return null;
+
+  const label =
+    sla.stage === "new"
+      ? t("sla.new_overdue").replace("{hours}", String(sla.hours))
+      : t("sla.delivery_overdue").replace("{days}", String(sla.days));
+  const tone =
+    sla.level === "breach"
+      ? "border-destructive/40 bg-destructive/10 text-destructive"
+      : "border-warning/40 bg-warning/10 text-warning";
+
+  return (
+    <span
+      title={label}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tone}`}
+    >
+      <Clock size={11} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+/** tel: / wa.me shortcuts straight from the row — the confirmer's main tools. */
+export function OrderQuickContact({ order }: { order: OrderListItem }) {
+  const t = useT("orders");
+  const tel = telLink(order.phone);
+  const message = t("quick_contact.whatsapp_message").replace(
+    "{order}",
+    order.orderNumber,
+  );
+  const wa = whatsappLink(order.phone, message);
+  if (!tel && !wa) {
+    return <span className="text-xs text-muted-foreground">{t("quick_contact.no_phone")}</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-xs text-muted-foreground" dir="ltr">
+        {order.phone}
+      </span>
+      {tel && (
+        <a
+          href={tel}
+          aria-label={t("quick_contact.call")}
+          title={t("quick_contact.call")}
+          className="grid size-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          <Phone size={13} />
+        </a>
+      )}
+      {wa && (
+        <a
+          href={wa}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t("quick_contact.whatsapp")}
+          title={t("quick_contact.whatsapp")}
+          className="grid size-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          <MessageCircle size={13} />
+        </a>
+      )}
+    </span>
+  );
+}
+
 export function OrderDesktopRow({
   order,
   drivers,
@@ -125,14 +201,13 @@ export function OrderDesktopRow({
             <Star size={12} className="fill-warning text-warning" />
           )}
         </a>
+        <OrderSlaBadge order={order} />
       </TableCell>
       <TableCell>
         <p className="font-medium text-foreground">{order.customerName}</p>
       </TableCell>
       <TableCell>
-        <span className="text-xs text-muted-foreground" dir="ltr">
-          {order.phone}
-        </span>
+        <OrderQuickContact order={order} />
       </TableCell>
       <TableCell>
         <OrderStatus order={order} onChanged={onChanged} onError={onError} />
@@ -207,12 +282,13 @@ export function OrderMobileCard({
             {(order.hasReview ?? 0) > 0 && (
               <Star size={12} className="fill-warning text-warning" />
             )}
+            <OrderSlaBadge order={order} />
           </div>
           <p className="mt-0.5 truncate text-sm font-medium text-foreground">
             {order.customerName}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground" dir="ltr">
-            {order.phone}
+          <p className="mt-0.5">
+            <OrderQuickContact order={order} />
           </p>
         </div>
         <div className="flex items-start gap-1">
