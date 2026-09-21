@@ -118,7 +118,12 @@
       "review.rejected": "رفض تقييمًا",
       "review.deleted": "حذف تقييمًا",
       "operations.settings_changed": "غيّر إعدادات العمليات",
-      "operations.assignment_changed": "غيّر تعيين الطلبات"
+      "operations.assignment_changed": "غيّر تعيين الطلبات",
+      "expense.created": "سجّل مصروفاً",
+      "expense.updated": "عدّل مصروفاً",
+      "expense.deleted": "حذف مصروفاً",
+      "daily_report.settings_changed": "غيّر إعدادات التقرير اليومي",
+      "daily_report.sent": "أرسل التقرير اليومي"
     },
     "table": {
       "action": "الإجراء",
@@ -172,7 +177,8 @@
     "integrations": "التكاملات",
     "notifications": "الإشعارات",
     "email": "إرسال البريد الإلكتروني",
-    "verification": "التحقق"
+    "verification": "التحقق",
+    "finance": "المالية"
   },
   "invite_dialog_extra": {
     "permissions_label": "الصلاحيات",

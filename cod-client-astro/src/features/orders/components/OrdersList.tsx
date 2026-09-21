@@ -31,10 +31,11 @@ import {
   type OrderFilters,
   type OrderSortKey,
 } from "@/features/orders/model";
-import type {
-  DeliveryCompany,
-  Driver,
-  OrderListItem,
+import {
+  ORDER_STATUSES,
+  type DeliveryCompany,
+  type Driver,
+  type OrderListItem,
 } from "@/features/orders/types";
 import {
   EmptyState,
@@ -139,10 +140,20 @@ export function OrdersList() {
   const [automationBusy, setAutomationBusy] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | Error | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<OrderFilters>(() => ({
-    ...EMPTY_FILTERS,
-    query: new URLSearchParams(window.location.search).get("search") ?? "",
-  }));
+  const [filters, setFilters] = useState<OrderFilters>(() => {
+    // Deep links from the dashboard (alerts, heatmap, today board) preselect filters.
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const delivery = params.get("delivery");
+    const wilaya = params.get("wilaya");
+    return {
+      ...EMPTY_FILTERS,
+      query: params.get("search") ?? "",
+      status: status && (ORDER_STATUSES as readonly string[]).includes(status) ? status : EMPTY_FILTERS.status,
+      delivery: delivery && ["driver", "company", "unassigned"].includes(delivery) ? delivery : EMPTY_FILTERS.delivery,
+      wilaya: wilaya ? wilaya : EMPTY_FILTERS.wilaya,
+    };
+  });
   const [sortKey, setSortKey] = useState<OrderSortKey>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);

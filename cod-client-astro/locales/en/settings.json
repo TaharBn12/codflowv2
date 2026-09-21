@@ -193,7 +193,8 @@
     "approval_action_settings_operations": "Change operations settings",
     "approval_action_settings_integrations": "Change integrations and secrets",
     "approval_action_landing_pages_publish": "Publish landing page",
-    "approval_action_landing_pages_delete": "Delete landing page"
+    "approval_action_landing_pages_delete": "Delete landing page",
+    "reports_title": "Daily reports"
   },
   "shipping": {
     "title": "Shipping Rates",
@@ -266,5 +267,31 @@
     "toggle_on": "ON",
     "toggle_off": "OFF",
     "bulk_fill_success": "Rates applied to all wilayas"
+  },
+  "reports": {
+    "title": "Automatic daily report",
+    "subtitle": "A KPI summary (orders, delivery rate, revenue, top products, alerts) sent every day to Telegram and/or email.",
+    "enabled": "Send a daily report",
+    "enabled_hint": "When enabled, CodFlow sends the report once a day at the chosen hour.",
+    "send_hour": "Send at",
+    "send_hour_hint": "Local hour — 20:00 gives a near-complete picture of the day.",
+    "timezone": "Timezone",
+    "timezone_hint": "Used to compute the local day and the send hour.",
+    "telegram": "Telegram",
+    "telegram_ready": "Uses the bot configured in Telegram approvals.",
+    "telegram_missing": "Configure the Telegram bot and chat first (Telegram approvals section).",
+    "email": "Email",
+    "email_ready": "Uses your transactional email provider.",
+    "email_missing": "Configure and enable email sending first (Email section).",
+    "recipients": "Recipients",
+    "recipients_hint": "Comma-separated email addresses.",
+    "recipients_required": "Add at least one recipient or disable email delivery.",
+    "recipients_invalid": "One of the email addresses is invalid.",
+    "send_now": "Send now",
+    "send_now_hint": "Sends today's report immediately through the enabled channels — handy to test the setup.",
+    "last_sent": "Last sent",
+    "sent_success": "Report sent.",
+    "sent_not_configured": "No channel is configured — set up Telegram or email first.",
+    "sent_failed": "The report could not be delivered."
   }
 }

@@ -26,6 +26,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck --workspace codflow-server
       - run: npm test --workspace codflow-server
+      - run: npm run test:scripts
       - run: cp wrangler.toml.example wrangler.toml
         working-directory: cod-server
       - run: npm run build:ci --workspace codflow-server

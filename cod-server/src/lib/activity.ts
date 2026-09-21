@@ -65,6 +65,13 @@ export const ACTIONS = {
   // Stock
   STOCK_ADJUSTED:          "stock.adjusted",
 
+  // Dashboard finance (expenses / ad spend) and the automatic daily report
+  EXPENSE_CREATED:         "expense.created",
+  EXPENSE_UPDATED:         "expense.updated",
+  EXPENSE_DELETED:         "expense.deleted",
+  DAILY_REPORT_SETTINGS_CHANGED: "daily_report.settings_changed",
+  DAILY_REPORT_SENT:       "daily_report.sent",
+
   // Reviews
   REVIEW_APPROVED:         "review.approved",
   REVIEW_REJECTED:         "review.rejected",

@@ -118,7 +118,12 @@
       "review.rejected": "A rejeté un avis",
       "review.deleted": "A supprimé un avis",
       "operations.settings_changed": "A modifié les paramètres des opérations",
-      "operations.assignment_changed": "A modifié l’affectation des commandes"
+      "operations.assignment_changed": "A modifié l’affectation des commandes",
+      "expense.created": "A enregistré une dépense",
+      "expense.updated": "A modifié une dépense",
+      "expense.deleted": "A supprimé une dépense",
+      "daily_report.settings_changed": "A modifié les paramètres du rapport quotidien",
+      "daily_report.sent": "A envoyé le rapport quotidien"
     },
     "table": {
       "action": "Action",
@@ -172,7 +177,8 @@
     "integrations": "Intégrations",
     "notifications": "Notifications",
     "email": "Envoi d'e-mails",
-    "verification": "Vérification"
+    "verification": "Vérification",
+    "finance": "Finance"
   },
   "invite_dialog_extra": {
     "permissions_label": "Permissions",

@@ -16,6 +16,7 @@ describe("settings model", () => {
       "api",
       "telegram",
       "approvals",
+      "reports",
     ]);
     expect(SETTINGS_CATEGORIES[0].labelKey).toBe("general_title");
     expect(SETTINGS_CATEGORIES[5].labelKey).toBe("otp_title");

@@ -50,5 +50,300 @@
     "delivered": "Commande livrée avec succès au client",
     "returned": "Le client a refusé ou retourné la commande à la porte",
     "cancelled": "Commande annulée, ne sera pas traitée"
+  },
+  "customize": {
+    "label": "Personnaliser",
+    "move_up": "Monter",
+    "move_down": "Descendre",
+    "show": "Afficher",
+    "hide": "Masquer",
+    "hidden_hint": "Ce widget est masqué. Cliquez sur « Afficher » pour le rétablir.",
+    "reset": "Réinitialiser",
+    "cancel": "Annuler",
+    "save": "Enregistrer la disposition",
+    "saved": "Disposition enregistrée",
+    "save_error": "Impossible d'enregistrer la disposition",
+    "hint": "Glissez les widgets par leur en-tête (ou utilisez les flèches) pour les réordonner, masquez ceux dont vous n'avez pas besoin, puis enregistrez. La disposition est propre à votre compte."
+  },
+  "actions": {
+    "refresh": "Actualiser"
+  },
+  "export": {
+    "label": "Exporter CSV",
+    "exporting": "Export en cours…",
+    "range_hint": "Période actuelle · {days} jours",
+    "format_hint": "CSV UTF-8 avec BOM — s'ouvre directement dans Excel et Google Sheets.",
+    "error": "Échec de l'export",
+    "reports": {
+      "overview": "Synthèse des KPI",
+      "timeseries": "Commandes et revenu dans le temps",
+      "wilayas": "Wilayas",
+      "products": "Produits",
+      "carriers": "Transporteurs",
+      "pnl": "Compte de résultat",
+      "roas": "Dépenses pub et ROAS",
+      "expenses": "Dépenses"
+    }
+  },
+  "range": {
+    "label": "Période",
+    "today": "Aujourd'hui",
+    "yesterday": "Hier",
+    "7d": "7 derniers jours",
+    "30d": "30 derniers jours",
+    "90d": "90 derniers jours",
+    "this_month": "Ce mois-ci",
+    "last_month": "Mois dernier",
+    "custom": "Personnalisée…",
+    "from": "Du",
+    "to": "Au"
+  },
+  "kpis": {
+    "title": "Indicateurs clés",
+    "subtitle": "Commandes créées sur la période, comparées à la période précédente de même durée",
+    "no_previous": "Pas de données précédentes",
+    "pts": "pts",
+    "vs_previous": "vs période précédente",
+    "total_orders": "Commandes",
+    "confirmation_rate": "Taux de confirmation",
+    "confirmation_rate_hint": "Commandes confirmées (ou au-delà) ÷ toutes les commandes créées sur la période",
+    "delivery_rate": "Taux de livraison",
+    "delivery_rate_hint": "Livrées ÷ (livrées + retournées)",
+    "return_rate": "Taux de retour",
+    "return_rate_hint": "Retournées ÷ (livrées + retournées)",
+    "revenue_delivered": "Revenu encaissé",
+    "revenue_delivered_hint": "Somme des commandes livrées (COD encaissé)",
+    "revenue_pending": "Revenu en attente",
+    "revenue_pending_hint": "Valeur des commandes encore en cours",
+    "aov": "Panier moyen",
+    "aov_hint": "Valeur moyenne d'une commande hors annulations",
+    "in_transit": "En transit",
+    "in_transit_hint": "Assignées, expédiées ou en cours de livraison",
+    "pending_confirmation": "En attente de confirmation"
+  },
+  "timeseries": {
+    "title": "Commandes et revenu dans le temps",
+    "subtitle": "Les périodes suivent votre journée locale",
+    "mode": "Mesure",
+    "mode_orders": "Commandes",
+    "mode_revenue": "Revenu",
+    "granularity": "Granularité",
+    "day": "Jour",
+    "week": "Semaine",
+    "month": "Mois",
+    "orders": "Commandes",
+    "delivered": "Livrées",
+    "returned": "Retournées",
+    "confirmed": "Confirmées",
+    "revenue_delivered": "Revenu encaissé",
+    "revenue_pending": "Revenu en attente"
+  },
+  "empty": {
+    "no_data": "Aucune donnée pour cette période"
+  },
+  "wilayas": {
+    "title": "Carte de chaleur des wilayas",
+    "subtitle": "D'où viennent vos commandes et où elles sont livrées",
+    "metric": "Mesure",
+    "metric_orders": "Commandes",
+    "metric_deliveryRate": "Taux de livraison",
+    "metric_returnRate": "Taux de retour",
+    "metric_revenueDelivered": "Revenu encaissé",
+    "map_label": "Carte des 58 wilayas d'Algérie colorée selon la mesure choisie",
+    "legend_low": "Faible",
+    "legend_high": "Élevé",
+    "hover_hint": "Survolez ou touchez une wilaya pour les détails.",
+    "top_by": "Meilleures wilayas par",
+    "unknown": "{count} commandes sans wilaya n'apparaissent pas sur la carte."
+  },
+  "products": {
+    "title": "Performance des produits",
+    "subtitle": "Meilleures ventes, produits à retours et marge brute",
+    "view": "Vue",
+    "view_best": "Meilleures ventes",
+    "view_worst": "Plus retournés",
+    "view_profit": "Marge brute",
+    "no_cost_price": "Ajoutez un prix de revient à vos produits pour voir la marge brute.",
+    "orders": "commandes",
+    "delivered": "livrées",
+    "return_rate": "retours",
+    "cogs": "Coût",
+    "missing_cost_price": "{count} produits sans prix de revient sont exclus."
+  },
+  "carriers": {
+    "title": "Performance des transporteurs",
+    "subtitle": "Sociétés de livraison vs livreurs internes",
+    "in_house": "Livreurs internes",
+    "delivery_rate": "Taux de livraison",
+    "return_rate": "Taux de retour",
+    "carrier": "Transporteur",
+    "orders": "Commandes",
+    "avg_days": "Délai moyen (j)",
+    "revenue": "Encaissé",
+    "in_transit": "en transit",
+    "attempts": "tentatives moy."
+  },
+  "alerts": {
+    "title": "Alertes intelligentes",
+    "subtitle": "Ce qui demande votre attention maintenant",
+    "empty_title": "Tout est en ordre",
+    "empty_description": "Aucune alerte — rien de bloqué, en retard ou en rupture.",
+    "show_details": "Voir le détail",
+    "hide_details": "Masquer le détail",
+    "severity": {
+      "critical": "Critique",
+      "warning": "Attention",
+      "info": "Info"
+    },
+    "items": {
+      "unconfirmed_orders": {
+        "title": "{count} commandes non confirmées depuis plus de 24h",
+        "hint": "Nouvelles commandes en attente d'un appel de confirmation depuis plus d'un jour."
+      },
+      "unreachable_orders": {
+        "title": "{count} commandes injoignables à rappeler",
+        "hint": "Clients injoignables — planifiez une nouvelle tentative."
+      },
+      "stuck_out_for_delivery": {
+        "title": "{count} colis en cours de livraison depuis 5 jours ou plus",
+        "hint": "Relancez le transporteur ou le livreur avant qu'ils ne deviennent des retours."
+      },
+      "stuck_dispatched": {
+        "title": "{count} colis sans mise à jour transporteur depuis 7 jours ou plus",
+        "hint": "Expédiés à une société mais sans changement de statut — vérifiez le suivi."
+      },
+      "confirmed_not_shipped": {
+        "title": "{count} commandes confirmées non expédiées depuis 48h",
+        "hint": "Confirmées mais toujours pas préparées ni remises au transporteur."
+      },
+      "low_stock": {
+        "title": "{count} produits au seuil de stock bas ou en dessous",
+        "hint": "Réapprovisionnez avant que les commandes n'échouent."
+      },
+      "stock_runway": {
+        "title": "{count} produits seront épuisés d'ici une semaine",
+        "hint": "Basé sur les unités livrées des 14 derniers jours."
+      },
+      "driver_cash": {
+        "title": "{count} livreurs détiennent du cash non remis",
+        "hint": "Récupérez le cash COD des livreurs ayant un solde en attente élevé."
+      },
+      "webhook_errors": {
+        "title": "{count} erreurs de webhook transporteur sur 24h",
+        "hint": "Les mises à jour de suivi échouent peut-être — vérifiez l'intégration de la société de livraison."
+      },
+      "overdue_tasks": {
+        "title": "{count} tâches en retard",
+        "hint": "Tâches d'exploitation ayant dépassé leur échéance."
+      },
+      "pending_approvals": {
+        "title": "{count} approbations vous attendent",
+        "hint": "Actions sensibles demandées par votre équipe via Telegram."
+      },
+      "overdue_tickets": {
+        "title": "{count} tickets support hors délai",
+        "hint": "Tickets clients ayant dépassé le temps de réponse cible."
+      },
+      "unread_support": {
+        "title": "{count} messages support non lus",
+        "hint": "Conversations avec de nouveaux messages clients."
+      },
+      "abandoned_24h": {
+        "title": "{count} paniers abandonnés sur 24h",
+        "hint": "Visiteurs ayant commencé une commande sans la finir — rappelez-les."
+      }
+    }
+  },
+  "today": {
+    "title": "Aujourd'hui",
+    "subtitle": "Votre file de travail et les chiffres du jour",
+    "to_confirm": "À confirmer",
+    "to_retry": "À rappeler",
+    "to_prepare": "À préparer",
+    "to_ship": "Prêtes à expédier",
+    "in_transit": "En transit",
+    "late_shipments": "Colis en retard",
+    "orders_today": "Commandes du jour",
+    "delivered_today": "Livrées aujourd'hui",
+    "returned_today": "Retournées aujourd'hui",
+    "revenue_today": "Encaissé aujourd'hui",
+    "my_open_tasks": "Mes tâches ouvertes",
+    "overdue_tasks": "Mes tâches en retard",
+    "pending_approvals": "Approbations en attente",
+    "drivers_cash": "Livreurs avec du cash",
+    "open_conversations": "Conversations ouvertes"
+  },
+  "roas": {
+    "title": "Dépenses pub et ROAS",
+    "subtitle": "Dépenses publicitaires quotidiennes vs revenu livré",
+    "add_spend": "Ajouter une dépense pub",
+    "empty_title": "Aucune dépense pub enregistrée",
+    "empty_description": "Saisissez ce que vous dépensez chaque jour sur Meta, TikTok ou Google pour voir votre vrai retour sur investissement publicitaire.",
+    "spend": "Dépenses pub",
+    "revenue_delivered": "Revenu encaissé",
+    "roas": "ROAS",
+    "cost_per_order": "Coût / commande",
+    "cost_per_confirmed": "Coût / confirmée",
+    "cost_per_delivered": "Coût / livrée",
+    "orders": "Commandes",
+    "delivered": "Livrées",
+    "by_platform": "Par plateforme",
+    "by_landing_page": "Par page de destination",
+    "unattributed": "Non attribué à une page de destination"
+  },
+  "pnl": {
+    "title": "Compte de résultat",
+    "subtitle": "Revenu encaissé moins coût des produits, livraison, commissions et dépenses",
+    "revenue_delivered": "Revenu encaissé",
+    "delivered_orders": "commandes livrées",
+    "delivery_fees": "Frais de livraison encaissés",
+    "cogs": "Coût des marchandises (prix de revient)",
+    "missing_cost": "{count} produits sans prix de revient — le coût des marchandises est sous-estimé.",
+    "driver_fees": "Frais livreurs",
+    "gross_profit": "Marge brute",
+    "commissions": "Commissions équipe",
+    "net_profit": "Bénéfice net",
+    "net_margin": "Marge nette",
+    "profit_per_order": "Bénéfice par commande livrée",
+    "revenue_lost_returns": "Revenu perdu (retours)",
+    "cost_breakdown": "Répartition des coûts",
+    "no_costs": "Aucun coût enregistré sur cette période."
+  },
+  "expenses": {
+    "title": "Dépenses",
+    "add": "Ajouter une dépense",
+    "edit": "Modifier",
+    "edit_title": "Modifier la dépense",
+    "add_title": "Ajouter une dépense",
+    "dialog_description": "Les dépenses alimentent le compte de résultat ; les dépenses pub alimentent aussi le widget ROAS.",
+    "date": "Date",
+    "amount": "Montant (DA)",
+    "category": "Catégorie",
+    "platform": "Plateforme",
+    "landing_page": "Page de destination",
+    "landing_page_hint": "Optionnel — attribuez cette dépense à une page de destination pour comparer vos campagnes.",
+    "all_landing_pages": "Toute la boutique",
+    "note": "Note",
+    "save": "Enregistrer",
+    "saved": "Dépense enregistrée",
+    "deleted": "Dépense supprimée",
+    "invalid_amount": "Saisissez une date valide et un montant positif.",
+    "empty": "Aucune dépense sur cette période.",
+    "loading": "Chargement…",
+    "categories": {
+      "ads": "Publicité",
+      "carrier": "Factures transporteurs",
+      "packaging": "Emballage",
+      "salaries": "Salaires",
+      "rent": "Loyer",
+      "other": "Autre"
+    },
+    "platforms": {
+      "meta": "Meta (Facebook / Instagram)",
+      "tiktok": "TikTok",
+      "google": "Google",
+      "snapchat": "Snapchat",
+      "other": "Autre"
+    }
   }
 }

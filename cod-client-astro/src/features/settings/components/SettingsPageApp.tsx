@@ -20,6 +20,7 @@ import { EmailSettings } from "@/features/settings/components/EmailSettings";
 import { TelegramSettings } from "@/features/settings/components/TelegramSettings";
 import { ApprovalPoliciesSettings } from "@/features/settings/components/ApprovalPoliciesSettings";
 import { ApiSettings } from "@/features/settings/components/ApiSettings";
+import { ReportsSettings } from "@/features/settings/components/ReportsSettings";
 
 function SettingsContent() {
   const t = useT("settings");
@@ -114,6 +115,8 @@ function SettingsContent() {
         return <TelegramSettings />;
       case "approvals":
         return <ApprovalPoliciesSettings />;
+      case "reports":
+        return <ReportsSettings />;
       default:
         return null;
     }

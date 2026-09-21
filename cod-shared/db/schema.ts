@@ -1650,3 +1650,55 @@ export const abandonedOrders = sqliteTable("abandoned_orders", {
   phoneIdx:     index("abandoned_orders_phone_idx").on(t.phone),
   createdAtIdx: index("abandoned_orders_created_at_idx").on(t.createdAt),
 }));
+
+// ─── Dashboard Analytics ─────────────────────────────────────────────────────
+
+export const EXPENSE_CATEGORIES = ["ads", "carrier", "packaging", "salaries", "rent", "other"] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+export const AD_PLATFORMS = ["meta", "tiktok", "google", "snapchat", "other"] as const;
+export type AdPlatform = (typeof AD_PLATFORMS)[number];
+
+/**
+ * Money the business spends that the order tables cannot derive on their own:
+ * ad budgets (ROAS), carrier invoices, packaging, salaries, rent. Feeds the
+ * dashboard P&L and the ROAS widget. `date` is the store-local calendar day.
+ */
+export const businessExpenses = sqliteTable("business_expenses", {
+  id: text("id").primaryKey(),
+  date: text("date").notNull(),
+  category: text("category", { enum: EXPENSE_CATEGORIES }).notNull(),
+  platform: text("platform"),
+  amount: real("amount").notNull(),
+  currency: text("currency").notNull().default("DZD"),
+  landingPageId: text("landing_page_id").references(() => landingPages.id, { onDelete: "set null" }),
+  note: text("note"),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({
+  dateIdx: index("business_expenses_date_idx").on(t.date, t.category),
+  landingPageIdx: index("business_expenses_landing_page_idx").on(t.landingPageId),
+}));
+
+/** Per-user dashboard widget order/visibility (JSON blob, versioned). */
+export const dashboardLayouts = sqliteTable("dashboard_layouts", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  layout: text("layout").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** Automated daily KPI report (Telegram / email) — single row, id = "default". */
+export const dashboardReportConfig = sqliteTable("dashboard_report_config", {
+  id: text("id").primaryKey().default("default"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  sendHour: integer("send_hour").notNull().default(20),
+  timezone: text("timezone").notNull().default("Africa/Algiers"),
+  telegramEnabled: integer("telegram_enabled", { mode: "boolean" }).notNull().default(true),
+  emailEnabled: integer("email_enabled", { mode: "boolean" }).notNull().default(false),
+  emailRecipients: text("email_recipients").notNull().default("[]"),
+  lastSentOn: text("last_sent_on"),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

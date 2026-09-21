@@ -149,7 +149,38 @@ function wrangler(args, opts = {}) {
   return sh("npx", ["wrangler", ...args], opts);
 }
 function tryJson(text) {
-  try { return JSON.parse(text); } catch { return null; }
+  try { return JSON.parse(text); } catch { /* fall through */ }
+  // Tolerate a banner / log line before the JSON payload (e.g. "⛅️ wrangler …").
+  const start = text.search(/[[{]/);
+  const end = Math.max(text.lastIndexOf("]"), text.lastIndexOf("}"));
+  if (start === -1 || end <= start) return null;
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+}
+function stripAnsi(text) {
+  // eslint-disable-next-line no-control-regex
+  return String(text ?? "").replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
+}
+/**
+ * Parse `wrangler r2 bucket list` output. Wrangler 4.x prints labelled values
+ * ("name:  <bucket>" / "creation_date:  …" blocks, no --json flag); older
+ * releases printed a whitespace table or JSON. Exported for unit tests.
+ */
+function parseBucketList(raw) {
+  const out = stripAnsi(raw);
+  const arr = tryJson(out);
+  if (Array.isArray(arr)) {
+    return arr.map((b) => (typeof b === "string" ? b : b?.name)).filter(Boolean);
+  }
+  const labelled = [];
+  for (const line of out.split("\n")) {
+    const m = line.match(/^\s*name:\s*(\S+)\s*$/i);
+    if (m) labelled.push(m[1]);
+  }
+  if (labelled.length) return labelled;
+  // Legacy whitespace table: first token per line, minus obvious non-names.
+  return out.split("\n")
+    .map((l) => l.trim().split(/\s+/)[0])
+    .filter((t) => t && !t.endsWith(":") && !/^listing$/i.test(t) && !t.startsWith("⛅"));
 }
 function findD1(name) {
   const out = wrangler(["d1", "list", "--json"], { label: "wrangler d1 list --json" });
@@ -184,9 +215,24 @@ function createKv(title) {
 }
 function listBuckets() {
   const out = wrangler(["r2", "bucket", "list"], { label: "wrangler r2 bucket list" });
-  const arr = tryJson(out);
-  if (Array.isArray(arr)) return arr.map((b) => (typeof b === "string" ? b : b.name));
-  return out.split("\n").map((l) => l.trim().split(/\s+/)[0]).filter(Boolean);
+  return parseBucketList(out);
+}
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+/** True when `wrangler r2 bucket info <name>` output describes that bucket. */
+function bucketInfoSaysExists(raw, name) {
+  const out = stripAnsi(raw);
+  const json = tryJson(out);
+  if (json && typeof json === "object" && !Array.isArray(json) && json.name === name) return true;
+  return new RegExp(`^\\s*name:\\s*${escapeRegExp(name)}\\s*$`, "im").test(out);
+}
+/** Direct existence probe — independent of the list output format. */
+function bucketExists(name) {
+  const out = wrangler(["r2", "bucket", "info", name], {
+    allowFail: true, label: `wrangler r2 bucket info ${name}`,
+  });
+  return bucketInfoSaysExists(out, name);
 }
 function createBucket(name) {
   const out = wrangler(["r2", "bucket", "create", name], {
@@ -217,7 +263,7 @@ function ensureKv(title, create = true) {
   return id;
 }
 function ensureBucket(create = true) {
-  if (listBuckets().includes(NAMES.bucket)) {
+  if (listBuckets().includes(NAMES.bucket) || bucketExists(NAMES.bucket)) {
     ok(`R2 bucket '${NAMES.bucket}' already exists — reusing it`);
     return;
   }
@@ -996,5 +1042,5 @@ if (isMain) main().catch((err) => { console.error(err); process.exit(1); });
 export {
   genServerToml, genDashToml, genThemeWrangler, assertNoPlaceholders,
   stripTomlComments, replaceTomlVar, replaceInlineVar, parseSimpleEnv,
-  captureWorkersDevUrl,
+  captureWorkersDevUrl, parseBucketList, bucketInfoSaysExists, tryJson, stripAnsi,
 };

@@ -193,7 +193,8 @@
     "approval_action_settings_operations": "تغيير إعدادات العمليات",
     "approval_action_settings_integrations": "تغيير إعدادات التكاملات والأسرار",
     "approval_action_landing_pages_publish": "نشر صفحة الهبوط",
-    "approval_action_landing_pages_delete": "حذف صفحة الهبوط"
+    "approval_action_landing_pages_delete": "حذف صفحة الهبوط",
+    "reports_title": "التقارير اليومية"
   },
   "shipping": {
     "title": "أسعار التوصيل",
@@ -266,5 +267,31 @@
     "toggle_on": "مفعّل",
     "toggle_off": "معطّل",
     "bulk_fill_success": "تم تطبيق الأسعار على جميع الولايات"
+  },
+  "reports": {
+    "title": "التقرير اليومي التلقائي",
+    "subtitle": "ملخص للمؤشرات (الطلبات، نسبة التسليم، الإيراد، أفضل المنتجات، التنبيهات) يُرسل يومياً إلى Telegram و/أو البريد الإلكتروني.",
+    "enabled": "إرسال تقرير يومي",
+    "enabled_hint": "عند التفعيل، يرسل CodFlow التقرير مرة واحدة يومياً في الساعة المحددة.",
+    "send_hour": "وقت الإرسال",
+    "send_hour_hint": "بالتوقيت المحلي — الساعة 20:00 تعطي صورة شبه كاملة عن اليوم.",
+    "timezone": "المنطقة الزمنية",
+    "timezone_hint": "تُستخدم لحساب اليوم المحلي ووقت الإرسال.",
+    "telegram": "Telegram",
+    "telegram_ready": "يستخدم البوت المُعدّ في قسم موافقات Telegram.",
+    "telegram_missing": "اضبط بوت Telegram والمحادثة أولاً (قسم موافقات Telegram).",
+    "email": "البريد الإلكتروني",
+    "email_ready": "يستخدم مزوّد البريد الإلكتروني الخاص بك.",
+    "email_missing": "اضبط إرسال البريد وفعّله أولاً (قسم البريد الإلكتروني).",
+    "recipients": "المستلمون",
+    "recipients_hint": "عناوين بريد إلكتروني مفصولة بفواصل.",
+    "recipients_required": "أضف مستلماً واحداً على الأقل أو عطّل الإرسال بالبريد.",
+    "recipients_invalid": "أحد عناوين البريد الإلكتروني غير صالح.",
+    "send_now": "إرسال الآن",
+    "send_now_hint": "يرسل تقرير اليوم فوراً عبر القنوات المفعّلة — مفيد لاختبار الإعداد.",
+    "last_sent": "آخر إرسال",
+    "sent_success": "تم إرسال التقرير.",
+    "sent_not_configured": "لا توجد قناة مضبوطة — اضبط Telegram أو البريد الإلكتروني أولاً.",
+    "sent_failed": "تعذّر إرسال التقرير."
   }
 }
