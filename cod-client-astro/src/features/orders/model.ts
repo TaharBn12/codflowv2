@@ -414,3 +414,108 @@ export function filterAbandonedOrders(
     return true;
   });
 }
+
+// ─── SLA indicator ───────────────────────────────────────────────────────────
+
+/**
+ * How long an order may sit in a state before the row turns red.
+ * Hours for the confirmation stage (the merchant's own clock), days for the
+ * carrier stage (once it is out for delivery the clock is the courier's).
+ */
+export const SLA_THRESHOLDS = {
+  newHours: 12,
+  outForDeliveryDays: 3,
+} as const;
+
+export type SlaLevel = "ok" | "warn" | "breach";
+
+export interface OrderSla {
+  level: SlaLevel;
+  /** "new" | "out_for_delivery" | null — which clock is running. */
+  stage: "new" | "out_for_delivery" | null;
+  hours: number;
+  days: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * SLA state for an orders-list row. Only the two states the merchant can act
+ * on are timed: an unconfirmed "new" order and a parcel stuck out for
+ * delivery. Everything else is "ok" — a warning on a state nobody owns is
+ * noise, not a signal.
+ */
+export function orderSla(
+  order: Pick<OrderListItem, "status" | "createdAt">,
+  now: number = Date.now(),
+  thresholds: { newHours?: number; outForDeliveryDays?: number } = {},
+): OrderSla {
+  const newHours = thresholds.newHours ?? SLA_THRESHOLDS.newHours;
+  const outForDeliveryDays =
+    thresholds.outForDeliveryDays ?? SLA_THRESHOLDS.outForDeliveryDays;
+
+  const created = Date.parse(order.createdAt);
+  if (Number.isNaN(created)) {
+    return { level: "ok", stage: null, hours: 0, days: 0 };
+  }
+
+  const elapsedMs = Math.max(0, now - created);
+  const hours = Math.floor(elapsedMs / 3_600_000);
+  const days = Math.floor(elapsedMs / DAY_MS);
+
+  if (order.status === "new") {
+    return {
+      level: hours >= newHours ? "breach" : hours >= newHours / 2 ? "warn" : "ok",
+      stage: "new",
+      hours,
+      days,
+    };
+  }
+
+  if (order.status === "out_for_delivery") {
+    return {
+      level:
+        days >= outForDeliveryDays
+          ? "breach"
+          : days >= Math.max(1, outForDeliveryDays - 1)
+            ? "warn"
+            : "ok",
+      stage: "out_for_delivery",
+      hours,
+      days,
+    };
+  }
+
+  return { level: "ok", stage: null, hours, days };
+}
+
+// ─── Quick contact ───────────────────────────────────────────────────────────
+
+/**
+ * Algerian numbers are stored locally ("0551234567"). wa.me and tel: both need
+ * the international form, so the leading 0 becomes +213. Numbers already in
+ * international form are passed through untouched.
+ */
+export function toInternationalPhone(phone: string): string | null {
+  const digits = phone.replace(/[^\d+]/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("+")) return digits;
+  if (digits.startsWith("00")) return `+${digits.slice(2)}`;
+  if (digits.startsWith("0") && digits.length === 10) return `+213${digits.slice(1)}`;
+  if (digits.startsWith("213")) return `+${digits}`;
+  return null;
+}
+
+export function telLink(phone: string): string | null {
+  const international = toInternationalPhone(phone);
+  return international ? `tel:${international}` : null;
+}
+
+/** wa.me takes the number without "+" and the message URL-encoded. */
+export function whatsappLink(phone: string, message?: string): string | null {
+  const international = toInternationalPhone(phone);
+  if (!international) return null;
+  const number = international.replace("+", "");
+  const query = message ? `?text=${encodeURIComponent(message)}` : "";
+  return `https://wa.me/${number}${query}`;
+}

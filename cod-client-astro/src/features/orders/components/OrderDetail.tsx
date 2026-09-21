@@ -326,7 +326,12 @@ export function OrderDetail({ orderId }: { orderId: string }) {
         <div className="space-y-5">
           <OrderCustomerCard order={order} />
           <OrderProductsCard order={order} locale={locale} />
-          <OrderDeliveryCard order={order} company={company} />
+          <OrderDeliveryCard
+            order={order}
+            company={company}
+            identity={identity}
+            onSynced={load}
+          />
         </div>
 
         <div className="space-y-5 lg:sticky lg:top-5 lg:self-start">

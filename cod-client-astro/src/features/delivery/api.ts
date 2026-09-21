@@ -2,6 +2,11 @@ import { apiFetch } from "@/lib/api";
 import { listOrders } from "@/features/orders/api";
 import type { OrderListItem } from "@/features/orders/types";
 import type { Driver, DriverCompensation, DriverOrder, DriverPayment, DriverPaymentType, DriverStatus, VehicleType, Wilaya, DeliveryCompany, StopDesk, ShippingProfile, ShippingProfileWithRules, CommuneOverride } from "./types";
+import type {
+  CarrierAutoSyncStatus,
+  CarrierSyncRun,
+  CompanySyncResult,
+} from "@/features/orders/types";
 
 interface ListEnvelope<T> {
   success: boolean;
@@ -320,4 +325,35 @@ export interface CommuneOverrideDraft {
   stopDeskEnabled?: boolean | null;
   homePrice?: number | null;
   stopDeskPrice?: number | null;
+}
+
+// ─── Carrier status auto-sync ────────────────────────────────────────────────
+
+/** Current auto-sync state for a company: switches, backlog, last run. */
+export async function getCompanyAutoSyncStatus(companyId: string) {
+  return (
+    await apiFetch<DataEnvelope<CarrierAutoSyncStatus>>(
+      `/api/delivery-companies/${encodeURIComponent(companyId)}/auto-sync/status`,
+    )
+  ).data;
+}
+
+/** Run the auto-sync for one company right now (the cron's manual twin). */
+export async function syncCompanyStatuses(companyId: string, opts: { force?: boolean } = {}) {
+  const suffix = opts.force ? "?force=true" : "";
+  return (
+    await apiFetch<DataEnvelope<CompanySyncResult>>(
+      `/api/delivery-companies/${encodeURIComponent(companyId)}/sync-statuses${suffix}`,
+      { method: "POST" },
+    )
+  ).data;
+}
+
+/** The company's sync history, newest first. */
+export async function listCompanySyncRuns(companyId: string, limit = 20) {
+  return (
+    await apiFetch<DataEnvelope<{ runs: CarrierSyncRun[] }>>(
+      `/api/delivery-companies/${encodeURIComponent(companyId)}/sync-runs?limit=${limit}`,
+    )
+  ).data.runs;
 }

@@ -22,6 +22,10 @@ export const ACTIONS = {
   ORDER_DISPATCHED:        "order.dispatched",
   ORDER_PRODUCT_RETURNED:  "order.product_returned",
   ORDER_DELETED:           "order.deleted",
+  /** Carrier tracking poll applied (manual per-order, or the cron sweep). */
+  ORDER_CARRIER_SYNCED:    "order.carrier_synced",
+  /** Bulk carrier tracking poll from the orders list. */
+  ORDER_CARRIER_SYNC_BULK: "order.carrier_sync_bulk",
 
   // Customers
   CUSTOMER_CREATED:        "customer.created",

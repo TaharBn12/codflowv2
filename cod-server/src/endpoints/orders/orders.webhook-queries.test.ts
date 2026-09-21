@@ -60,6 +60,35 @@ describe("updateOrderStatusWebhook", () => {
     expect(result).toEqual({ updated: false });
   });
 
+  it("treats dispatched as past assignment — a carrier cannot walk it back to new", async () => {
+    const db = makeMockDb([f(orderRow({ status: "dispatched" }))]);
+
+    const result = await updateOrderStatusWebhook(db, "ord_1", "new", "carrier-sync:yalidine");
+
+    expect(result).toEqual({ updated: false });
+  });
+
+  it("lets the carrier advance a dispatched order to out_for_delivery", async () => {
+    const db = makeMockDb([f(orderRow({ status: "dispatched", driver_id: null }))]);
+
+    const result = await updateOrderStatusWebhook(
+      db,
+      "ord_1",
+      "out_for_delivery",
+      "carrier-sync:yalidine",
+    );
+
+    expect(result).toEqual({ updated: true });
+  });
+
+  it("keeps assigned → dispatched on the manual dispatch path (same rank)", async () => {
+    const db = makeMockDb([f(orderRow({ status: "assigned" }))]);
+
+    const result = await updateOrderStatusWebhook(db, "ord_1", "dispatched", "carrier-sync:yalidine");
+
+    expect(result).toEqual({ updated: false });
+  });
+
   it("commits a forward status change (batch path)", async () => {
     const db = makeMockDb([f(orderRow({ status: "confirmed", driver_id: null }))]);
 

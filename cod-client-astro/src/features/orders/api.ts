@@ -2,10 +2,12 @@ import { apiFetch, apiFetchBlob } from "@/lib/api";
 import type {
   AbandonedOrder,
   AbandonedStats,
+  BulkCarrierSyncResult,
   Commune,
   Customer,
   DeliveryCompany,
   Driver,
+  OrderCarrierSyncResult,
   OrderDetail,
   OrderListItem,
   Product,
@@ -165,4 +167,31 @@ export function updateAbandonedStatus(id: string, status: string) {
 
 export function deleteAbandonedOrder(id: string) {
   return apiFetch<DataEnvelope<null>>(`/api/abandoned-orders/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// ─── Carrier status auto-sync ────────────────────────────────────────────────
+
+/** Poll the carrier for one order and apply what it reports (throttle bypassed). */
+export async function syncOrderCarrierStatus(id: string) {
+  return (
+    await apiFetch<DataEnvelope<OrderCarrierSyncResult>>(
+      `/api/orders/${encodeURIComponent(id)}/sync-carrier`,
+      { method: "POST" },
+    )
+  ).data;
+}
+
+/** Poll the carrier for a selection, or sweep everything currently due. */
+export async function bulkSyncCarrierStatuses(body: {
+  orderIds?: string[];
+  companyId?: string;
+  force?: boolean;
+  limit?: number;
+} = {}) {
+  return (
+    await apiFetch<DataEnvelope<BulkCarrierSyncResult>>(
+      "/api/orders/bulk-sync-carrier",
+      json({ method: "POST", body: JSON.stringify(body) }),
+    )
+  ).data;
 }

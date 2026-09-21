@@ -311,5 +311,75 @@
     "confirmation_agent": "Confirmation agent",
     "follow_up_agent": "Follow-up agent",
     "unassigned": "Unassigned"
+  },
+  "carrier_sync": {
+    "toolbar_button": "Sync from carriers",
+    "toolbar_hint": "Pulls the latest statuses from the delivery companies and applies them (forward-only)",
+    "bulk_button": "Sync statuses from carriers",
+    "syncing": "Syncing from carriers...",
+    "result": "Updated {updated} of {polled} orders",
+    "errors": "Some orders failed at the carrier",
+    "unmapped": "Unknown carrier statuses",
+    "row_button": "Sync from carrier",
+    "last_status": "Last carrier status",
+    "last_sync": "Last sync",
+    "never_synced": "Not synced yet",
+    "updated_to": "Status updated to",
+    "unchanged": "No change — status already matches",
+    "unmapped_status": "Unknown carrier status",
+    "failed": "Could not reach the carrier",
+    "fails_count": "failed attempts"
+  },
+  "sla": {
+    "label": "SLA",
+    "new_overdue": "New for {hours} h without confirmation",
+    "delivery_overdue": "Out for delivery for {days} d",
+    "ok": "On time"
+  },
+  "quick_contact": {
+    "call": "Call",
+    "whatsapp": "WhatsApp",
+    "whatsapp_message": "Hello, we are contacting you about your order {order}.",
+    "no_phone": "No phone number"
+  },
+  "export": {
+    "export_button": "Export CSV",
+    "export_columns_title": "Choose columns",
+    "export_run": "Export {count} orders",
+    "export_empty": "No orders to export with the current filters",
+    "columns": {
+      "order_number": "Order number",
+      "created_at": "Created at",
+      "status": "Status",
+      "customer_name": "Customer",
+      "phone": "Phone",
+      "wilaya": "Wilaya",
+      "commune": "Commune",
+      "address": "Address",
+      "price": "Product price",
+      "delivery_fee": "Delivery fee",
+      "cod_amount": "Amount due (number)",
+      "cod_amount_text": "Amount due (formatted)",
+      "delivery_type": "Delivery type",
+      "delivery_method": "Delivery method",
+      "driver_name": "Driver",
+      "tracking_number": "Tracking number",
+      "station_code": "Station code",
+      "delivery_attempts": "Delivery attempts",
+      "last_carrier_status": "Last carrier status",
+      "last_tracking_sync_at": "Last sync",
+      "notes": "Notes"
+    }
+  },
+  "bulk": {
+    "status_title": "Change status",
+    "driver_title": "Assign driver",
+    "apply": "Apply",
+    "pick_status": "Pick a status…",
+    "pick_driver": "Pick a driver…",
+    "done_status": "Status changed on {ok} orders",
+    "done_driver": "{ok} orders assigned to the driver",
+    "failed": "{count} orders failed",
+    "partial": "{ok} succeeded, {count} failed"
   }
 }

@@ -1029,6 +1029,7 @@ const STATUS_RANK: Record<string, number> = {
   preparing: 2,
   ready: 3,
   assigned: 4,
+  dispatched: 4,
   out_for_delivery: 5,
   delivered: 6,
   returned: 6,
