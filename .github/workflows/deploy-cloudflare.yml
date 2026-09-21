@@ -127,7 +127,7 @@ jobs:
 
       - name: Preserve deploy diagnostics
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cloudflare-deploy-log-${{ github.run_attempt }}
           path: ${{ runner.temp }}/cloudflare-deploy.log
