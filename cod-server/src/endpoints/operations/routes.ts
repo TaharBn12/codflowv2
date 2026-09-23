@@ -16,7 +16,7 @@ import type { AppContext } from "@/types";
 import { z } from "zod";
 import { hasPermission } from "../../../../cod-shared/rbac/utils";
 import { SCOPES } from "../../../../cod-shared/rbac/scopes";
-import { logActivity, ACTIONS } from "@/lib/activity";
+import { logActivity, logActivities, ACTIONS } from "@/lib/activity";
 import { chooseLeastLoadedConfirmer, createStaffCommissionStages } from "../../../../cod-shared/queries/orders";
 import {
   APPROVAL_ACTIONS,
@@ -314,6 +314,7 @@ routes.post("/orders/auto-assign", async (c) => {
     .limit(100)
     .all();
   let assigned = 0;
+  const assignedOrders: Parameters<typeof logActivities>[3] = [];
   for (const order of pending) {
     const agent = await chooseLeastLoadedConfirmer(db);
     if (!agent) break;
@@ -343,8 +344,10 @@ routes.post("/orders/auto-assign", async (c) => {
     ]);
     await createStaffCommissionStages(db, order.id, false);
     assigned += 1;
+    assignedOrders.push({ entity: { type: "order", id: order.id, label: order.orderNumber }, metadata: { mode: "auto", assigneeId: agent.id, assigneeName: agent.name } });
   }
   if (assigned) await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_ASSIGNMENT_CHANGED, { type: "operations", id: "auto-assignment", label: "Automatic order assignment" }, { mode: "manual_auto_assign", assigned });
+  await logActivities(db, c.get("user"), ACTIONS.ORDER_CONFIRMER_ASSIGNED, assignedOrders);
   return c.json({
     success: true,
     data: { assigned, remaining: pending.length - assigned },
@@ -399,6 +402,16 @@ routes.post("/orders/bulk-assign", async (c) => {
     .from(orders)
     .where(inArray(orders.id, parsed.data.orderIds))
     .all();
+  const previousAssignees = new Map(
+    (selected.length
+      ? await db
+          .select({ orderId: orderConfirmationAssignments.orderId, assigneeId: orderConfirmationAssignments.assigneeId })
+          .from(orderConfirmationAssignments)
+          .where(inArray(orderConfirmationAssignments.orderId, selected.map((order) => order.id)))
+          .all()
+      : []
+    ).map((row) => [row.orderId, row.assigneeId]),
+  );
   const now = new Date().toISOString();
   const statements: any[] = selected.length
     ? [
@@ -464,6 +477,10 @@ routes.post("/orders/bulk-assign", async (c) => {
     }
   }
   if (selected.length) await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_ASSIGNMENT_CHANGED, { type: "operations", id: assignee.id, label: assignee.name }, { mode: "manual_reassignment", orderIds: selected.map((order) => order.id), assigneeId: assignee.id });
+  await logActivities(db, c.get("user"), ACTIONS.ORDER_CONFIRMER_ASSIGNED, selected.map((order) => ({
+    entity: { type: "order", id: order.id, label: order.orderNumber },
+    metadata: { mode: "manual", assigneeId: assignee.id, assigneeName: assignee.name, previousAssigneeId: previousAssignees.get(order.id) ?? null },
+  })));
   return c.json({
     success: true,
     data: { assigned: selected.length, assignee },

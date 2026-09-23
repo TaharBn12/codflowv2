@@ -14,6 +14,7 @@
  */
 
 import { z } from "@hono/zod-openapi";
+import { CONTACT_CHANNELS, CONTACT_OUTCOMES } from "../../../../cod-shared/lib/order-contact";
 
 // ─── Enums & Constants ────────────────────────────────────────────────────────
 
@@ -199,6 +200,13 @@ export const OrderListItemSchema = OrderBaseSchema.extend({
   lastUpdatedBy: z.string().nullable().optional().openapi({
     description:
       "User ID of the last status-change actor. Included in list responses only (GET /api/orders).",
+  }),
+  unansweredCallsToday: z.number().int().optional().openapi({
+    description:
+      "Unanswered confirmation calls logged today (Algeria time) — the confirmer's daily limit is 3. List responses only.",
+  }),
+  lastContactAt: z.string().nullable().optional().openapi({
+    description: "Time of the most recent logged call or message. List responses only.",
   }),
 }).openapi("OrderListItem", {
   description: "Order summary for list view - includes joins but not nested arrays",
@@ -388,3 +396,110 @@ export const AbandonedOrderStatsSchema = z
   .openapi("AbandonedOrderStats");
 
 export type AbandonedOrderStatus = z.infer<typeof AbandonedOrderStatusEnum>;
+
+// ─── Confirmer contact attempts & order activity ──────────────────────────────
+
+export const ContactChannelEnum = z.enum(CONTACT_CHANNELS);
+export const ContactOutcomeEnum = z.enum(CONTACT_OUTCOMES);
+
+export const ContactAttemptSchema = z
+  .object({
+    id: z.string(),
+    orderId: z.string(),
+    channel: ContactChannelEnum,
+    outcome: ContactOutcomeEnum,
+    note: z.string().nullable(),
+    callbackAt: z.string().datetime().nullable(),
+    createdBy: z.string(),
+    createdByName: z.string(),
+    createdAt: z.string().datetime(),
+  })
+  .openapi("ContactAttempt");
+
+export const ContactSummarySchema = z
+  .object({
+    dailyLimit: z.number().int().openapi({ example: 3 }),
+    unansweredToday: z.number().int().openapi({
+      description: "Unanswered calls (no answer, busy, switched off, wrong number) logged today, Algeria time",
+    }),
+    remainingToday: z.number().int(),
+    limitReached: z.boolean(),
+    callsToday: z.number().int(),
+    messagesToday: z.number().int(),
+    totalCalls: z.number().int(),
+    totalMessages: z.number().int(),
+    lastAttempt: z
+      .object({
+        channel: ContactChannelEnum,
+        outcome: ContactOutcomeEnum,
+        createdAt: z.string().datetime(),
+        createdByName: z.string().nullable(),
+      })
+      .nullable(),
+    nextCallbackAt: z.string().datetime().nullable(),
+    resetsAt: z.string().datetime().openapi({ description: "Next Algeria midnight, when the daily counter resets" }),
+  })
+  .openapi("ContactSummary");
+
+export const ContactAttemptsDataSchema = z
+  .object({
+    attempts: z.array(ContactAttemptSchema),
+    summary: ContactSummarySchema,
+  })
+  .openapi("ContactAttemptsData");
+
+export const ContactAttemptCreatedDataSchema = z
+  .object({
+    attempt: ContactAttemptSchema,
+    summary: ContactSummarySchema,
+    statusChanged: z.object({ from: OrderStatusEnum, to: OrderStatusEnum }).nullable(),
+    callbackTaskId: z.string().nullable(),
+  })
+  .openapi("ContactAttemptCreatedData");
+
+export const OrderNoteDataSchema = z
+  .object({
+    id: z.string(),
+    note: z.string(),
+    createdAt: z.string().datetime(),
+  })
+  .openapi("OrderNoteData");
+
+export const OrderActivityEntrySchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(["created", "status", "contact", "note", "event"]),
+    action: z.string().openapi({ example: "order.contact_attempt" }),
+    actorId: z.string().nullable(),
+    actorName: z.string().nullable(),
+    actorRole: z.string().nullable(),
+    source: z.string().nullable().openapi({
+      description: "Non-user origin of a status change (e.g. `webhook:yalidine`, `carrier-sync:noest`)",
+    }),
+    createdAt: z.string(),
+    fromStatus: z.string().nullable(),
+    toStatus: z.string().nullable(),
+    channel: z.string().nullable(),
+    outcome: z.string().nullable(),
+    note: z.string().nullable(),
+    callbackAt: z.string().nullable(),
+    metadata: z.record(z.string(), z.unknown()).nullable(),
+  })
+  .openapi("OrderActivityEntry");
+
+export const OrderActivityDataSchema = z
+  .object({
+    order: z.object({
+      id: z.string(),
+      orderNumber: z.string(),
+      customerName: z.string(),
+      phone: z.string(),
+      status: OrderStatusEnum,
+      orderType: OrderTypeEnum,
+      createdAt: z.string(),
+      confirmationAssigneeName: z.string().nullable(),
+    }),
+    summary: ContactSummarySchema,
+    entries: z.array(OrderActivityEntrySchema),
+  })
+  .openapi("OrderActivityData");

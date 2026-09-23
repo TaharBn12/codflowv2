@@ -9,7 +9,7 @@ const orderDetailFallback = {
   configureServer(server) {
     server.middlewares.use((request, _response, next) => {
       const pathname = request.url?.split("?", 1)[0] ?? "";
-       const isOrderDetail = /^\/orders\/[^/]+\/?$/.test(pathname) && pathname !== "/orders/new" && pathname !== "/orders/abandoned";
+       const isOrderDetail = /^\/orders\/[^/]+(?:\/activity)?\/?$/.test(pathname) && pathname !== "/orders/new" && pathname !== "/orders/abandoned";
        const isCustomerDetail = /^\/customers\/[^/]+(?:\/edit)?\/?$/.test(pathname) && pathname !== "/customers/new";
        const isCustomerGroupDetail = /^\/customer-groups\/[^/]+(?:\/edit)?\/?$/.test(pathname) && pathname !== "/customer-groups/new";
        const isCustomerTagDetail = /^\/customer-tags\/[^/]+(?:\/edit)?\/?$/.test(pathname) && pathname !== "/customer-tags/new";

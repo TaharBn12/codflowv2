@@ -535,6 +535,10 @@ export async function addShipmentRemark(c: Context<AppContext>) {
       durationMs,
     });
 
+    await logActivity(db, c.get("user"), ACTIONS.ORDER_STATUS_CHANGED, {
+      type: "order", id: orderId, label: order.orderNumber,
+    }, { action: "carrier_remark", note: body.content.trim(), trackingNumber: order.trackingNumber, companyName: company.name });
+
     return c.json({ success: true, message: "Remark added" }, 200);
   } catch (err) {
     const durationMs = Date.now() - startMs;

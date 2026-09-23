@@ -1,4 +1,4 @@
-import { Clock, MapPin, MessageCircle, PackageOpen, Phone, Star } from "lucide-react";
+import { Clock, MapPin, MessageCircle, PackageOpen, Phone, PhoneMissed, Star } from "lucide-react";
 import { useState } from "react";
 import { useLocale, useT } from "@/i18n/react";
 import { Select, TableCell, TableRow } from "@/components/ui";
@@ -133,11 +133,25 @@ export function OrderQuickContact({ order }: { order: OrderListItem }) {
   if (!tel && !wa) {
     return <span className="text-xs text-muted-foreground">{t("quick_contact.no_phone")}</span>;
   }
+  const callsToday = order.unansweredCallsToday ?? 0;
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1">
       <span className="text-xs text-muted-foreground" dir="ltr">
         {order.phone}
       </span>
+      {callsToday > 0 && (
+        <span
+          title={t("contact.today_counter")}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums ${
+            callsToday >= 3
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-warning/40 bg-warning/10 text-warning"
+          }`}
+        >
+          <PhoneMissed size={10} aria-hidden="true" />
+          {t("contact.calls_today_badge").replace("{count}", String(callsToday))}
+        </span>
+      )}
       {tel && (
         <a
           href={tel}

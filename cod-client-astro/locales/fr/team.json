@@ -123,7 +123,10 @@
       "expense.updated": "A modifié une dépense",
       "expense.deleted": "A supprimé une dépense",
       "daily_report.settings_changed": "A modifié les paramètres du rapport quotidien",
-      "daily_report.sent": "A envoyé le rapport quotidien"
+      "daily_report.sent": "A envoyé le rapport quotidien",
+      "order.contact_attempt": "A enregistré une tentative de contact",
+      "order.note_added": "A ajouté une note à une commande",
+      "order.confirmer_assigned": "A assigné un confirmateur à une commande"
     },
     "table": {
       "action": "Action",

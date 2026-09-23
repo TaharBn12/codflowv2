@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   ALLOWED_TRANSITIONS,
+  algeriaDayKey,
+  canLogContact,
+  groupByAlgeriaDay,
+  orderActivityHref,
+  parseOrderRoute,
+  toCallbackIso,
   detailStatusActions,
   dispatchFieldSupport,
   canAssignOrder,
@@ -350,5 +356,57 @@ describe("phone helpers", () => {
   it("URL-encodes the prefilled WhatsApp message", () => {
     const link = whatsappLink("0551234567", "طلبكم ORD-1");
     expect(link).toBe(`https://wa.me/213551234567?text=${encodeURIComponent("طلبكم ORD-1")}`);
+  });
+});
+
+describe("order routes", () => {
+  it("recognizes the detail and activity URLs served through the root fallback", () => {
+    expect(parseOrderRoute("/orders/ord_1")).toEqual({ kind: "detail", id: "ord_1" });
+    expect(parseOrderRoute("/orders/ord_1/")).toEqual({ kind: "detail", id: "ord_1" });
+    expect(parseOrderRoute("/orders/ord_1/activity")).toEqual({ kind: "activity", id: "ord_1" });
+    expect(parseOrderRoute("/orders/ord%2F1/activity")).toEqual({ kind: "activity", id: "ord/1" });
+  });
+
+  it("leaves static order pages and unknown sub-paths alone", () => {
+    expect(parseOrderRoute("/orders").kind).toBe("none");
+    expect(parseOrderRoute("/orders/new").kind).toBe("none");
+    expect(parseOrderRoute("/orders/abandoned").kind).toBe("none");
+    expect(parseOrderRoute("/orders/ord_1/unknown").kind).toBe("none");
+    expect(parseOrderRoute("/orders/%E0%A4%A").kind).toBe("none");
+  });
+
+  it("builds an encoded activity link", () => {
+    expect(orderActivityHref("ord/1")).toBe("/orders/ord%2F1/activity");
+  });
+});
+
+describe("contact helpers", () => {
+  it("allows contact logging until the order is closed", () => {
+    expect(canLogContact("new")).toBe(true);
+    expect(canLogContact("unreachable")).toBe(true);
+    expect(canLogContact("out_for_delivery")).toBe(true);
+    expect(canLogContact("delivered")).toBe(false);
+    expect(canLogContact("cancelled")).toBe(false);
+    expect(canLogContact("returned")).toBe(false);
+  });
+
+  it("converts a datetime-local value to ISO and rejects empty input", () => {
+    expect(toCallbackIso("")).toBeNull();
+    expect(toCallbackIso("not-a-date")).toBeNull();
+    expect(toCallbackIso("2026-09-23T18:30")).toBe(new Date("2026-09-23T18:30").toISOString());
+  });
+
+  it("groups entries by Algeria calendar day (UTC+1)", () => {
+    expect(algeriaDayKey("2026-09-23T22:59:00.000Z")).toBe("2026-09-23");
+    expect(algeriaDayKey("2026-09-23T23:01:00.000Z")).toBe("2026-09-24");
+    const groups = groupByAlgeriaDay([
+      { id: "a", createdAt: "2026-09-24T08:00:00.000Z" },
+      { id: "b", createdAt: "2026-09-23T23:30:00.000Z" },
+      { id: "c", createdAt: "2026-09-23T10:00:00.000Z" },
+    ]);
+    expect(groups.map((group) => [group.day, group.items.map((item) => item.id)])).toEqual([
+      ["2026-09-24", ["a", "b"]],
+      ["2026-09-23", ["c"]],
+    ]);
   });
 });

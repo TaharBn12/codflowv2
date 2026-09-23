@@ -1,3 +1,9 @@
+import type {
+  ContactChannel,
+  ContactOutcome,
+  ContactSummary,
+} from "../../../../cod-shared/lib/order-contact";
+
 export const ORDER_STATUSES = [
   "new",
   "confirmed",
@@ -94,6 +100,8 @@ export interface OrderBase {
 export interface OrderListItem extends OrderBase {
   hasReview?: number;
   lastUpdatedBy?: string | null;
+  unansweredCallsToday?: number;
+  lastContactAt?: string | null;
 }
 
 export interface OrderDetail extends OrderBase {
@@ -319,4 +327,64 @@ export interface AbandonedStats {
   totalConverted: number;
   conversionRate: number;
   estimatedLostRevenue: number;
+}
+
+export type { ContactChannel, ContactOutcome, ContactSummary };
+
+export interface ContactAttempt {
+  id: string;
+  orderId: string;
+  channel: ContactChannel;
+  outcome: ContactOutcome;
+  note: string | null;
+  callbackAt: string | null;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface ContactAttemptsData {
+  attempts: ContactAttempt[];
+  summary: ContactSummary;
+}
+
+export interface ContactAttemptResult extends ContactAttemptsData {
+  attempt: ContactAttempt;
+  statusChanged: { from: OrderStatus; to: OrderStatus } | null;
+  callbackTaskId: string | null;
+}
+
+export type OrderActivityKind = "created" | "status" | "contact" | "note" | "event";
+
+export interface OrderActivityEntry {
+  id: string;
+  kind: OrderActivityKind;
+  action: string;
+  actorId: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  source: string | null;
+  createdAt: string;
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus | null;
+  channel: ContactChannel | null;
+  outcome: ContactOutcome | null;
+  note: string | null;
+  callbackAt: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface OrderActivityData {
+  order: {
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    phone: string;
+    status: OrderStatus;
+    orderType: OrderType;
+    createdAt: string;
+    confirmationAssigneeName: string | null;
+  };
+  summary: ContactSummary;
+  entries: OrderActivityEntry[];
 }
