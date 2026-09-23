@@ -1760,3 +1760,72 @@ export const dashboardReportConfig = sqliteTable("dashboard_report_config", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+// ─── Risk control & saved views (migration 0036) ──────────────────────────────
+
+/**
+ * Banned customers: phones and IPs that must never enter the confirmation
+ * queue again (serial returners, fraudulent COD, abusive callers).
+ *
+ * Membership is DERIVED, not copied: an order is "blacklisted" when its phone
+ * (or the shopper's IP) matches an `active` row here. Lifting a ban therefore
+ * stops flagging that customer's whole history at once, and no column has to
+ * be added to `orders`.
+ *
+ * `value` is the canonical match key — the local Algerian mobile form
+ * ("0551234567", the same shape orders.phone is validated into) for phones,
+ * the trimmed literal for IPs. `rawValue` keeps what the operator typed.
+ */
+export const customerBlacklist = sqliteTable("customer_blacklist", {
+  id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["phone", "ip"] }).notNull(),
+  value: text("value").notNull(),
+  rawValue: text("raw_value").notNull(),
+  reason: text("reason"),
+  status: text("status", { enum: ["active", "lifted"] }).notNull().default("active"),
+  /** Orders created while the entry was active — what the ban actually saved. */
+  hitCount: integer("hit_count").notNull().default(0),
+  lastHitAt: text("last_hit_at"),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  liftedAt: text("lifted_at"),
+  liftedBy: text("lifted_by").references(() => users.id, { onDelete: "set null" }),
+  liftedReason: text("lifted_reason"),
+}, (t) => ({
+  statusCreatedIdx: index("customer_blacklist_status_created_idx").on(t.status, t.createdAt),
+}));
+
+/**
+ * Named, shareable list state. Two shapes share one table because they are
+ * the same idea — "a saved answer to a question the merchant keeps asking":
+ *
+ *   kind = "orders-filter"   → filters + sortKey/sortDirection
+ *   kind = "export-template" → columns + headers (+ optional carrierId)
+ *
+ * Stored server-side rather than in localStorage so a view can be shared with
+ * the team (`shared = 1`) and survives a device or browser change.
+ */
+export const savedViews = sqliteTable("saved_views", {
+  id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["orders-filter", "export-template"] })
+    .notNull()
+    .default("orders-filter"),
+  name: text("name").notNull(),
+  ownerId: text("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** 0 = private to the owner, 1 = visible to everyone who can read orders. */
+  shared: integer("shared", { mode: "boolean" }).notNull().default(false),
+  /** JSON — the orders-list filter state. */
+  filters: text("filters").notNull().default("{}"),
+  sortKey: text("sort_key"),
+  sortDirection: text("sort_direction", { enum: ["asc", "desc"] }),
+  /** JSON array of export column keys, in carrier-file order. */
+  columns: text("columns"),
+  /** JSON map: column key → header text override. */
+  headers: text("headers"),
+  carrierId: text("carrier_id").references(() => deliveryCompanies.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => ({
+  ownerIdx: index("saved_views_owner_idx").on(t.kind, t.ownerId, t.updatedAt),
+  sharedIdx: index("saved_views_shared_idx").on(t.kind, t.shared, t.updatedAt),
+}));

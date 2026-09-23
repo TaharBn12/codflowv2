@@ -11,6 +11,10 @@ import { getPixelConfig } from "../../../../cod-shared/queries/pixel-config";
 import { resolveConversionForStage, getCapiWorkflowId } from "@/workflows/capi-helpers";
 import { stores } from "../../../../cod-shared/db/schema";
 import { eq } from "drizzle-orm";
+import {
+  findActiveBlacklistEntry,
+  recordBlacklistHit,
+} from "../../../../cod-shared/queries/blacklist";
 
 export async function getStoreConfig(c: Context<AppContext>) {
   const storeId = c.get("storeId")!;
@@ -223,6 +227,25 @@ export async function createStoreOrder(c: Context<AppContext>) {
     ipAddress,
     userAgent,
   });
+
+  // Blacklist enforcement. The order is created either way — a banned shopper's
+  // order is the evidence, and refusing it would only push them to another
+  // number — but the hit is counted on the ban so the merchant can see it
+  // working. Nothing about it reaches the shopper, and no activity-log row is
+  // written here: that log is per team member, and a storefront order has no
+  // actor. The ban's own hit_count / last_hit_at is this audit trail.
+  try {
+    const blacklistHit = await findActiveBlacklistEntry(db, {
+      phone: data.phone,
+      ip: ipAddress ?? null,
+    });
+    if (blacklistHit) await recordBlacklistHit(db, blacklistHit.id);
+  } catch (err) {
+    // Fail-open: the order is already placed and paid for in the customer's
+    // mind. Losing a hit counter is nothing next to losing a sale, so the
+    // lookup is allowed to fail loudly in the log and quietly in the response.
+    console.error("[blacklist] store order lookup failed:", err);
+  }
 
   // Meta CAPI conversion event at checkout — evaluated against merchant's tracking mode.
   // When mode is instant "Purchase", sends Purchase (matching the thank-you Pixel).

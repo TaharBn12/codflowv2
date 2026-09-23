@@ -191,6 +191,25 @@ const OrderBaseSchema = z.object({
 /**
  * Order list item - includes joins but not heavy nested arrays
  */
+/**
+ * Risk signals derived per row (migration 0036). Blacklist membership is looked
+ * up from `customer_blacklist` rather than stored on the order, so lifting a ban
+ * un-flags the customer's whole history immediately.
+ */
+const OrderRiskFields = {
+  blacklisted: z.number().int().optional().openapi({
+    description:
+      "1 when an active blacklist entry covers this order's phone, 0 otherwise. Derived at read time, never stored on the order.",
+  }),
+  blacklistReason: z.string().nullable().optional().openapi({
+    description: "Reason recorded on the active ban, when there is one.",
+  }),
+  duplicateCount: z.number().int().optional().openapi({
+    description:
+      "How many OTHER orders share this phone inside the duplicate window (default 48h). 1 = this order has a twin.",
+  }),
+};
+
 export const OrderListItemSchema = OrderBaseSchema.extend({
   hasReview: z.number().int().optional().openapi({
     description:
@@ -200,6 +219,7 @@ export const OrderListItemSchema = OrderBaseSchema.extend({
     description:
       "User ID of the last status-change actor. Included in list responses only (GET /api/orders).",
   }),
+  ...OrderRiskFields,
 }).openapi("OrderListItem", {
   description: "Order summary for list view - includes joins but not nested arrays",
 });
@@ -210,6 +230,7 @@ export const OrderListItemSchema = OrderBaseSchema.extend({
  * Full order detail - includes products and status history
  */
 export const OrderDetailSchema = OrderBaseSchema.extend({
+  ...OrderRiskFields,
   products: z.array(OrderProductSchema).optional().openapi({
     description: "Order line items. Included in GET /api/orders/{id} (detail view only).",
   }),

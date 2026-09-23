@@ -15,6 +15,7 @@ import { logActivity, ACTIONS } from "@/lib/activity";
 import { NotFoundError, BusinessLogicError, ValidationError } from "@/lib/errors/classes";
 import { ERROR_CODES, ERROR_CATEGORIES } from "../../../../cod-shared/errors/codes";
 import { shouldTriggerCapiPurchase, shouldTriggerCapiConfirmed, getCapiWorkflowId } from "@/workflows/capi-helpers";
+import { allowedOrderTransitions, canTransitionOrder } from "../../../../cod-shared/lib/order-status";
 
 /**
  * PATCH /orders/:id/status
@@ -41,23 +42,11 @@ export async function updateStatus(c: Context<AppContext>) {
     throw new NotFoundError("Order", orderId);
   }
 
-  // Guard: enforce valid forward transitions — prevents backward moves and invalid jumps
-  const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    new:              ["confirmed", "unreachable", "cancelled"],
-    confirmed:        ["preparing", "unreachable", "cancelled"],
-    unreachable:      ["confirmed", "cancelled"],
-    preparing:        ["ready", "cancelled"],
-    ready:            ["out_for_delivery", "dispatched", "cancelled"],
-    assigned:         ["out_for_delivery", "dispatched", "cancelled"],
-    dispatched:       ["out_for_delivery", "cancelled"],
-    out_for_delivery: ["delivered", "returned"],
-    delivered:        [],
-    returned:         [],
-    cancelled:        [],
-  };
-
-  const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
-  if (!allowed.includes(validated.status)) {
+  // Guard: enforce valid forward transitions — prevents backward moves and
+  // invalid jumps. The table itself lives in cod-shared/lib/order-status so the
+  // bulk endpoints and the dashboard apply exactly the same rule.
+  const allowed = allowedOrderTransitions(order.status);
+  if (!canTransitionOrder(order.status, validated.status)) {
     return c.json({
       error: `Cannot transition from "${order.status}" to "${validated.status}"`,
       code: "INVALID_STATUS_TRANSITION",
