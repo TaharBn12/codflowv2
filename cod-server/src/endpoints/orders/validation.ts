@@ -79,6 +79,19 @@ export const orderFiltersSchema = z.object({
   search: z.string().optional(),
   confirmationAssignment: z.enum(["assigned", "unassigned", "all"]).optional(),
   confirmerId: z.string().optional(),
+  /** Only rows that have a twin on the same phone inside the window. */
+  duplicatesOnly: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => value === "true")
+    .describe("true = only orders whose phone appears on another recent order"),
+  duplicateWindowHours: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(720)
+    .optional()
+    .describe("Rolling window for duplicate detection (default 48h)"),
   limit: z.coerce.number().int().positive().max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   cursor: z
@@ -102,6 +115,44 @@ export const bulkDispatchSchema = z.object({
   companyId: z.string().min(1),
   orderIds: z.array(z.string().min(1)).min(1).max(100, "Maximum 100 orders per bulk dispatch"),
 });
+
+/**
+ * POST /orders/bulk-cancel — cancel up to 100 orders in one call.
+ *
+ * The state machine still applies per order: an order that has already left for
+ * the customer (`out_for_delivery`) cannot be cancelled, and one rejection never
+ * aborts the rest of the batch. `reason` is written to the activity log so a
+ * mass cancellation stays explainable afterwards.
+ */
+export const bulkCancelSchema = z.object({
+  orderIds: z.array(z.string().min(1)).min(1).max(100, "Maximum 100 orders per bulk action"),
+  reason: z.string().trim().max(200).optional(),
+});
+
+/**
+ * POST /orders/bulk-delete — permanently delete up to 100 orders.
+ *
+ * `confirm: true` is required: deletion cascades to lines, shipments and status
+ * history and cannot be undone, so a caller has to say it means it.
+ */
+export const bulkDeleteSchema = z.object({
+  orderIds: z.array(z.string().min(1)).min(1).max(100, "Maximum 100 orders per bulk action"),
+  confirm: z.literal(true, { error: "Bulk delete requires confirm: true" }),
+});
+
+/** GET /orders/duplicates — phone groups with more than one recent order. */
+export const duplicatesQuerySchema = z.object({
+  windowHours: z.coerce.number().int().min(1).max(720).optional(),
+  /** Restrict to one number — the "is this customer already ordering?" check. */
+  phone: z.string().trim().min(6).max(25).optional(),
+  /** Comma-separated status filter, e.g. "new,confirmed". */
+  statuses: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+export type BulkCancelInput = z.infer<typeof bulkCancelSchema>;
+export type BulkDeleteInput = z.infer<typeof bulkDeleteSchema>;
+export type DuplicatesQueryInput = z.infer<typeof duplicatesQuerySchema>;
 
 export type BulkDispatchInput = z.infer<typeof bulkDispatchSchema>;
 

@@ -26,6 +26,19 @@ export const ACTIONS = {
   ORDER_CARRIER_SYNCED:    "order.carrier_synced",
   /** Bulk carrier tracking poll from the orders list. */
   ORDER_CARRIER_SYNC_BULK: "order.carrier_sync_bulk",
+  /** Bulk cancel from the orders list (one row per batch, counts in metadata). */
+  ORDER_CANCELLED_BULK:    "order.cancelled_bulk",
+  /** Bulk permanent delete from the orders list. */
+  ORDER_DELETED_BULK:      "order.deleted_bulk",
+  /** Spreadsheet import — one row per batch, per-row failures in metadata. */
+  ORDERS_IMPORTED:         "order.imported",
+
+  // Customer blacklist (banned phones / IPs)
+  BLACKLIST_ENTRY_ADDED:   "blacklist.entry_added",
+  BLACKLIST_ENTRY_LIFTED:  "blacklist.entry_lifted",
+  BLACKLIST_ENTRY_DELETED: "blacklist.entry_deleted",
+  /** An order was placed by a banned phone/IP — the ban earned its keep. */
+  BLACKLIST_HIT:           "blacklist.hit",
 
   // Customers
   CUSTOMER_CREATED:        "customer.created",

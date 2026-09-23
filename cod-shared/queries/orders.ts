@@ -35,6 +35,7 @@ import {
   like,
   or,
   sql,
+  inArray,
   getTableColumns,
   aliasedTable,
 } from "drizzle-orm";
@@ -42,6 +43,21 @@ import {
 const driversAlias = aliasedTable(drivers, "d");
 
 import { safeLikeTerm } from "./search";
+import {
+  blacklistReasonSubselect,
+  blacklistedFlag,
+  findActiveBlacklistEntry,
+  recordBlacklistHit,
+} from "./blacklist";
+import { toLocalAlgerianMobile } from "../lib/phone";
+
+/**
+ * How far back two orders may be placed and still count as "the same customer
+ * ordering twice". 48h is the Algerian COD reality: a shopper who re-orders the
+ * next day usually means it, one who places five orders in an afternoon does
+ * not — and a parcel already in the carrier's hands cannot be merged anyway.
+ */
+export const DUPLICATE_WINDOW_HOURS = 48;
 
 export interface OrderFilters {
   status?: (typeof orders.$inferSelect)["status"] | "all";
@@ -56,6 +72,10 @@ export interface OrderFilters {
   cursor?: string;
   confirmationAssignment?: "assigned" | "unassigned" | "all";
   confirmerId?: string;
+  /** Only rows with at least one other order on the same phone in the window. */
+  duplicatesOnly?: boolean;
+  /** Rolling window for duplicate detection. Defaults to 48h. */
+  duplicateWindowHours?: number;
 }
 
 export function encodeOrderCursor(createdAt: string, id: string): string {
@@ -117,6 +137,19 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
     );
   }
 
+  // ISO strings compare lexicographically, so a JS-computed cutoff needs no
+  // date arithmetic in SQL and still uses idx_orders_phone_created.
+  const windowHours = filters.duplicateWindowHours ?? DUPLICATE_WINDOW_HOURS;
+  const duplicateCutoff = new Date(
+    Date.now() - Math.max(1, windowHours) * 3_600_000,
+  ).toISOString();
+
+  if (filters.duplicatesOnly) {
+    conditions.push(
+      sql`EXISTS (SELECT 1 FROM orders dup WHERE dup.phone = ${orders.phone} AND dup.id <> ${orders.id} AND dup.created_at >= ${duplicateCutoff})`,
+    );
+  }
+
   let offset = filters.offset ?? 0;
   if (filters.cursor) {
     const after = parseOrderCursor(filters.cursor);
@@ -142,6 +175,14 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
       >`(SELECT by FROM order_status_history WHERE order_id = orders.id ORDER BY timestamp DESC LIMIT 1)`,
       confirmationAssigneeId: sql<string | null>`(SELECT assignee_id FROM order_confirmation_assignments WHERE order_id = orders.id LIMIT 1)`,
       confirmationAssigneeName: sql<string | null>`(SELECT u.name FROM order_confirmation_assignments ca JOIN users u ON u.id = ca.assignee_id WHERE ca.order_id = orders.id LIMIT 1)`,
+      // ── Risk signals, derived per row (all index-backed lookups) ──────────
+      // Blacklist membership is looked up rather than stored on the order, so
+      // lifting a ban un-flags the customer's whole history immediately.
+      blacklisted: blacklistedFlag(orders.phone),
+      blacklistReason: blacklistReasonSubselect(orders.phone),
+      // How many OTHER orders share this phone inside the rolling window —
+      // 1 means "there is a twin", which is what the row badge shows.
+      duplicateCount: sql<number>`(SELECT COUNT(*) FROM orders dup WHERE dup.phone = ${orders.phone} AND dup.id <> ${orders.id} AND dup.created_at >= ${duplicateCutoff})`,
     })
     .from(orders)
     .leftJoin(wilayas, eq(orders.wilayaId, wilayas.id))
@@ -155,6 +196,9 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
 }
 
 export async function getOrderById(db: AppDb, orderId: string) {
+  const detailDuplicateCutoff = new Date(
+    Date.now() - DUPLICATE_WINDOW_HOURS * 3_600_000,
+  ).toISOString();
   const order = await db
     .select({
       ...getTableColumns(orders),
@@ -166,6 +210,11 @@ export async function getOrderById(db: AppDb, orderId: string) {
       labelUrl: companyShipments.labelUrl,
       confirmationAssigneeId: sql<string | null>`(SELECT assignee_id FROM order_confirmation_assignments WHERE order_id = orders.id LIMIT 1)`,
       confirmationAssigneeName: sql<string | null>`(SELECT u.name FROM order_confirmation_assignments ca JOIN users u ON u.id = ca.assignee_id WHERE ca.order_id = orders.id LIMIT 1)`,
+      // Same derived risk signals as the list row — the detail page shows the
+      // ban banner and the "N other orders on this number" link.
+      blacklisted: blacklistedFlag(orders.phone),
+      blacklistReason: blacklistReasonSubselect(orders.phone),
+      duplicateCount: sql<number>`(SELECT COUNT(*) FROM orders dup WHERE dup.phone = ${orders.phone} AND dup.id <> ${orders.id} AND dup.created_at >= ${detailDuplicateCutoff})`,
     })
     .from(orders)
     .leftJoin(wilayas, eq(orders.wilayaId, wilayas.id))
@@ -208,6 +257,197 @@ export async function getOrderById(db: AppDb, orderId: string) {
   };
 }
 
+// ─── Duplicate detection ──────────────────────────────────────────────────────
+
+export interface DuplicateGroupOrder {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  createdAt: string;
+  customerName: string;
+  price: number;
+  deliveryFee: number;
+  wilaya: string | null;
+  commune: string | null;
+  /** First line's product — enough to tell "re-order" from "same basket twice". */
+  productName: string | null;
+  trackingNumber: string | null;
+}
+
+export interface DuplicateGroup {
+  phone: string;
+  count: number;
+  /** Every order in the group carries the same first product. */
+  sameProduct: boolean;
+  /** At least one order already left for the customer — merging is too late. */
+  shipped: boolean;
+  /** Total COD at risk if the whole group turns out to be one real order. */
+  totalCod: number;
+  lastCreatedAt: string;
+  orders: DuplicateGroupOrder[];
+}
+
+/**
+ * Orders placed twice by the same number inside a rolling window.
+ *
+ * Grouping is on the exact stored phone: both write paths (storefront and
+ * dashboard) validate into the canonical local form `0[567]XXXXXXXX`, so no
+ * normalization is needed in SQL and `idx_orders_phone_created` covers the
+ * scan. Two queries regardless of group count — the groups, then their members.
+ *
+ * `sameProduct` separates the two very different cases a merchant faces: the
+ * same basket ordered twice is almost always an accidental double submit (cancel
+ * one), while different products on the same number is a family sharing a phone
+ * (leave both alone).
+ */
+export async function findDuplicateOrderGroups(
+  db: AppDb,
+  opts: {
+    windowHours?: number;
+    /** Restrict to one number — the "is this customer already ordering?" check. */
+    phone?: string | null;
+    statuses?: OrderStatus[];
+    limit?: number;
+  } = {},
+): Promise<DuplicateGroup[]> {
+  const windowHours = opts.windowHours ?? DUPLICATE_WINDOW_HOURS;
+  const cutoff = new Date(
+    Date.now() - Math.max(1, windowHours) * 3_600_000,
+  ).toISOString();
+
+  const conditions = [sql`${orders.createdAt} >= ${cutoff}`];
+  if (opts.phone) {
+    const key = toLocalAlgerianMobile(opts.phone) ?? opts.phone.trim();
+    if (!key) return [];
+    conditions.push(eq(orders.phone, key));
+  }
+  if (opts.statuses?.length) {
+    conditions.push(inArray(orders.status, opts.statuses));
+  }
+  const where = and(...conditions);
+
+  const groups = await db
+    .select({
+      phone: orders.phone,
+      count: sql<number>`COUNT(*)`,
+      lastCreatedAt: sql<string>`MAX(${orders.createdAt})`,
+    })
+    .from(orders)
+    .where(where)
+    .groupBy(orders.phone)
+    .having(sql`COUNT(*) > 1`)
+    .orderBy(sql`COUNT(*) DESC`, sql`MAX(${orders.createdAt}) DESC`)
+    .limit(opts.limit ?? 50)
+    .all();
+
+  if (groups.length === 0) return [];
+
+  const rows = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      customerName: orders.customerName,
+      phone: orders.phone,
+      price: orders.price,
+      deliveryFee: orders.deliveryFee,
+      codAmount: orders.codAmount,
+      trackingNumber: orders.trackingNumber,
+      wilaya: wilayas.nameAr,
+      commune: communes.nameAr,
+      productName: sql<string | null>`(SELECT op.product_name FROM order_products op WHERE op.order_id = ${orders.id} ORDER BY op.created_at LIMIT 1)`,
+    })
+    .from(orders)
+    .leftJoin(wilayas, eq(orders.wilayaId, wilayas.id))
+    .leftJoin(communes, eq(orders.communeId, communes.id))
+    .where(and(inArray(orders.phone, groups.map((group) => group.phone)), where))
+    .orderBy(orders.phone, desc(orders.createdAt), desc(orders.id))
+    .all();
+
+  const byPhone = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const bucket = byPhone.get(row.phone);
+    if (bucket) bucket.push(row);
+    else byPhone.set(row.phone, [row]);
+  }
+
+  const SHIPPED: OrderStatus[] = [
+    "assigned",
+    "dispatched",
+    "out_for_delivery",
+    "delivered",
+  ];
+
+  return groups
+    .map((group) => {
+      const members = byPhone.get(group.phone) ?? [];
+      const productNames = members.map((member) => member.productName);
+      return {
+        phone: group.phone,
+        count: members.length,
+        sameProduct:
+          members.length > 1 &&
+          productNames.every((name) => name === productNames[0]),
+        shipped: members.some((member) => SHIPPED.includes(member.status)),
+        totalCod: members.reduce(
+          (sum, member) => sum + (member.codAmount ?? member.price + member.deliveryFee),
+          0,
+        ),
+        lastCreatedAt: group.lastCreatedAt,
+        orders: members.map((member) => ({
+          id: member.id,
+          orderNumber: member.orderNumber,
+          status: member.status,
+          createdAt: member.createdAt,
+          customerName: member.customerName,
+          price: member.price,
+          deliveryFee: member.deliveryFee,
+          wilaya: member.wilaya,
+          commune: member.commune,
+          productName: member.productName,
+          trackingNumber: member.trackingNumber,
+        })),
+      } satisfies DuplicateGroup;
+    })
+    .filter((group) => group.count > 1);
+}
+
+/**
+ * How many recent orders each of these phones already has — one query for a
+ * whole spreadsheet, so an import can warn "this customer ordered twice
+ * yesterday" without an N+1 lookup per row.
+ */
+export async function countRecentOrdersByPhone(
+  db: AppDb,
+  phones: string[],
+  windowHours: number = DUPLICATE_WINDOW_HOURS,
+): Promise<Map<string, number>> {
+  const keys = [
+    ...new Set(
+      phones
+        .map((phone) => toLocalAlgerianMobile(phone))
+        .filter((phone): phone is string => Boolean(phone)),
+    ),
+  ];
+  if (keys.length === 0) return new Map();
+
+  const cutoff = new Date(Date.now() - Math.max(1, windowHours) * 3_600_000).toISOString();
+  const rows = await db
+    .select({ phone: orders.phone, count: sql<number>`COUNT(*)` })
+    .from(orders)
+    .where(
+      and(
+        inArray(orders.phone, keys),
+        sql`${orders.createdAt} >= ${cutoff}`,
+      ),
+    )
+    .groupBy(orders.phone)
+    .all();
+
+  return new Map(rows.map((row) => [row.phone, Number(row.count)]));
+}
+
 export async function isAutomaticConfirmationAssignmentEnabled(db: AppDb) {
   const setting = await db.select({ enabled: operationAutomationSettings.autoAssignEnabled })
     .from(operationAutomationSettings).where(eq(operationAutomationSettings.id, "default")).get();
@@ -233,7 +473,14 @@ export async function createOrder(
   actor?: { id: string; name: string } | null,
 ) {
   const now = orderData.createdAt ?? new Date().toISOString();
-  const confirmer = orderData.status === "new" && (await isAutomaticConfirmationAssignmentEnabled(db))
+  // A banned number never enters the confirmation queue. The order is still
+  // recorded — the merchant wants the evidence and the eventual return stats —
+  // but it is left unassigned so no confirmer spends a call on it, and the hit
+  // is counted on the ban so its value stays visible.
+  const blacklistHit = orderData.status === "new"
+    ? await findActiveBlacklistEntry(db, { phone: orderData.phone ?? null })
+    : null;
+  const confirmer = !blacklistHit && orderData.status === "new" && (await isAutomaticConfirmationAssignmentEnabled(db))
     ? await chooseLeastLoadedConfirmer(db)
     : null;
   const statements: BatchStatement[] = [db.insert(orders).values(orderData)];
@@ -361,6 +608,10 @@ export async function createOrder(
   // fail (and roll back entirely) when stock is insufficient — no silent
   // floor-at-zero, no lost-update races.
   await db.batch(statements as [BatchStatement, ...BatchStatement[]]);
+
+  // Counted only after the batch commits: an order that rolled back (insufficient
+  // stock) never happened, so it must not inflate what the ban "saved".
+  if (blacklistHit) await recordBlacklistHit(db, blacklistHit.id, now);
 
   return orderData.id;
 }

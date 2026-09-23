@@ -17,6 +17,9 @@ import * as statusTransitions from "./status-transitions";
 import * as dispatch from "./dispatch";
 import * as shipmentOps from "./shipment-operations";
 import * as carrierSync from "./carrier-sync";
+import * as bulk from "./bulk";
+import * as duplicates from "./duplicates";
+import * as importer from "./import";
 
 import {
   createOrderSchema,
@@ -25,6 +28,9 @@ import {
   returnOrderProductSchema,
   orderFiltersSchema,
   bulkDispatchSchema,
+  bulkCancelSchema,
+  bulkDeleteSchema,
+  duplicatesQuerySchema,
 } from "./validation";
 
 import {
@@ -793,8 +799,261 @@ credentials, or the carrier returned no history for the tracking number.`,
   handler: carrierSync.syncOrderCarrierStatus,
 });
 
-// IMPORTANT: /bulk-dispatch must come before /{id} routes — otherwise
-// "bulk-dispatch" would be captured as an id param.
+// ─── Bulk cancel / delete, duplicates, spreadsheet import ─────────────────────
+
+const BulkRowResultSchema = z.object({
+  orderId: z.string(),
+  orderNumber: z.string().nullable(),
+  ok: z.boolean(),
+  outcome: z.enum(["cancelled", "deleted", "not_found", "invalid_transition", "error"]),
+  status: z.string().optional(),
+  error: z.string().optional(),
+  code: z.string().optional(),
+});
+
+const BulkTotalsSchema = z.object({
+  requested: z.number().int(),
+  ok: z.number().int(),
+  skipped: z.number().int(),
+  failed: z.number().int(),
+});
+
+const BulkActionDataSchema = z.object({
+  totals: BulkTotalsSchema,
+  results: z.array(BulkRowResultSchema),
+});
+
+const bulkCancelRoute = defineRoute({
+  method: "post",
+  path: "/bulk-cancel",
+  auth: { scope: SCOPES.ORDERS_DELETE },
+  tags: ["Orders"],
+  summary: "Cancel up to 100 orders",
+  description: `Cancels every selected order the status machine allows, through the same
+single-order transition used by \`PATCH /orders/{id}/status\` — so stock is
+restored, driver credit is reversed and the status history is written per order.
+
+An order that cannot be cancelled (already \`out_for_delivery\`, \`delivered\`,
+\`returned\`, or already \`cancelled\`) is reported as \`invalid_transition\` and
+never aborts the batch: HTTP 200 with \`totals.skipped > 0\` is the honest answer.
+
+\`reason\` is recorded on the batch's activity-log entry.`,
+  operationId: "bulkCancelOrders",
+  body: bulkCancelSchema,
+  responses: {
+    200: {
+      description: "Batch executed — per-order results and tally",
+      content: jsonContent(SuccessResponseSchema(BulkActionDataSchema)),
+    },
+  },
+  handler: bulk.bulkCancelOrders,
+});
+
+const bulkDeleteRoute = defineRoute({
+  method: "post",
+  path: "/bulk-delete",
+  auth: { scope: SCOPES.ORDERS_DELETE },
+  tags: ["Orders"],
+  summary: "Permanently delete up to 100 orders",
+  description: `Irreversible: each order cascades to its lines, shipments and status history,
+and customer/driver counters plus inventory are reversed by the same query the
+single-order DELETE uses.
+
+Requires \`confirm: true\` in the body — a mass delete should never happen by
+accident from a stray request.`,
+  operationId: "bulkDeleteOrders",
+  body: bulkDeleteSchema,
+  responses: {
+    200: {
+      description: "Batch executed — per-order results and tally",
+      content: jsonContent(SuccessResponseSchema(BulkActionDataSchema)),
+    },
+  },
+  handler: bulk.bulkDeleteOrders,
+});
+
+const DuplicateGroupOrderSchema = z.object({
+  id: z.string(),
+  orderNumber: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+  customerName: z.string(),
+  price: z.number(),
+  deliveryFee: z.number(),
+  wilaya: z.string().nullable(),
+  commune: z.string().nullable(),
+  productName: z.string().nullable(),
+  trackingNumber: z.string().nullable(),
+});
+
+const DuplicateGroupSchema = z.object({
+  phone: z.string(),
+  count: z.number().int(),
+  sameProduct: z.boolean(),
+  shipped: z.boolean(),
+  totalCod: z.number(),
+  lastCreatedAt: z.string(),
+  orders: z.array(DuplicateGroupOrderSchema),
+});
+
+const duplicatesRoute = defineRoute({
+  method: "get",
+  path: "/duplicates",
+  auth: { scope: SCOPES.ORDERS_READ },
+  tags: ["Orders"],
+  summary: "Detect duplicate orders by phone",
+  description: `Groups orders placed on the same phone number inside a rolling window
+(default 48h) and returns the orders behind each group.
+
+\`sameProduct\` separates the two cases that need opposite reactions: the same
+basket twice is almost always an accidental double submit (cancel one), while
+different products on one number is usually a family sharing a phone (leave both
+alone). \`shipped\` marks groups where at least one parcel already left — too late
+to merge.
+
+Confirmers are refused (403): a global duplicate list would expose every other
+confirmer's queue.`,
+  operationId: "listDuplicateOrders",
+  query: duplicatesQuerySchema,
+  responses: {
+    200: {
+      description: "Duplicate groups, biggest first",
+      content: jsonContent(
+        SuccessResponseSchema(
+          z.object({
+            windowHours: z.number().int(),
+            groups: z.array(DuplicateGroupSchema),
+            totalGroups: z.number().int(),
+            totalOrders: z.number().int(),
+            actionableCod: z.number(),
+          }),
+        ),
+      ),
+    },
+    403: { description: "Caller is a confirmer (sees only their own queue)" },
+  },
+  handler: duplicates.listDuplicateOrders,
+});
+
+const ImportRowIssueSchema = z.object({
+  row: z.number().int(),
+  field: z.string(),
+  code: z.string(),
+  severity: z.enum(["error", "warning"]),
+  message: z.string(),
+  value: z.string().optional(),
+});
+
+const ImportRowPreviewSchema = z.object({
+  row: z.number().int(),
+  valid: z.boolean(),
+  customerName: z.string().nullable(),
+  phone: z.string().nullable(),
+  wilayaId: z.number().int().nullable(),
+  wilaya: z.string().nullable(),
+  communeId: z.string().nullable(),
+  commune: z.string().nullable(),
+  address: z.string().nullable(),
+  productId: z.string().nullable(),
+  productName: z.string().nullable(),
+  variantLabel: z.string().nullable(),
+  quantity: z.number().int(),
+  price: z.number().nullable(),
+  deliveryFee: z.number().nullable(),
+  deliveryType: z.enum(["home", "stop_desk"]),
+  notes: z.string().nullable(),
+  externalReference: z.string().nullable(),
+  issues: z.array(ImportRowIssueSchema),
+});
+
+const ImportResultSchema = z.object({
+  dryRun: z.boolean(),
+  sheetName: z.string(),
+  sheetNames: z.array(z.string()),
+  truncated: z.boolean(),
+  headers: z.array(z.string()),
+  headerRow: z.number().int(),
+  mapping: z.object({
+    columns: z.record(z.string(), z.number().int()),
+    headers: z.record(z.string(), z.string()),
+    unmapped: z.array(z.object({ index: z.number().int(), header: z.string() })),
+    missingRequired: z.array(z.string()),
+  }),
+  totals: z.object({
+    rowsInSheet: z.number().int(),
+    parsed: z.number().int(),
+    valid: z.number().int(),
+    invalid: z.number().int(),
+    warnings: z.number().int(),
+    created: z.number().int(),
+    failed: z.number().int(),
+  }),
+  rows: z.array(ImportRowPreviewSchema),
+  failures: z.array(ImportRowIssueSchema).optional(),
+  createdOrders: z.array(
+    z.object({ row: z.number().int(), orderId: z.string(), orderNumber: z.string() }),
+  ),
+  nextOffset: z.number().int().nullable(),
+});
+
+const importRoute = defineRoute({
+  method: "post",
+  path: "/import",
+  auth: { scope: SCOPES.ORDERS_CREATE },
+  tags: ["Orders"],
+  summary: "Import orders from Excel / CSV / Google Sheets",
+  description: `Uploads a spreadsheet (.xlsx, .xls, .csv — a Google Sheet exported or
+published as either) and turns its rows into orders.
+
+**Two phases.** \`dryRun=true\` parses, auto-maps the header row, resolves wilayas,
+communes and catalog products, and reports every row's issues without writing
+anything. \`dryRun=false\` then creates orders for the valid rows in
+\`[offset, offset + limit)\` — paging keeps a large sheet inside one Worker
+invocation, and \`nextOffset\` tells the caller whether more pages remain.
+
+**Column detection** is by alias, in Arabic, French and English ("رقم الهاتف",
+"Téléphone", "Phone Number" all map to \`phone\`); pass \`mapping\` (JSON of
+field → column index) to override any guess the picker got wrong.
+
+**Rules.** The sheet's price wins over the catalog price (imported orders carry
+promo and negotiated totals). Rows whose product is not in the catalog are
+rejected unless \`fallbackProductId\` names one. Blacklisted phones and phones
+that already ordered recently come back as warnings, not errors — the merchant
+decides.`,
+  operationId: "importOrders",
+  bodyContent: {
+    "multipart/form-data": {
+      schema: z.object({
+        file: z.instanceof(File).openapi({ type: "string", format: "binary" }),
+        dryRun: z.string().optional().openapi({ example: "true" }),
+        offset: z.string().optional().openapi({ example: "0" }),
+        limit: z.string().optional().openapi({ example: "100", description: "Max 100 rows created per call" }),
+        orderType: z.string().optional().openapi({ example: "offline", description: "offline (default) or online" }),
+        fallbackProductId: z.string().optional(),
+        sheetName: z.string().optional(),
+        mapping: z.string().optional().openapi({ description: 'JSON object of field → column index, e.g. {"phone":3}' }),
+      }),
+    },
+  },
+  responses: {
+    200: {
+      description: "Preview (dryRun) or creation report",
+      content: jsonContent(SuccessResponseSchema(ImportResultSchema)),
+    },
+    400: {
+      description:
+        "Missing file, unsupported type, unreadable workbook, empty sheet (INVALID_FILE_TYPE / REQUIRED_FIELD_MISSING / INVALID_FORMAT)",
+    },
+    422: {
+      description: "A required column could not be detected — the response still carries the headers and mapping so the caller can fix it",
+    },
+  },
+  handler: importer.importOrders,
+});
+
+// IMPORTANT: every static path (/bulk-dispatch, /bulk-cancel, /bulk-delete,
+// /duplicates, /import) must come before the /{id} routes — otherwise the
+// literal segment would be captured as an id param.
 const router = new OpenAPIHono<AppContext>();
 
 // Return 404 for every direct read or mutation of another confirmer's order.
@@ -813,6 +1072,10 @@ router.use("/:id/*", requireConfirmerOwnership);
 router.openapi(listOrdersRoute.route, listOrdersRoute.handler);
 router.openapi(bulkDispatchRoute.route, bulkDispatchRoute.handler);
 router.openapi(bulkSyncCarrierRoute.route, bulkSyncCarrierRoute.handler);
+router.openapi(bulkCancelRoute.route, bulkCancelRoute.handler);
+router.openapi(bulkDeleteRoute.route, bulkDeleteRoute.handler);
+router.openapi(duplicatesRoute.route, duplicatesRoute.handler);
+router.openapi(importRoute.route, importRoute.handler);
 
 router.openapi(getOrderRoute.route, getOrderRoute.handler);
 router.openapi(createOrderRoute.route, createOrderRoute.handler);
