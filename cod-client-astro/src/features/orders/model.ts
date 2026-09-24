@@ -519,3 +519,70 @@ export function whatsappLink(phone: string, message?: string): string | null {
   const query = message ? `?text=${encodeURIComponent(message)}` : "";
   return `https://wa.me/${number}${query}`;
 }
+
+// ─── Order routes (root SPA fallback) ────────────────────────────────────────
+
+export type OrderRoute =
+  | { kind: "detail"; id: string }
+  | { kind: "activity"; id: string }
+  | { kind: "none" };
+
+const STATIC_ORDER_PAGES = new Set(["new", "abandoned"]);
+
+export function parseOrderRoute(pathname: string): OrderRoute {
+  const match = pathname.match(/^\/orders\/([^/]+)(?:\/(activity))?\/?$/);
+  if (!match || STATIC_ORDER_PAGES.has(match[1])) return { kind: "none" };
+  let id: string;
+  try {
+    id = decodeURIComponent(match[1]);
+  } catch {
+    return { kind: "none" };
+  }
+  return match[2] === "activity" ? { kind: "activity", id } : { kind: "detail", id };
+}
+
+export function orderActivityHref(orderId: string): string {
+  return `/orders/${encodeURIComponent(orderId)}/activity`;
+}
+
+// ─── Confirmer contact log ───────────────────────────────────────────────────
+
+export function canLogContact(status: OrderStatus): boolean {
+  return !isTerminalStatus(status);
+}
+
+export function toCallbackIso(localValue: string): string | null {
+  if (!localValue) return null;
+  const date = new Date(localValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function toLocalInputValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function defaultCallbackInput(now: Date = new Date()): string {
+  const next = new Date(now.getTime() + 60 * 60 * 1000);
+  next.setMinutes(next.getMinutes() < 30 ? 30 : 60, 0, 0);
+  return toLocalInputValue(next);
+}
+
+export function algeriaDayKey(iso: string): string {
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) return "";
+  return new Date(time + 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export function groupByAlgeriaDay<T extends { createdAt: string }>(
+  items: readonly T[],
+): Array<{ day: string; items: T[] }> {
+  const groups: Array<{ day: string; items: T[] }> = [];
+  for (const item of items) {
+    const day = algeriaDayKey(item.createdAt);
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.items.push(item);
+    else groups.push({ day, items: [item] });
+  }
+  return groups;
+}

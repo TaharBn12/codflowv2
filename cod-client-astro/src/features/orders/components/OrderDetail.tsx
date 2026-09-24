@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, History, X } from "lucide-react";
 import {
   canScope,
   useIdentity,
@@ -9,6 +9,7 @@ import { OrderStatusBadge } from "@/features/orders/components/OrderStatusBadge"
 import {
   Alert,
   Button,
+  LinkButton,
   PageHeader,
   useConfirmDialog,
 } from "@/components/ui";
@@ -34,6 +35,7 @@ import {
   canDispatchOrder,
   detailStatusActions,
   dispatchFieldSupport,
+  orderActivityHref,
   orderStatusFlow,
   shipmentCapabilities,
   shipmentUpdateFieldSupport,
@@ -50,6 +52,8 @@ import { OrderDeliveryCard } from "@/features/orders/components/OrderDeliveryCar
 import { OrderStatusTimelineCard } from "@/features/orders/components/OrderStatusTimelineCard";
 import { OrderShipmentActionsCard } from "@/features/orders/components/OrderShipmentActionsCard";
 import { OrderMobileActionBar } from "@/features/orders/components/OrderMobileActionBar";
+import { OrderContactCard } from "@/features/orders/components/OrderContactCard";
+import { OrderNoteCard } from "@/features/orders/components/OrderNoteCard";
 
 export function OrderDetail({ orderId }: { orderId: string }) {
   const t = useT("orders");
@@ -299,6 +303,10 @@ export function OrderDetail({ orderId }: { orderId: string }) {
               status={effectiveStatus ?? order.status}
               webhook={order.statusHistory[0]?.by?.startsWith("webhook:")}
             />
+            <LinkButton href={orderActivityHref(order.id)} variant="secondary" size="sm">
+              <History size={14} aria-hidden="true" />
+              {t("activity.open")}
+            </LinkButton>
             {canScope(identity, "orders:delete") &&
               canDeleteOrderFromDetail(effectiveStatus ?? order.status) && (
                 <Button
@@ -325,6 +333,11 @@ export function OrderDetail({ orderId }: { orderId: string }) {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <OrderCustomerCard order={order} />
+          <OrderContactCard
+            order={{ ...order, status: effectiveStatus ?? order.status }}
+            canUpdate={canScope(identity, "orders:update")}
+            onStatusChanged={load}
+          />
           <OrderProductsCard order={order} locale={locale} />
           <OrderDeliveryCard
             order={order}
@@ -395,6 +408,7 @@ export function OrderDetail({ orderId }: { orderId: string }) {
             }
             onFetchTracking={fetchTracking}
           />
+          {canScope(identity, "orders:update") && <OrderNoteCard orderId={order.id} />}
         </div>
       </div>
 

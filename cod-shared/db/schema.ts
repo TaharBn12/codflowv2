@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, real, uniqueIndex, index, primaryKey } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import { CONTACT_CHANNELS, CONTACT_OUTCOMES } from "../lib/order-contact";
 
 const authNow = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
 
@@ -564,6 +565,18 @@ export const adminApprovalRequests = sqliteTable("admin_approval_requests", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (t) => ({ statusExpiryIdx: index("admin_approvals_status_expiry_idx").on(t.status, t.expiresAt) }));
+
+export const orderContactAttempts = sqliteTable("order_contact_attempts", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  channel: text("channel", { enum: CONTACT_CHANNELS }).notNull(),
+  outcome: text("outcome", { enum: CONTACT_OUTCOMES }).notNull(),
+  note: text("note"),
+  callbackAt: text("callback_at"),
+  createdBy: text("created_by").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (t) => ({ orderCreatedIdx: index("order_contact_attempts_order_created_idx").on(t.orderId, t.createdAt) }));
 
 export const orderConfirmationAssignments = sqliteTable("order_confirmation_assignments", {
   orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),

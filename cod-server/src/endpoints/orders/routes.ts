@@ -17,6 +17,7 @@ import * as statusTransitions from "./status-transitions";
 import * as dispatch from "./dispatch";
 import * as shipmentOps from "./shipment-operations";
 import * as carrierSync from "./carrier-sync";
+import * as contact from "./contact";
 
 import {
   createOrderSchema,
@@ -25,6 +26,8 @@ import {
   returnOrderProductSchema,
   orderFiltersSchema,
   bulkDispatchSchema,
+  contactAttemptSchema,
+  orderNoteSchema,
 } from "./validation";
 
 import {
@@ -41,6 +44,10 @@ import {
   BulkDispatchResultItemSchema,
   ReturnProductDataSchema,
   CarrierRecordsArraySchema,
+  ContactAttemptsDataSchema,
+  ContactAttemptCreatedDataSchema,
+  OrderNoteDataSchema,
+  OrderActivityDataSchema,
 } from "@/openapi/schemas";
 
 const jsonContent = <T extends z.ZodType>(schema: T) => ({
@@ -254,6 +261,99 @@ Rejected with 422 while the overall order is already \`returned\` or \`cancelled
     },
   },
   handler: handlers.returnOrderProduct,
+});
+
+// ─── Confirmer contact & order activity ───────────────────────────────────────
+
+const listContactAttemptsRoute = defineRoute({
+  method: "get",
+  path: "/{id}/contact-attempts",
+  auth: { scope: SCOPES.ORDERS_READ },
+  tags: ["Orders"],
+  summary: "List contact attempts",
+  description: `Calls and messages the confirmation agent logged against this order, newest first, plus a summary with today's unanswered-call counter (Algeria time).
+
+Confirmers only see orders assigned to them (404 otherwise).`,
+  operationId: "listOrderContactAttempts",
+  params: IdParamSchema,
+  responses: {
+    200: {
+      description: "Contact attempts with the daily summary",
+      content: jsonContent(SuccessResponseSchema(ContactAttemptsDataSchema)),
+    },
+  },
+  handler: contact.listContactAttempts,
+});
+
+const createContactAttemptRoute = defineRoute({
+  method: "post",
+  path: "/{id}/contact-attempts",
+  auth: { scope: SCOPES.ORDERS_UPDATE },
+  tags: ["Orders"],
+  summary: "Log a contact attempt",
+  description: `Records one call or message outcome and writes it to the order activity log.
+
+**Outcomes:** calls use \`no_answer\`, \`busy\`, \`switched_off\`, \`wrong_number\`, \`answered\`, \`callback_requested\`; WhatsApp/SMS use \`message_sent\`.
+
+**Daily limit:** at most 3 unanswered calls (\`no_answer\`, \`busy\`, \`switched_off\`, \`wrong_number\`) per order per Algeria day — the 4th returns \`422 CONTACT_LIMIT_REACHED\` with \`resetsAt\`. The check and the insert run as one guarded statement, so concurrent requests cannot exceed the limit. Messages and answered calls are never limited.
+
+**Side effects:**
+- \`no_answer\` / \`busy\` / \`switched_off\` on a \`new\` order moves it to \`unreachable\` (logged as a status change)
+- \`callback_requested\` requires \`callbackAt\` (within 30 days) and opens a high-priority \`callback\` task for the assigned confirmer
+- \`answered\` / \`callback_requested\` completes any open callback task
+
+Rejected with 422 on delivered, returned, or cancelled orders.`,
+  operationId: "createOrderContactAttempt",
+  params: IdParamSchema,
+  body: contactAttemptSchema,
+  responses: {
+    201: {
+      description: "Attempt recorded",
+      content: jsonContent(SuccessWithMessageSchema(ContactAttemptCreatedDataSchema)),
+    },
+    400: { description: "Invalid channel/outcome combination or callback time (VALIDATION_FAILED)" },
+    422: { description: "Daily unanswered-call limit reached (CONTACT_LIMIT_REACHED) or order closed" },
+  },
+  handler: contact.createContactAttempt,
+});
+
+const addOrderNoteRoute = defineRoute({
+  method: "post",
+  path: "/{id}/notes",
+  auth: { scope: SCOPES.ORDERS_UPDATE },
+  tags: ["Orders"],
+  summary: "Add an internal note",
+  description: "Adds a team-only note to the order activity log (never sent to the carrier or the customer).",
+  operationId: "addOrderNote",
+  params: IdParamSchema,
+  body: orderNoteSchema,
+  responses: {
+    201: {
+      description: "Note added",
+      content: jsonContent(SuccessWithMessageSchema(OrderNoteDataSchema)),
+    },
+  },
+  handler: contact.addOrderNote,
+});
+
+const getOrderActivityRoute = defineRoute({
+  method: "get",
+  path: "/{id}/activity",
+  auth: { scope: SCOPES.ORDERS_READ },
+  tags: ["Orders"],
+  summary: "Get the order activity log",
+  description: `Full chronological log of one order, newest first: creation, every status change (users, carrier webhooks, carrier sync), contact attempts, internal notes, driver assignment, dispatch and shipment actions.
+
+Readable by anyone with \`orders:read\`; confirmers only for orders assigned to them.`,
+  operationId: "getOrderActivity",
+  params: IdParamSchema,
+  responses: {
+    200: {
+      description: "Order activity log",
+      content: jsonContent(SuccessResponseSchema(OrderActivityDataSchema)),
+    },
+  },
+  handler: contact.getOrderActivity,
 });
 
 // ─── Carrier dispatch ─────────────────────────────────────────────────────────
@@ -832,5 +932,9 @@ router.openapi(getRemarksRoute.route, getRemarksRoute.handler);
 router.openapi(getTrackingRoute.route, getTrackingRoute.handler);
 router.openapi(proxyLabelRoute.route, proxyLabelRoute.handler);
 router.openapi(syncOrderCarrierRoute.route, syncOrderCarrierRoute.handler);
+router.openapi(listContactAttemptsRoute.route, listContactAttemptsRoute.handler);
+router.openapi(createContactAttemptRoute.route, createContactAttemptRoute.handler);
+router.openapi(addOrderNoteRoute.route, addOrderNoteRoute.handler);
+router.openapi(getOrderActivityRoute.route, getOrderActivityRoute.handler);
 
 export default router;

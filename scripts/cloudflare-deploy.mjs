@@ -10,7 +10,9 @@
  *   3. Bind real IDs into cod-server/wrangler.toml + cod-client-astro/wrangler.toml
  *      (+ unique worker names, root .env, dashboard .env, .dev.vars files)
  *   4. Generate secrets (BETTER_AUTH_SECRET, MCP_LOGIN_TICKET_SECRET, STORE_API_KEY)
- *   5. Migrate + seed remote D1, seed admin user
+ *   5. Migrate remote D1 (before any worker deploy, so new code never runs
+ *      against an old schema), then seed + seed admin user after the first
+ *      server deploy
  *   6. Deploy server → dashboard → storefront theme, wire real URLs, redeploy,
  *      smoke-test every worker
  *   7. Print resource inventory + write credentials file (chmod 600) to $HOME
@@ -698,6 +700,15 @@ async function main() {
     return;
   }
 
+  // ── Step 5 — migrate ─────────────────────────────────────────────────────
+  if (!CFG.deployOnly || !CFG.skipMigrations) {
+    step(CFG.deployOnly ? "Migrate D1 (remote — idempotent)" : "Migrate D1 (remote)");
+    sh("npm", ["run", "db:migrate:local"], { cwd: SERVER_DIR, stdio: "inherit" });
+    sh("npm", ["run", "db:migrate:remote"], { cwd: SERVER_DIR, stdio: "inherit" });
+  } else {
+    info("--deploy-only + --skip-migrations: D1 left completely untouched.");
+  }
+
   // ── Step 6a — deploy server ──────────────────────────────────────────────
   step("Deploy cod-server");
   let out = sh("npx", ["wrangler", "deploy"], { cwd: SERVER_DIR, label: "wrangler deploy (cod-server)" });
@@ -738,15 +749,9 @@ async function main() {
     info("--deploy-only: skipping server secret puts — existing values stay.");
   }
 
-  // ── Step 5 — migrate + seed ──────────────────────────────────────────────
-  if (!CFG.deployOnly || !CFG.skipMigrations) {
-    step(CFG.deployOnly ? "Migrate D1 (remote — idempotent)" : "Migrate + seed D1 (remote)");
-    sh("npm", ["run", "db:migrate:local"], { cwd: SERVER_DIR, stdio: "inherit" });
-    sh("npm", ["run", "db:migrate:remote"], { cwd: SERVER_DIR, stdio: "inherit" });
-  } else {
-    info("--deploy-only + --skip-migrations: D1 left completely untouched.");
-  }
+  // ── Step 5b — seed ───────────────────────────────────────────────────────
   if (!CFG.deployOnly) {
+  step("Seed D1 (remote)");
   if (!CFG.skipSeed) {
     let productCount = -1;
     if (!CFG.forceReseed) {
