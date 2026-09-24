@@ -55,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- deploy: `scripts/cloudflare-deploy.mjs` (both the "Deploy to Cloudflare" and
+  "Deploy update (workers only)" workflows) now applies remote D1 migrations
+  before the first `wrangler deploy` of cod-server. Previously the new Worker
+  went live first and the migration ran afterwards, so a release that adds a
+  table (e.g. migration 0036) served 500s on the affected endpoints for that
+  window — or indefinitely if the migration step then failed
 - delivery: Yalidine webhook signature verification implemented (HMAC-SHA256
   over raw body, hex digest, constant-time compare) — previously a TODO that
   accepted unsigned events

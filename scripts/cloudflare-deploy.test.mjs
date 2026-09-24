@@ -71,3 +71,16 @@ test("bucketInfoSaysExists recognises `r2 bucket info` output (labelled or JSON)
   assert.equal(bucketInfoSaysExists("name: bucket.with.dots\n", "bucket.with.dots"), true);
   assert.equal(bucketInfoSaysExists("name: bucketXwithXdots\n", "bucket.with.dots"), false);
 });
+
+test("remote D1 migrations run before the first cod-server deploy", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("./cloudflare-deploy.mjs", import.meta.url), "utf8");
+  const main = src.slice(src.indexOf("async function main()"));
+  const migrate = main.indexOf('sh("npm", ["run", "db:migrate:remote"]');
+  const firstServerDeploy = main.indexOf('label: "wrangler deploy (cod-server)"');
+  const seed = main.indexOf('sh("npm", ["run", "db:seed:remote"]');
+  assert.ok(migrate > 0 && firstServerDeploy > 0 && seed > 0);
+  assert.ok(migrate < firstServerDeploy);
+  assert.ok(migrate < seed);
+  assert.equal(main.split('"db:migrate:remote"').length - 1, 1);
+});
