@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { CompanyCredentialsFormCard } from "@/features/delivery/components/CompanyCredentialsFormCard";
 import { CompanyCredentialsSidebar } from "@/features/delivery/components/CompanyCredentialsSidebar";
+import { CompanyAutoSyncCard } from "@/features/delivery/components/CompanyAutoSyncCard";
 import { CompanyWebhookSetupCard } from "@/features/delivery/components/CompanyWebhookSetupCard";
 import { CompanyZrWebhookCard } from "@/features/delivery/components/CompanyZrWebhookCard";
 import { notify } from "@/lib/notify";
@@ -299,6 +300,12 @@ export function CompanyCredentialsDetail({ providerCode }: { providerCode: strin
           onSaved={() => void load()}
         />
       )}
+
+      <CompanyAutoSyncCard
+        company={company}
+        canManage={canManage}
+        onChanged={() => void load()}
+      />
     </div>
   );
 }

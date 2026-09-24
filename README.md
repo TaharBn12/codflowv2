@@ -90,6 +90,9 @@ CodFlow v1.1.0 — here's what works today:
 
 ### Merchant Dashboard (`cod-client-astro`)
 - ✅ Order management with full COD lifecycle tracking
+- ✅ Orders list: bulk status/driver assignment, CSV export with a column picker, per-row SLA indicator, and `tel:`/WhatsApp quick contact
+- ✅ Confirmer contact log: one-tap call outcomes (no answer, busy, phone off, wrong number, answered, call back later) plus "message sent" via WhatsApp/SMS, a server-enforced limit of 3 unanswered calls per order per day (Algeria time), scheduled callbacks that create tasks, and internal notes
+- ✅ Order log page (`/orders/<id>/activity`): creation, every status change (users, carrier webhooks, carrier sync), contact attempts, notes, confirmer/driver assignment, and shipment actions in one timeline
 - ✅ Product catalog with multi-attribute variants (size, color, SKU) and image uploads
 - ✅ Inventory tracking with low-stock alerts and adjustment history
 - ✅ Promotion engine (Buy X Get Y, free shipping rules)
@@ -109,6 +112,7 @@ CodFlow v1.1.0 — here's what works today:
 - ✅ 4 Algerian carriers + EcoTrack (80+ couriers behind one API)
 - ✅ One-click shipment creation with printable labels
 - ✅ Real-time webhook tracking (Yalidine, ZR Express with HMAC verification)
+- ✅ Carrier status auto-sync — a `*/15` cron polls every connected carrier's tracking API for shipped orders, with per-company interval, run history, and manual sync per order or per company
 - ✅ Carrier delivery-zone name sync — dispatches carry the carrier's exact wilaya/commune spellings (Yalidine)
 - ✅ Dispatch-time delivery-type switching (home ⇄ stop desk) with wilaya-scoped desk picking
 - ✅ Webhook event log with per-event outcomes (applied / ignored / unmapped / error) per carrier

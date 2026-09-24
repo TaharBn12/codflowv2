@@ -2,10 +2,17 @@ import { apiFetch, apiFetchBlob } from "@/lib/api";
 import type {
   AbandonedOrder,
   AbandonedStats,
+  BulkCarrierSyncResult,
   Commune,
+  ContactAttemptResult,
+  ContactAttemptsData,
+  ContactChannel,
+  ContactOutcome,
   Customer,
   DeliveryCompany,
   Driver,
+  OrderActivityData,
+  OrderCarrierSyncResult,
   OrderDetail,
   OrderListItem,
   Product,
@@ -89,6 +96,25 @@ export function addShipmentRemark(id: string, content: string) {
   return apiFetch<DataEnvelope<null>>(`/api/orders/${encodeURIComponent(id)}/add-remark`, json({ method: "POST", body: JSON.stringify({ content }) }));
 }
 
+export async function listContactAttempts(id: string) {
+  return (await apiFetch<DataEnvelope<ContactAttemptsData>>(`/api/orders/${encodeURIComponent(id)}/contact-attempts`)).data;
+}
+
+export async function logContactAttempt(
+  id: string,
+  body: { channel: ContactChannel; outcome: ContactOutcome; note?: string | null; callbackAt?: string | null },
+) {
+  return (await apiFetch<DataEnvelope<ContactAttemptResult>>(`/api/orders/${encodeURIComponent(id)}/contact-attempts`, json({ method: "POST", body: JSON.stringify(body) }))).data;
+}
+
+export async function addOrderNote(id: string, note: string) {
+  return (await apiFetch<DataEnvelope<{ id: string; note: string; createdAt: string }>>(`/api/orders/${encodeURIComponent(id)}/notes`, json({ method: "POST", body: JSON.stringify({ note }) }))).data;
+}
+
+export async function getOrderActivity(id: string) {
+  return (await apiFetch<DataEnvelope<OrderActivityData>>(`/api/orders/${encodeURIComponent(id)}/activity`)).data;
+}
+
 export async function getTracking(id: string) {
   return (await apiFetch<DataEnvelope<Array<Record<string, unknown>>>>(`/api/orders/${encodeURIComponent(id)}/tracking-events`)).data;
 }
@@ -165,4 +191,31 @@ export function updateAbandonedStatus(id: string, status: string) {
 
 export function deleteAbandonedOrder(id: string) {
   return apiFetch<DataEnvelope<null>>(`/api/abandoned-orders/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// ─── Carrier status auto-sync ────────────────────────────────────────────────
+
+/** Poll the carrier for one order and apply what it reports (throttle bypassed). */
+export async function syncOrderCarrierStatus(id: string) {
+  return (
+    await apiFetch<DataEnvelope<OrderCarrierSyncResult>>(
+      `/api/orders/${encodeURIComponent(id)}/sync-carrier`,
+      { method: "POST" },
+    )
+  ).data;
+}
+
+/** Poll the carrier for a selection, or sweep everything currently due. */
+export async function bulkSyncCarrierStatuses(body: {
+  orderIds?: string[];
+  companyId?: string;
+  force?: boolean;
+  limit?: number;
+} = {}) {
+  return (
+    await apiFetch<DataEnvelope<BulkCarrierSyncResult>>(
+      "/api/orders/bulk-sync-carrier",
+      json({ method: "POST", body: JSON.stringify(body) }),
+    )
+  ).data;
 }

@@ -414,3 +414,175 @@ export function filterAbandonedOrders(
     return true;
   });
 }
+
+// ─── SLA indicator ───────────────────────────────────────────────────────────
+
+/**
+ * How long an order may sit in a state before the row turns red.
+ * Hours for the confirmation stage (the merchant's own clock), days for the
+ * carrier stage (once it is out for delivery the clock is the courier's).
+ */
+export const SLA_THRESHOLDS = {
+  newHours: 12,
+  outForDeliveryDays: 3,
+} as const;
+
+export type SlaLevel = "ok" | "warn" | "breach";
+
+export interface OrderSla {
+  level: SlaLevel;
+  /** "new" | "out_for_delivery" | null — which clock is running. */
+  stage: "new" | "out_for_delivery" | null;
+  hours: number;
+  days: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * SLA state for an orders-list row. Only the two states the merchant can act
+ * on are timed: an unconfirmed "new" order and a parcel stuck out for
+ * delivery. Everything else is "ok" — a warning on a state nobody owns is
+ * noise, not a signal.
+ */
+export function orderSla(
+  order: Pick<OrderListItem, "status" | "createdAt">,
+  now: number = Date.now(),
+  thresholds: { newHours?: number; outForDeliveryDays?: number } = {},
+): OrderSla {
+  const newHours = thresholds.newHours ?? SLA_THRESHOLDS.newHours;
+  const outForDeliveryDays =
+    thresholds.outForDeliveryDays ?? SLA_THRESHOLDS.outForDeliveryDays;
+
+  const created = Date.parse(order.createdAt);
+  if (Number.isNaN(created)) {
+    return { level: "ok", stage: null, hours: 0, days: 0 };
+  }
+
+  const elapsedMs = Math.max(0, now - created);
+  const hours = Math.floor(elapsedMs / 3_600_000);
+  const days = Math.floor(elapsedMs / DAY_MS);
+
+  if (order.status === "new") {
+    return {
+      level: hours >= newHours ? "breach" : hours >= newHours / 2 ? "warn" : "ok",
+      stage: "new",
+      hours,
+      days,
+    };
+  }
+
+  if (order.status === "out_for_delivery") {
+    return {
+      level:
+        days >= outForDeliveryDays
+          ? "breach"
+          : days >= Math.max(1, outForDeliveryDays - 1)
+            ? "warn"
+            : "ok",
+      stage: "out_for_delivery",
+      hours,
+      days,
+    };
+  }
+
+  return { level: "ok", stage: null, hours, days };
+}
+
+// ─── Quick contact ───────────────────────────────────────────────────────────
+
+/**
+ * Algerian numbers are stored locally ("0551234567"). wa.me and tel: both need
+ * the international form, so the leading 0 becomes +213. Numbers already in
+ * international form are passed through untouched.
+ */
+export function toInternationalPhone(phone: string): string | null {
+  const digits = phone.replace(/[^\d+]/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("+")) return digits;
+  if (digits.startsWith("00")) return `+${digits.slice(2)}`;
+  if (digits.startsWith("0") && digits.length === 10) return `+213${digits.slice(1)}`;
+  if (digits.startsWith("213")) return `+${digits}`;
+  return null;
+}
+
+export function telLink(phone: string): string | null {
+  const international = toInternationalPhone(phone);
+  return international ? `tel:${international}` : null;
+}
+
+/** wa.me takes the number without "+" and the message URL-encoded. */
+export function whatsappLink(phone: string, message?: string): string | null {
+  const international = toInternationalPhone(phone);
+  if (!international) return null;
+  const number = international.replace("+", "");
+  const query = message ? `?text=${encodeURIComponent(message)}` : "";
+  return `https://wa.me/${number}${query}`;
+}
+
+// ─── Order routes (root SPA fallback) ────────────────────────────────────────
+
+export type OrderRoute =
+  | { kind: "detail"; id: string }
+  | { kind: "activity"; id: string }
+  | { kind: "none" };
+
+const STATIC_ORDER_PAGES = new Set(["new", "abandoned"]);
+
+export function parseOrderRoute(pathname: string): OrderRoute {
+  const match = pathname.match(/^\/orders\/([^/]+)(?:\/(activity))?\/?$/);
+  if (!match || STATIC_ORDER_PAGES.has(match[1])) return { kind: "none" };
+  let id: string;
+  try {
+    id = decodeURIComponent(match[1]);
+  } catch {
+    return { kind: "none" };
+  }
+  return match[2] === "activity" ? { kind: "activity", id } : { kind: "detail", id };
+}
+
+export function orderActivityHref(orderId: string): string {
+  return `/orders/${encodeURIComponent(orderId)}/activity`;
+}
+
+// ─── Confirmer contact log ───────────────────────────────────────────────────
+
+export function canLogContact(status: OrderStatus): boolean {
+  return !isTerminalStatus(status);
+}
+
+export function toCallbackIso(localValue: string): string | null {
+  if (!localValue) return null;
+  const date = new Date(localValue);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function toLocalInputValue(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function defaultCallbackInput(now: Date = new Date()): string {
+  const next = new Date(now.getTime() + 60 * 60 * 1000);
+  next.setMinutes(next.getMinutes() < 30 ? 30 : 60, 0, 0);
+  return toLocalInputValue(next);
+}
+
+export function algeriaDayKey(iso: string): string {
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) return "";
+  return new Date(time + 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export function groupByAlgeriaDay<T extends { createdAt: string }>(
+  items: readonly T[],
+): Array<{ day: string; items: T[] }> {
+  const groups: Array<{ day: string; items: T[] }> = [];
+  for (const item of items) {
+    const day = algeriaDayKey(item.createdAt);
+    const last = groups[groups.length - 1];
+    if (last && last.day === day) last.items.push(item);
+    else groups.push({ day, items: [item] });
+  }
+  return groups;
+}

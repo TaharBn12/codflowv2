@@ -6,6 +6,12 @@
 
 import { z } from "zod";
 import { parseOrderCursor } from "../../../../cod-shared/queries/orders";
+import {
+  CONTACT_CHANNELS,
+  CONTACT_OUTCOMES,
+  NOTE_MAX_LENGTH,
+  isValidContactCombination,
+} from "../../../../cod-shared/lib/order-contact";
 
 export const createOrderSchema = z.object({
   customerId: z.string().min(1),
@@ -104,6 +110,46 @@ export const bulkDispatchSchema = z.object({
 });
 
 export type BulkDispatchInput = z.infer<typeof bulkDispatchSchema>;
+
+const CALLBACK_PAST_TOLERANCE_MS = 5 * 60 * 1000;
+const CALLBACK_MAX_AHEAD_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const contactAttemptSchema = z
+  .object({
+    channel: z.enum(CONTACT_CHANNELS),
+    outcome: z.enum(CONTACT_OUTCOMES),
+    note: z.string().trim().max(NOTE_MAX_LENGTH).nullish(),
+    callbackAt: z.string().datetime().nullish(),
+  })
+  .superRefine((data, ctx) => {
+    if (!isValidContactCombination(data.channel, data.outcome)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcome"],
+        message:
+          data.channel === "call"
+            ? "Calls cannot use the message_sent outcome"
+            : "Messages only support the message_sent outcome",
+      });
+    }
+    if (data.outcome !== "callback_requested") return;
+    if (!data.callbackAt) {
+      ctx.addIssue({ code: "custom", path: ["callbackAt"], message: "callbackAt is required when a callback is requested" });
+      return;
+    }
+    const at = Date.parse(data.callbackAt);
+    const now = Date.now();
+    if (at < now - CALLBACK_PAST_TOLERANCE_MS || at > now + CALLBACK_MAX_AHEAD_MS) {
+      ctx.addIssue({ code: "custom", path: ["callbackAt"], message: "callbackAt must be within the next 30 days" });
+    }
+  });
+
+export const orderNoteSchema = z.object({
+  note: z.string().trim().min(1).max(NOTE_MAX_LENGTH),
+});
+
+export type ContactAttemptInput = z.infer<typeof contactAttemptSchema>;
+export type OrderNoteInput = z.infer<typeof orderNoteSchema>;
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;

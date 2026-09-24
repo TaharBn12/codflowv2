@@ -123,7 +123,10 @@
       "expense.updated": "عدّل مصروفاً",
       "expense.deleted": "حذف مصروفاً",
       "daily_report.settings_changed": "غيّر إعدادات التقرير اليومي",
-      "daily_report.sent": "أرسل التقرير اليومي"
+      "daily_report.sent": "أرسل التقرير اليومي",
+      "order.contact_attempt": "سجّل محاولة اتصال",
+      "order.note_added": "أضاف ملاحظة على طلبية",
+      "order.confirmer_assigned": "عيّن مؤكدًا لطلبية"
     },
     "table": {
       "action": "الإجراء",

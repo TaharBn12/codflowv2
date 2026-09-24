@@ -29,6 +29,10 @@ export interface CreateDeliveryCompanyData {
   supportsTracking: boolean;
   /** When omitted, the DB default (true) applies. Provider-specific defaults live at the HTTP handler. */
   autoValidate?: boolean;
+  /** Poll the tracking API on the cron tick (DB default: true). */
+  autoSyncEnabled?: boolean;
+  /** Minimum minutes between two polls of the same order (DB default: 30). */
+  autoSyncIntervalMin?: number;
   notes?: string | null;
 }
 
@@ -45,6 +49,8 @@ export interface UpdateDeliveryCompanyData {
   supportsStopDesk?: boolean;
   supportsTracking?: boolean;
   autoValidate?: boolean;
+  autoSyncEnabled?: boolean;
+  autoSyncIntervalMin?: number;
   notes?: string | null;
 }
 
@@ -141,6 +147,8 @@ export async function createDeliveryCompany(
     // fall through to the DB column default (true). Keeps behavior symmetric
     // with all other optional columns in this insert.
     ...(data.autoValidate !== undefined ? { autoValidate: data.autoValidate } : {}),
+    ...(data.autoSyncEnabled !== undefined ? { autoSyncEnabled: data.autoSyncEnabled } : {}),
+    ...(data.autoSyncIntervalMin !== undefined ? { autoSyncIntervalMin: data.autoSyncIntervalMin } : {}),
     notes: data.notes ?? null,
     createdAt: now,
     updatedAt: now,

@@ -42,6 +42,7 @@ import {
 const driversAlias = aliasedTable(drivers, "d");
 
 import { safeLikeTerm } from "./search";
+import { algeriaDayBounds } from "../lib/order-contact";
 
 export interface OrderFilters {
   status?: (typeof orders.$inferSelect)["status"] | "all";
@@ -117,6 +118,7 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
     );
   }
 
+  const { start: dayStart, end: dayEnd } = algeriaDayBounds();
   let offset = filters.offset ?? 0;
   if (filters.cursor) {
     const after = parseOrderCursor(filters.cursor);
@@ -142,6 +144,8 @@ export async function getAllOrders(db: AppDb, filters: OrderFilters = {}) {
       >`(SELECT by FROM order_status_history WHERE order_id = orders.id ORDER BY timestamp DESC LIMIT 1)`,
       confirmationAssigneeId: sql<string | null>`(SELECT assignee_id FROM order_confirmation_assignments WHERE order_id = orders.id LIMIT 1)`,
       confirmationAssigneeName: sql<string | null>`(SELECT u.name FROM order_confirmation_assignments ca JOIN users u ON u.id = ca.assignee_id WHERE ca.order_id = orders.id LIMIT 1)`,
+      unansweredCallsToday: sql<number>`(SELECT COUNT(*) FROM order_contact_attempts oca WHERE oca.order_id = orders.id AND oca.channel = 'call' AND oca.outcome IN ('no_answer','busy','switched_off','wrong_number') AND oca.created_at >= ${dayStart} AND oca.created_at < ${dayEnd})`,
+      lastContactAt: sql<string | null>`(SELECT MAX(oca.created_at) FROM order_contact_attempts oca WHERE oca.order_id = orders.id)`,
     })
     .from(orders)
     .leftJoin(wilayas, eq(orders.wilayaId, wilayas.id))
@@ -1029,6 +1033,7 @@ const STATUS_RANK: Record<string, number> = {
   preparing: 2,
   ready: 3,
   assigned: 4,
+  dispatched: 4,
   out_for_delivery: 5,
   delivered: 6,
   returned: 6,

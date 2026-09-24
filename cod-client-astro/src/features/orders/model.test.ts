@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   ALLOWED_TRANSITIONS,
+  algeriaDayKey,
+  canLogContact,
+  groupByAlgeriaDay,
+  orderActivityHref,
+  parseOrderRoute,
+  toCallbackIso,
   detailStatusActions,
   dispatchFieldSupport,
   canAssignOrder,
@@ -8,6 +14,7 @@ import {
   canDispatchOrder,
   filterOrders,
   formatMoney,
+  orderSla,
   orderTotal,
   orderStatusFlow,
   orderStatusOptions,
@@ -15,6 +22,9 @@ import {
   shipmentCapabilities,
   shipmentUpdateFieldSupport,
   sortOrders,
+  telLink,
+  toInternationalPhone,
+  whatsappLink,
 } from "./model";
 import type { OrderListItem } from "./types";
 
@@ -285,5 +295,118 @@ describe("orders model", () => {
       "2",
     ]);
     expect(paginateOrders(rows, 2, 2).map((item) => item.id)).toEqual(["3"]);
+  });
+});
+
+describe("orderSla", () => {
+  const NOW = Date.parse("2026-09-21T12:00:00.000Z");
+  const hoursAgo = (hours: number) =>
+    new Date(NOW - hours * 3_600_000).toISOString();
+
+  it("breaches when a new order sits unconfirmed past the threshold", () => {
+    const sla = orderSla({ status: "new", createdAt: hoursAgo(13) }, NOW);
+    expect(sla).toMatchObject({ level: "breach", stage: "new", hours: 13 });
+  });
+
+  it("warns at half the new-order threshold", () => {
+    expect(orderSla({ status: "new", createdAt: hoursAgo(6) }, NOW).level).toBe("warn");
+  });
+
+  it("breaches when a parcel stays out for delivery past the day threshold", () => {
+    const sla = orderSla({ status: "out_for_delivery", createdAt: hoursAgo(24 * 4) }, NOW);
+    expect(sla).toMatchObject({ level: "breach", stage: "out_for_delivery", days: 4 });
+  });
+
+  it("stays quiet for states nobody owns", () => {
+    expect(orderSla({ status: "confirmed", createdAt: hoursAgo(100) }, NOW)).toMatchObject({
+      level: "ok",
+      stage: null,
+    });
+  });
+
+  it("honours custom thresholds", () => {
+    const sla = orderSla({ status: "new", createdAt: hoursAgo(2) }, NOW, { newHours: 1 });
+    expect(sla.level).toBe("breach");
+  });
+
+  it("tolerates an unparsable createdAt", () => {
+    expect(orderSla({ status: "new", createdAt: "not-a-date" }, NOW).level).toBe("ok");
+  });
+});
+
+describe("phone helpers", () => {
+  it("converts a local Algerian number to international form", () => {
+    expect(toInternationalPhone("0551234567")).toBe("+213551234567");
+    expect(toInternationalPhone("05 51 23 45 67")).toBe("+213551234567");
+    expect(toInternationalPhone("00213551234567")).toBe("+213551234567");
+    expect(toInternationalPhone("+213551234567")).toBe("+213551234567");
+  });
+
+  it("returns null when there is no usable number", () => {
+    expect(toInternationalPhone("")).toBeNull();
+    expect(telLink("")).toBeNull();
+    expect(whatsappLink("")).toBeNull();
+  });
+
+  it("builds tel: and wa.me links", () => {
+    expect(telLink("0551234567")).toBe("tel:+213551234567");
+    expect(whatsappLink("0551234567")).toBe("https://wa.me/213551234567");
+  });
+
+  it("URL-encodes the prefilled WhatsApp message", () => {
+    const link = whatsappLink("0551234567", "طلبكم ORD-1");
+    expect(link).toBe(`https://wa.me/213551234567?text=${encodeURIComponent("طلبكم ORD-1")}`);
+  });
+});
+
+describe("order routes", () => {
+  it("recognizes the detail and activity URLs served through the root fallback", () => {
+    expect(parseOrderRoute("/orders/ord_1")).toEqual({ kind: "detail", id: "ord_1" });
+    expect(parseOrderRoute("/orders/ord_1/")).toEqual({ kind: "detail", id: "ord_1" });
+    expect(parseOrderRoute("/orders/ord_1/activity")).toEqual({ kind: "activity", id: "ord_1" });
+    expect(parseOrderRoute("/orders/ord%2F1/activity")).toEqual({ kind: "activity", id: "ord/1" });
+  });
+
+  it("leaves static order pages and unknown sub-paths alone", () => {
+    expect(parseOrderRoute("/orders").kind).toBe("none");
+    expect(parseOrderRoute("/orders/new").kind).toBe("none");
+    expect(parseOrderRoute("/orders/abandoned").kind).toBe("none");
+    expect(parseOrderRoute("/orders/ord_1/unknown").kind).toBe("none");
+    expect(parseOrderRoute("/orders/%E0%A4%A").kind).toBe("none");
+  });
+
+  it("builds an encoded activity link", () => {
+    expect(orderActivityHref("ord/1")).toBe("/orders/ord%2F1/activity");
+  });
+});
+
+describe("contact helpers", () => {
+  it("allows contact logging until the order is closed", () => {
+    expect(canLogContact("new")).toBe(true);
+    expect(canLogContact("unreachable")).toBe(true);
+    expect(canLogContact("out_for_delivery")).toBe(true);
+    expect(canLogContact("delivered")).toBe(false);
+    expect(canLogContact("cancelled")).toBe(false);
+    expect(canLogContact("returned")).toBe(false);
+  });
+
+  it("converts a datetime-local value to ISO and rejects empty input", () => {
+    expect(toCallbackIso("")).toBeNull();
+    expect(toCallbackIso("not-a-date")).toBeNull();
+    expect(toCallbackIso("2026-09-23T18:30")).toBe(new Date("2026-09-23T18:30").toISOString());
+  });
+
+  it("groups entries by Algeria calendar day (UTC+1)", () => {
+    expect(algeriaDayKey("2026-09-23T22:59:00.000Z")).toBe("2026-09-23");
+    expect(algeriaDayKey("2026-09-23T23:01:00.000Z")).toBe("2026-09-24");
+    const groups = groupByAlgeriaDay([
+      { id: "a", createdAt: "2026-09-24T08:00:00.000Z" },
+      { id: "b", createdAt: "2026-09-23T23:30:00.000Z" },
+      { id: "c", createdAt: "2026-09-23T10:00:00.000Z" },
+    ]);
+    expect(groups.map((group) => [group.day, group.items.map((item) => item.id)])).toEqual([
+      ["2026-09-24", ["a", "b"]],
+      ["2026-09-23", ["c"]],
+    ]);
   });
 });

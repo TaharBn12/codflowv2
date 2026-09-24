@@ -22,6 +22,13 @@ export const ACTIONS = {
   ORDER_DISPATCHED:        "order.dispatched",
   ORDER_PRODUCT_RETURNED:  "order.product_returned",
   ORDER_DELETED:           "order.deleted",
+  /** Carrier tracking poll applied (manual per-order, or the cron sweep). */
+  ORDER_CARRIER_SYNCED:    "order.carrier_synced",
+  /** Bulk carrier tracking poll from the orders list. */
+  ORDER_CARRIER_SYNC_BULK: "order.carrier_sync_bulk",
+  ORDER_CONTACT_ATTEMPT:   "order.contact_attempt",
+  ORDER_NOTE_ADDED:        "order.note_added",
+  ORDER_CONFIRMER_ASSIGNED: "order.confirmer_assigned",
 
   // Customers
   CUSTOMER_CREATED:        "customer.created",
@@ -103,27 +110,68 @@ export type ActivityAction = (typeof ACTIONS)[keyof typeof ACTIONS];
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
+type ActivityActor = Pick<AuthUser, "id" | "name" | "role">;
+type ActivityEntity = { type: string; id: string; label?: string | null };
+
+function activityRow(
+  actor: ActivityActor,
+  action: ActivityAction,
+  entity: ActivityEntity,
+  metadata?: Record<string, unknown>,
+) {
+  return {
+    id: crypto.randomUUID(),
+    actorId: actor.id,
+    actorName: actor.name ?? "Unknown",
+    actorRole: actor.role,
+    action,
+    entityType: entity.type,
+    entityId: entity.id,
+    entityLabel: entity.label ?? null,
+    metadata: metadata ? JSON.stringify(metadata) : null,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export async function writeActivity(
+  db: AppDb,
+  actor: ActivityActor,
+  action: ActivityAction,
+  entity: ActivityEntity,
+  metadata?: Record<string, unknown>,
+) {
+  const row = activityRow(actor, action, entity, metadata);
+  await db.insert(activityLogs).values(row);
+  return row;
+}
+
 export async function logActivity(
   db: AppDb,
-  actor: Pick<AuthUser, "id" | "name" | "role">,
+  actor: ActivityActor,
   action: ActivityAction,
-  entity: { type: string; id: string; label?: string | null },
+  entity: ActivityEntity,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await db.insert(activityLogs).values({
-      id: crypto.randomUUID(),
-      actorId: actor.id,
-      actorName: actor.name ?? "Unknown",
-      actorRole: actor.role,
-      action,
-      entityType: entity.type,
-      entityId: entity.id,
-      entityLabel: entity.label ?? null,
-      metadata: metadata ? JSON.stringify(metadata) : null,
-      createdAt: new Date().toISOString(),
-    });
+    await writeActivity(db, actor, action, entity, metadata);
   } catch (err) {
     console.error("[activity] Failed to log:", action, entity.id, err);
+  }
+}
+
+export async function logActivities(
+  db: AppDb,
+  actor: ActivityActor,
+  action: ActivityAction,
+  entries: Array<{ entity: ActivityEntity; metadata?: Record<string, unknown> }>,
+): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const rows = entries.map((entry) => activityRow(actor, action, entry.entity, entry.metadata));
+    for (let i = 0; i < rows.length; i += 20) {
+      await db.insert(activityLogs).values(rows.slice(i, i + 20));
+    }
+  } catch (err) {
+    console.error("[activity] Failed to log batch:", action, entries.length, err);
   }
 }

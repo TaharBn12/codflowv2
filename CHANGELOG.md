@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- orders: confirmer contact log — `POST/GET /api/orders/:id/contact-attempts`
+  records call outcomes (`no_answer`, `busy`, `switched_off`, `wrong_number`,
+  `answered`, `callback_requested`) and `message_sent` over WhatsApp/SMS
+  (migration 0036 + `order_contact_attempts`). At most 3 unanswered calls per
+  order per Algeria day, enforced by a single guarded INSERT (the 4th returns
+  `422 CONTACT_LIMIT_REACHED` with `resetsAt`); messages and answered calls
+  are never limited. An unanswered call on a `new` order moves it to
+  `unreachable`; `callback_requested` opens a high-priority `callback` task
+  for the order's confirmer. Dashboard contact card on the order page with a
+  live "x/3 today" counter, plus an "x/3 today" badge in the orders list
+- orders: internal notes (`POST /api/orders/:id/notes`) and a dedicated order
+  log page at `/orders/<id>/activity` backed by `GET /api/orders/:id/activity`
+  — creation, status changes (including carrier webhooks and sync), contact
+  attempts, notes, confirmer/driver assignment, and shipment actions in one
+  day-grouped timeline with filters. Readable by anyone with `orders:read`;
+  confirmers only see their assigned orders
+- activity log: confirmer assignments (automatic and manual), carrier remarks,
+  and driver names are now recorded per order
+
 - checkout: optional per-store Cloudflare Turnstile bot protection on the
   order form (migration 0024 + `store_turnstile_config`), enabled from
   Dashboard → Settings → Verification with the merchant's own site/secret
@@ -36,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- deploy: `scripts/cloudflare-deploy.mjs` (both the "Deploy to Cloudflare" and
+  "Deploy update (workers only)" workflows) now applies remote D1 migrations
+  before the first `wrangler deploy` of cod-server. Previously the new Worker
+  went live first and the migration ran afterwards, so a release that adds a
+  table (e.g. migration 0036) served 500s on the affected endpoints for that
+  window — or indefinitely if the migration step then failed
 - delivery: Yalidine webhook signature verification implemented (HMAC-SHA256
   over raw body, hex digest, constant-time compare) — previously a TODO that
   accepted unsigned events

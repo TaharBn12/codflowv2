@@ -162,6 +162,17 @@ export {
   BulkDispatchDataSchema,
   ReturnProductDataSchema,
   CarrierRecordsArraySchema,
+
+  // Confirmer contact attempts & order activity
+  ContactChannelEnum,
+  ContactOutcomeEnum,
+  ContactAttemptSchema,
+  ContactSummarySchema,
+  ContactAttemptsDataSchema,
+  ContactAttemptCreatedDataSchema,
+  OrderNoteDataSchema,
+  OrderActivityEntrySchema,
+  OrderActivityDataSchema,
   
   // Types
   type OrderStatus,
