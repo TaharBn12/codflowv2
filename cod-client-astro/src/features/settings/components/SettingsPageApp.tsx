@@ -11,6 +11,7 @@ import type { StoreConfig, UpdateStoreData } from "@/features/settings/types";
 import { SettingsSidebar } from "@/features/settings/components/SettingsSidebar";
 import { GeneralSettings } from "@/features/settings/components/GeneralSettings";
 import { BrandingSettings } from "@/features/settings/components/BrandingSettings";
+import { StorefrontContentSettings } from "@/features/settings/components/StorefrontContentSettings";
 import { SeoSettings } from "@/features/settings/components/SeoSettings";
 import { ReviewsSettings } from "@/features/settings/components/ReviewsSettings";
 import { TrackingSettings } from "@/features/settings/components/TrackingSettings";
@@ -94,6 +95,8 @@ function SettingsContent() {
         return <GeneralSettings storeConfig={storeConfig} onSave={handleSave} />;
       case "branding":
         return <BrandingSettings storeConfig={storeConfig} onSave={handleSave} />;
+      case "storefront":
+        return <StorefrontContentSettings storeConfig={storeConfig} onSave={handleSave} />;
       case "seo":
         return <SeoSettings storeConfig={storeConfig} onSave={handleSave} />;
       case "reviews":

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- settings: storefront text & logo customization — a new *Storefront texts*
+  section in Dashboard → Settings edits all 177 theme01 content keys in a
+  per-language (ar/en) form with per-field and per-language reset, and
+  *Visual identity* gains a logo uploader (R2 via `POST /api/images/upload`).
+  Overrides are stored in `stores.content_json` (per-language
+  `{"ar": {…}, "en": {…}}`, legacy flat format still supported by the theme)
+  and `logo_url`; `PATCH /api/stores/me` now validates the contentJson shape
+  (400 on malformed JSON / wrong value types). Catalog defaults are generated
+  from the theme packs with a drift test
+  (`scripts/gen-content-catalog.{mjs,ts}`)
 - orders: confirmer contact log — `POST/GET /api/orders/:id/contact-attempts`
   records call outcomes (`no_answer`, `busy`, `switched_off`, `wrong_number`,
   `answered`, `callback_requested`) and `message_sent` over WhatsApp/SMS

@@ -34,7 +34,7 @@ Retrieve the current store's configuration. In this single-tenant architecture, 
 - **Theme:** `themeId` (active theme slug).
 - **Typography:** `fontFamily`, `fontUrl`.
 - **Localization:** `lang`, `currency`, `currencySymbol`.
-- **Content:** `contentJson` (serialized storefront text strings).
+- **Content:** `contentJson` (serialized storefront text overrides, see below).
 - **SEO:** `metaTitle`, `metaDescription`, `ogImage`.
 - **Settings:** `announcementBar`, `reviewsEnabled`, `status`.
 - **Storefront key:** `storeApiKey` (plaintext; visible to the merchant in settings).
@@ -54,6 +54,18 @@ Update store configuration. Partial updates are supported; set nullable fields t
 ```
 
 Field rules: hex colors accept 3–8 characters (including alpha); `lang` is `"ar"` or `"en"`; URLs are validated; `metaTitle` ≤ 200, `metaDescription`/`announcementBar` ≤ 500 chars.
+
+**`contentJson` shape.** The server stays theme-agnostic — it validates structure, not the theme's keys. Two shapes are accepted:
+
+```jsonc
+// Per-language (written by the dashboard settings screen):
+{ "ar": { "heroTitle": "…" }, "en": { "heroTitle": "…" } }
+
+// Legacy flat (applied to whatever language is active):
+{ "heroTitle": "…" }
+```
+
+Values must be strings. Set `contentJson: null` to clear all overrides (the theme falls back to its own defaults). The dashboard's *Storefront texts* settings screen edits this field key-by-key, per language.
 
 ### GET /api/stores/pixel-config
 Retrieve the store's Meta pixel tracking configuration, or `null` when none has been configured yet.

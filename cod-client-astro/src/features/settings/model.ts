@@ -1,6 +1,6 @@
-import { BarChart2, Bot, CalendarClock, Key, ListChecks, Mail, Palette, Search, ShieldCheck, Star, Store, type LucideIcon } from "lucide-react";
+import { BarChart2, Bot, CalendarClock, Key, Languages, ListChecks, Mail, Palette, Search, ShieldCheck, Star, Store, type LucideIcon } from "lucide-react";
 
-export type CategoryId = "general" | "branding" | "seo" | "reviews" | "analytics" | "verification" | "email" | "api" | "telegram" | "approvals" | "reports";
+export type CategoryId = "general" | "branding" | "storefront" | "seo" | "reviews" | "analytics" | "verification" | "email" | "api" | "telegram" | "approvals" | "reports";
 
 export interface SettingsCategory {
   id: CategoryId;
@@ -13,6 +13,7 @@ export interface SettingsCategory {
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: "general", icon: Store, labelKey: "general_title" },
   { id: "branding", icon: Palette, labelKey: "branding_title" },
+  { id: "storefront", icon: Languages, labelKey: "storefront_title" },
   { id: "seo", icon: Search, labelKey: "seo_title" },
   { id: "reviews", icon: Star, labelKey: "reviews_title" },
   { id: "analytics", icon: BarChart2, labelKey: "tracking_title" },
