@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- dashboard: the wilaya heatmap now draws a real map of Algeria — the schematic
+  58-square tile grid is replaced with the true wilaya boundaries (58 wilayas,
+  post-2019 layout) generated from the MIT-licensed
+  [`namrouche993/algeria-wilayas-geojson`](https://github.com/namrouche993/algeria-wilayas-geojson)
+  v58 by `scripts/gen-wilaya-map.mjs` (name-matched to the platform's 1-58 ids,
+  equirectangular projection, Douglas-Peucker simplification → ~35 KB of SVG
+  paths in `wilaya-map.ts`, no runtime network). The map stays clean: wilaya
+  numbers and names appear on hover (tooltip), focus, and in the details panel
+  on selection; metrics, colors, legend, and the top-8 list are unchanged
 - settings: storefront text & logo customization — a new *Storefront texts*
   section in Dashboard → Settings edits all 177 theme01 content keys in a
   per-language (ar/en) form with per-field and per-language reset, and
