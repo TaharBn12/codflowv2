@@ -489,6 +489,13 @@ export function orderSla(
   return { level: "ok", stage: null, hours, days };
 }
 
+/** Compact mobile form of the SLA badge: `>2J` past a day, hours before that. */
+export function orderSlaCompactLabel(sla: OrderSla): string | null {
+  if (sla.level === "ok" || sla.stage === null) return null;
+  if (sla.stage === "out_for_delivery") return `>${sla.days}J`;
+  return sla.days >= 1 ? `>${sla.days}J` : `${sla.hours}h`;
+}
+
 // ─── Quick contact ───────────────────────────────────────────────────────────
 
 /**

@@ -1,10 +1,11 @@
-import { Clock, MapPin, MessageCircle, PackageOpen, Phone, PhoneMissed, Star } from "lucide-react";
+import { Clock, MapPin, MessageCircle, PackageOpen, Phone, PhoneMissed, Star, Truck } from "lucide-react";
 import { useState } from "react";
 import { useLocale, useT } from "@/i18n/react";
 import { Select, TableCell, TableRow } from "@/components/ui";
 import {
   formatMoney,
   orderSla,
+  orderSlaCompactLabel,
   orderTotal,
   telLink,
   whatsappLink,
@@ -96,7 +97,13 @@ function ConfirmationAssignment({
 
 
 /** Red/amber dot when an order sits too long in a state the merchant owns. */
-export function OrderSlaBadge({ order }: { order: OrderListItem }) {
+export function OrderSlaBadge({
+  order,
+  compact = false,
+}: {
+  order: OrderListItem;
+  compact?: boolean;
+}) {
   const t = useT("orders");
   const sla = orderSla(order);
   if (sla.level === "ok") return null;
@@ -109,6 +116,24 @@ export function OrderSlaBadge({ order }: { order: OrderListItem }) {
     sla.level === "breach"
       ? "border-destructive/40 bg-destructive/10 text-destructive"
       : "border-warning/40 bg-warning/10 text-warning";
+
+  if (compact) {
+    const compactLabel = orderSlaCompactLabel(sla);
+    if (!compactLabel) return null;
+    const Icon = sla.stage === "out_for_delivery" ? Truck : Clock;
+    return (
+      <span
+        title={label}
+        aria-label={label}
+        className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold ${tone}`}
+      >
+        <Icon size={11} aria-hidden="true" />
+        <span dir="ltr" className="tabular-nums">
+          {compactLabel}
+        </span>
+      </span>
+    );
+  }
 
   return (
     <span
@@ -296,7 +321,7 @@ export function OrderMobileCard({
             {(order.hasReview ?? 0) > 0 && (
               <Star size={12} className="fill-warning text-warning" />
             )}
-            <OrderSlaBadge order={order} />
+            <OrderSlaBadge order={order} compact />
           </div>
           <p className="mt-0.5 truncate text-sm font-medium text-foreground">
             {order.customerName}
