@@ -8,6 +8,7 @@ describe("settings model", () => {
     expect(SETTINGS_CATEGORIES.map((category) => category.id)).toEqual([
       "general",
       "branding",
+      "storefront",
       "seo",
       "reviews",
       "analytics",
@@ -19,11 +20,11 @@ describe("settings model", () => {
       "reports",
     ]);
     expect(SETTINGS_CATEGORIES[0].labelKey).toBe("general_title");
-    expect(SETTINGS_CATEGORIES[5].labelKey).toBe("otp_title");
-    expect(SETTINGS_CATEGORIES[6].labelKey).toBe("email_title");
-    expect(SETTINGS_CATEGORIES[7].labelKey).toBe("api_key_title");
-    expect(SETTINGS_CATEGORIES[8].labelKey).toBe("telegram_title");
-    expect(SETTINGS_CATEGORIES[9].labelKey).toBe("approval_policies_title");
+    expect(SETTINGS_CATEGORIES[6].labelKey).toBe("otp_title");
+    expect(SETTINGS_CATEGORIES[7].labelKey).toBe("email_title");
+    expect(SETTINGS_CATEGORIES[8].labelKey).toBe("api_key_title");
+    expect(SETTINGS_CATEGORIES[9].labelKey).toBe("telegram_title");
+    expect(SETTINGS_CATEGORIES[10].labelKey).toBe("approval_policies_title");
   });
 
   it("maps every save failure to the store save error", () => {

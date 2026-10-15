@@ -373,6 +373,7 @@ astro check + tests for theme01.
 
 ### Recently Shipped
 
+- ✅ **Storefront Text & Logo Customization** — merchants edit every storefront text (177 keys, per language) and upload the store logo from Settings → Storefront texts / Visual identity; overrides are stored in `stores.content_json` / `logo_url` and merged over the theme defaults
 - ✅ **Yalidine Hardening** — full 36-status webhook mapping (live-verified return flows), HMAC-SHA256 signature verification, per-carrier delivery-zone name sync, dispatch-time delivery-type switching, and a webhook events log for every webhook-capable carrier
 - ✅ **Landing Pages** — one-product marketing pages (image stack + COD order form) with the Studio builder, per-link stats, A/B comparison, order attribution, and 7 MCP tools
 - ✅ **Astro Dashboard** — the merchant dashboard now runs on Astro (was Next.js)

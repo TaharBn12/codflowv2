@@ -1,9 +1,12 @@
 # Content Keys Reference
 
-All **155** content keys of the `StoreFrontContent` interface. The interface
+All **177** content keys of the `StoreFrontContent` interface. The interface
 lives in `src/theme/content/types.ts` and is implemented exactly by the three
 locale files `ar.ts`, `fr.ts`, and `en.ts`. Adding or removing a key means
-updating **all three** files — TypeScript fails the build otherwise.
+updating **all three** files — TypeScript fails the build otherwise — and
+regenerating the dashboard catalog
+(`cod-client-astro` `scripts/gen-content-catalog.{mjs,ts}`, see
+`content-catalog.test.ts`).
 
 > Icons are **not** content keys. Trust/step icons come from the
 > `astro-icon`/Heroicons set (`heroicons:check-badge`, `heroicons:truck`, …)
@@ -82,7 +85,7 @@ updating **all three** files — TypeScript fails the build otherwise.
 |-----|-------|
 | `footerAbout`, `footerQuickLinks`, `footerSupport`, `footerShipping`, `footerReturns`, `footerRights` | Footer headings + copyright line |
 
-### Order form (23)
+### Order form (24)
 | Key | Notes |
 |-----|-------|
 | `orderCta` / `orderCtaSubtext` | Product-card CTA + "Cash on delivery" subtext |
@@ -90,6 +93,7 @@ updating **all three** files — TypeScript fails the build otherwise.
 | `formDeliverySection` | Delivery-info section label |
 | `formNameLabel` / `formNamePlaceholder` | Full name |
 | `formPhoneLabel` / `formPhonePlaceholder` | Phone |
+| `formPhoneInvalid` | Phone validation error |
 | `formWilayaLabel` / `formWilayaPlaceholder` | Wilaya selector |
 | `formCommuneLabel` / `formCommunePlaceholder` | Commune selector |
 | `formCommuneLoading` | Loading state |
@@ -198,12 +202,27 @@ The complete AR/FR/EN defaults live in `src/theme/content/{ar,fr,en}.ts`.
 
 Store owners can override any key through the store's `contentJson` setting
 (`StoreConfig.contentJson` → `resolveContent(lang, contentJson)` in
-`src/theme/content/index.ts`). Unknown keys or invalid JSON are ignored and the
-locale defaults are used.
+`src/theme/content/index.ts`). The dashboard's **Storefront texts** settings
+screen (`cod-client-astro` `src/features/settings/components/StorefrontContentSettings.tsx`)
+edits every key with a per-language UI and writes the **per-language** format:
+
+```json
+{ "ar": { "heroTitle": "عنواني" }, "en": { "heroTitle": "My Custom Title" } }
+```
+
+The **legacy flat** format is still accepted and merged into whichever language
+is active:
 
 ```json
 { "heroTitle": "My Custom Title", "orderCta": "Buy Now!" }
 ```
+
+Unknown keys are kept as-is (forward-compatible with newer themes); invalid
+JSON or non-string values are ignored and the locale defaults are used. The
+dashboard catalog defaults
+(`cod-client-astro` `src/features/settings/content-catalog.ts`) are generated
+from `ar.ts`/`en.ts` and verified by a drift test, so the settings screen
+always reflects the theme's real strings.
 
 ## Adding a language
 

@@ -29,7 +29,8 @@ export const StoreSchema = z
     currency: z.string().openapi({ example: "DZD" }),
     currencySymbol: z.string().openapi({ example: "دج" }),
     contentJson: z.string().nullable().openapi({
-      description: "Serialized JSON of every text string shown in the storefront",
+      description:
+        "Serialized JSON of storefront text overrides, per language ({\"ar\": {\"heroTitle\": \"…\"}, \"en\": {…}}) or legacy flat ({\"heroTitle\": \"…\"}). null = use theme defaults.",
     }),
     metaTitle: z.string().nullable().openapi({ example: "My Shop — Best Products" }),
     metaDescription: z.string().nullable().openapi({ example: "Find the best products at My Shop." }),

@@ -97,3 +97,14 @@ export async function saveApprovalPolicy(userId: string, action: string, enabled
 export async function saveAllApprovalPolicies(userId: string, enabled: boolean) {
   return apiFetch(`/api/operations/telegram/approval-policies/${encodeURIComponent(userId)}`, json({ method: "PUT", body: JSON.stringify({ enabled }) }));
 }
+
+/** Upload a logo (or any store image) to R2. Multipart; no Content-Type set — the browser supplies the boundary. */
+export async function uploadStoreImage(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch<DataEnvelope<{ key: string; url: string }>>("/api/images/upload", {
+    method: "POST",
+    body: form,
+  });
+  return res.data;
+}

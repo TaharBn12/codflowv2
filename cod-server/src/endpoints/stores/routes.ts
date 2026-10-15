@@ -14,6 +14,7 @@ import type { AppContext } from "@/types";
 import { defineRoute } from "@/lib/route-builder";
 import { SCOPES } from "../../../../cod-shared/rbac/scopes";
 import * as handlers from "./handlers";
+import { contentJsonField } from "./validation";
 import {
   StoreSchema,
   StorePixelConfigSchema,
@@ -38,7 +39,7 @@ const updateStoreBodySchema = z.object({
   fontUrl: z.string().url().nullable().optional(),
   lang: z.enum(["ar", "en"]).optional(),
   currencySymbol: z.string().min(1).max(10).optional(),
-  contentJson: z.string().nullable().optional(),
+  contentJson: contentJsonField,
   metaTitle: z.string().max(200).nullable().optional(),
   metaDescription: z.string().max(500).nullable().optional(),
   ogImage: z.string().url().nullable().optional(),

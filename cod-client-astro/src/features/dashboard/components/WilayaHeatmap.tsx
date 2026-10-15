@@ -10,14 +10,18 @@ import {
   formatNumber,
   formatPercent,
   heatIntensity,
-  WILAYA_GRID,
-  WILAYA_TILES,
   type DateRange,
   type HeatMetric,
 } from "../model";
+import { WILAYA_MAP_PATHS, WILAYA_MAP_VIEWBOX } from "../wilaya-map";
 import { WidgetFrame, type WidgetChrome } from "./WidgetFrame";
 
 const METRICS: HeatMetric[] = ["orders", "deliveryRate", "returnRate", "revenueDelivered"];
+
+/** Platform wilaya ids (1-58) in ascending order, one SVG path each. */
+const WILAYA_MAP_IDS = Object.keys(WILAYA_MAP_PATHS)
+  .map(Number)
+  .sort((a, b) => a - b);
 
 /** Purple ramp for volume metrics, green for delivery rate, red for returns. */
 function tileColor(metric: HeatMetric, intensity: number): string {
@@ -107,40 +111,45 @@ export function WilayaHeatmap({ range, chrome, refreshKey }: { range: DateRange;
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div>
-            <div
-              dir="ltr"
-              role="img"
+            <svg
+              viewBox={WILAYA_MAP_VIEWBOX}
+              role="group"
               aria-label={t("wilayas.map_label")}
-              className="grid gap-1"
-              style={{
-                gridTemplateColumns: `repeat(${WILAYA_GRID.cols}, minmax(0, 1fr))`,
-                gridTemplateRows: `repeat(${WILAYA_GRID.rows}, minmax(0, 1fr))`,
-              }}
+              className="mx-auto block h-auto w-full max-w-[600px]"
             >
-              {WILAYA_TILES.map((tile) => {
-                const stat = byId.get(tile.id);
+              {WILAYA_MAP_IDS.map((id) => {
+                const stat = byId.get(id);
                 const value = metricValue(stat, metric);
                 const intensity = heatIntensity(value, max);
-                const isSelected = selected === tile.id;
+                const isSelected = selected === id;
                 return (
-                  <button
-                    key={tile.id}
-                    type="button"
-                    onClick={() => setSelected(isSelected ? null : tile.id)}
-                    onMouseEnter={() => setSelected(tile.id)}
-                    title={`${tile.id} ${nameOf(stat, tile.id)} — ${format(value)}`}
-                    aria-label={`${nameOf(stat, tile.id)}: ${format(value)}`}
+                  <path
+                    key={id}
+                    d={WILAYA_MAP_PATHS[id]}
+                    role="button"
+                    tabIndex={0}
                     aria-pressed={isSelected}
-                    className={`flex aspect-square min-w-0 items-center justify-center rounded-md text-[10px] font-bold tabular-nums transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      isSelected ? "ring-2 ring-foreground/60" : ""
-                    } ${intensity > 0.55 ? "text-white" : "text-foreground/80"}`}
-                    style={{ gridColumn: tile.col + 1, gridRow: tile.row + 1, background: tileColor(metric, intensity) }}
+                    aria-label={`${id} ${nameOf(stat, id)}: ${format(value)}`}
+                    onClick={() => setSelected(isSelected ? null : id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelected(isSelected ? null : id);
+                      }
+                    }}
+                    onMouseEnter={() => setSelected(id)}
+                    onFocus={() => setSelected(id)}
+                    vectorEffect="non-scaling-stroke"
+                    fill={tileColor(metric, intensity)}
+                    stroke={isSelected ? "var(--foreground)" : "var(--card)"}
+                    strokeWidth={isSelected ? 2.5 : 1}
+                    style={{ cursor: "pointer", outline: "none", transition: "fill 200ms, stroke 150ms" }}
                   >
-                    {tile.id}
-                  </button>
+                    <title>{`${id} ${nameOf(stat, id)} — ${format(value)}`}</title>
+                  </path>
                 );
               })}
-            </div>
+            </svg>
             <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
               <span>{t("wilayas.legend_low")}</span>
               <div className="flex h-2 flex-1 overflow-hidden rounded-full">
