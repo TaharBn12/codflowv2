@@ -1,3 +1,9 @@
+import type {
+  ContactChannel,
+  ContactOutcome,
+  ContactSummary,
+} from "../../../../cod-shared/lib/order-contact";
+
 export const ORDER_STATUSES = [
   "new",
   "confirmed",
@@ -81,6 +87,10 @@ export interface OrderBase {
   isFragile: boolean | null;
   codPaymentId?: string | null;
   feePaymentId?: string | null;
+  /** Carrier auto-sync bookkeeping (migration 0035). */
+  lastTrackingSyncAt?: string | null;
+  lastCarrierStatus?: string | null;
+  trackingSyncFails?: number | null;
   createdAt: string;
   updatedAt: string;
   confirmationAssigneeId?: string | null;
@@ -90,6 +100,8 @@ export interface OrderBase {
 export interface OrderListItem extends OrderBase {
   hasReview?: number;
   lastUpdatedBy?: string | null;
+  unansweredCallsToday?: number;
+  lastContactAt?: string | null;
 }
 
 export interface OrderDetail extends OrderBase {
@@ -119,6 +131,92 @@ export interface DeliveryCompany {
   supportsStopDesk: boolean;
   supportsTracking: boolean;
   autoValidate: boolean | null;
+  /** Poll the carrier tracking API on the cron tick (migration 0035). */
+  autoSyncEnabled?: boolean | null;
+  autoSyncIntervalMin?: number | null;
+}
+
+export interface CarrierSyncCounters {
+  scanned: number;
+  polled: number;
+  updated: number;
+  unchanged: number;
+  unmapped: number;
+  errors: number;
+}
+
+export interface CarrierSyncDetail {
+  orderId: string;
+  orderNumber: string;
+  trackingNumber: string;
+  outcome: "updated" | "unchanged" | "unmapped" | "error";
+  from: string;
+  to?: string;
+  carrierStatus?: string | null;
+  error?: string;
+}
+
+export interface CarrierSyncCompanyResult extends CarrierSyncCounters {
+  companyId: string;
+  companyCode: string;
+  companyName: string;
+  runId: string;
+  unmappedStatuses: string[];
+  error: string | null;
+}
+
+export interface BulkCarrierSyncResult {
+  companies: CarrierSyncCompanyResult[];
+  totals: CarrierSyncCounters;
+  details: CarrierSyncDetail[];
+}
+
+export interface OrderCarrierSyncResult {
+  orderId: string;
+  outcome: "updated" | "unchanged" | "unmapped" | "error";
+  from: string;
+  to: string;
+  carrierStatus: string | null;
+  companyId: string;
+  companyCode: string;
+  runId: string;
+}
+
+/** Result of POST /delivery-companies/:id/sync-statuses. */
+export interface CompanySyncResult extends CarrierSyncCounters {
+  runId: string;
+  companyCode: string;
+  unmappedStatuses: string[];
+  details: CarrierSyncDetail[];
+}
+
+export interface CarrierSyncRun {
+  id: string;
+  trigger: "cron" | "manual" | "company";
+  mode: "poll" | "reconcile";
+  startedAt: string;
+  finishedAt: string | null;
+  scanned: number;
+  polled: number;
+  updated: number;
+  unchanged: number;
+  unmapped: number;
+  errors: number;
+  unmappedStatuses: string[];
+  error: string | null;
+}
+
+export interface CarrierAutoSyncStatus {
+  companyId: string;
+  companyCode: string;
+  companyName: string;
+  autoSyncEnabled: boolean;
+  autoSyncIntervalMin: number;
+  hasCredentials: boolean;
+  hasWebhookSecret: boolean;
+  shippedOrders: number;
+  failingOrders: number;
+  lastRun: (CarrierSyncRun & { id: string }) | null;
 }
 
 export interface StopDesk {
@@ -229,4 +327,64 @@ export interface AbandonedStats {
   totalConverted: number;
   conversionRate: number;
   estimatedLostRevenue: number;
+}
+
+export type { ContactChannel, ContactOutcome, ContactSummary };
+
+export interface ContactAttempt {
+  id: string;
+  orderId: string;
+  channel: ContactChannel;
+  outcome: ContactOutcome;
+  note: string | null;
+  callbackAt: string | null;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface ContactAttemptsData {
+  attempts: ContactAttempt[];
+  summary: ContactSummary;
+}
+
+export interface ContactAttemptResult extends ContactAttemptsData {
+  attempt: ContactAttempt;
+  statusChanged: { from: OrderStatus; to: OrderStatus } | null;
+  callbackTaskId: string | null;
+}
+
+export type OrderActivityKind = "created" | "status" | "contact" | "note" | "event";
+
+export interface OrderActivityEntry {
+  id: string;
+  kind: OrderActivityKind;
+  action: string;
+  actorId: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  source: string | null;
+  createdAt: string;
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus | null;
+  channel: ContactChannel | null;
+  outcome: ContactOutcome | null;
+  note: string | null;
+  callbackAt: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface OrderActivityData {
+  order: {
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    phone: string;
+    status: OrderStatus;
+    orderType: OrderType;
+    createdAt: string;
+    confirmationAssigneeName: string | null;
+  };
+  summary: ContactSummary;
+  entries: OrderActivityEntry[];
 }

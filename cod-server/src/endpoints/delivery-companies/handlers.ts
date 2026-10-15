@@ -14,6 +14,12 @@ import * as validation from "./validation";
 import { getProvider, isEcotrackCompany } from "./providers/registry";
 import { EcotrackProvider } from "./providers/ecotrack/adapter";
 import { reconcileEcotrackOrders, DEFAULT_MAX_PAGES } from "./providers/ecotrack/reconcile";
+import {
+  DEFAULT_SYNC_BATCH_SIZE,
+  makeCapiTrigger,
+  syncCompanyStatuses,
+} from "./providers/auto-sync";
+import { getLastSyncRun, listSyncRuns } from "./providers/auto-sync.queries";
 import { NotFoundError, ValidationError, BusinessLogicError, ConflictError, ExternalApiError } from "@/lib/errors/classes";
 import { ERROR_CODES } from "../../../../cod-shared/errors/codes";
 import { syncCarrierGeoNames } from "../../../../cod-shared/queries/carrier-geo";
@@ -643,4 +649,191 @@ export async function listWebhookEvents(c: Context<AppContext>) {
     },
     200,
   );
+}
+
+// ─── Carrier Status Auto-Sync ────────────────────────────────────────────────
+
+/**
+ * GET /delivery-companies/:id/auto-sync/status
+ *
+ * Where this company stands on automatic status updates: the switches, the
+ * last run's outcome, and how many shipped orders are waiting on the carrier.
+ */
+export async function getCompanyAutoSyncStatus(c: Context<AppContext>) {
+  const db = getDb(c.env.DB);
+  const { id } = (c.req as any).valid?.("param") ?? { id: c.req.param("id")! };
+
+  const company = await queries.getDeliveryCompanyRaw(db, id);
+  if (!company) throw new NotFoundError("Delivery company", id);
+
+  const [lastRun] = await Promise.all([getLastSyncRun(db, id)]);
+
+  const counts = await db
+    .select({
+      shipped: count(),
+      neverSynced: count(orders.lastTrackingSyncAt),
+      failing: count(),
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, id),
+        sql`${orders.trackingNumber} IS NOT NULL`,
+        sql`${orders.status} NOT IN ('delivered', 'returned', 'cancelled')`,
+      ),
+    )
+    .get();
+
+  const failing = await db
+    .select({ failing: count() })
+    .from(orders)
+    .where(and(eq(orders.companyId, id), sql`${orders.trackingSyncFails} > 0`))
+    .get();
+
+  return c.json(
+    {
+      success: true,
+      data: {
+        companyId: id,
+        companyCode: company.code,
+        companyName: company.name,
+        autoSyncEnabled: company.autoSyncEnabled,
+        autoSyncIntervalMin: company.autoSyncIntervalMin,
+        hasCredentials: !!company.apiToken,
+        hasWebhookSecret: !!company.webhookSecret,
+        shippedOrders: Number(counts?.shipped ?? 0),
+        failingOrders: Number(failing?.failing ?? 0),
+        lastRun: lastRun
+          ? {
+              id: lastRun.id,
+              trigger: lastRun.trigger,
+              mode: lastRun.mode,
+              startedAt: lastRun.startedAt,
+              finishedAt: lastRun.finishedAt,
+              scanned: lastRun.scanned,
+              polled: lastRun.polled,
+              updated: lastRun.updated,
+              unchanged: lastRun.unchanged,
+              unmapped: lastRun.unmapped,
+              errors: lastRun.errors,
+              unmappedStatuses: parseJsonArray(lastRun.unmappedStatuses),
+              error: lastRun.errorMessage,
+            }
+          : null,
+      },
+    },
+    200,
+  );
+}
+
+/**
+ * POST /delivery-companies/:id/sync-statuses
+ *
+ * Run the auto-sync for this company right now (the cron's per-company twin).
+ */
+export async function triggerCompanyStatusSync(c: Context<AppContext>) {
+  const db = getDb(c.env.DB);
+  const { id } = (c.req as any).valid?.("param") ?? { id: c.req.param("id")! };
+  const query = (c.req as any).valid?.("query") ?? {};
+
+  const company = await queries.getDeliveryCompanyRaw(db, id);
+  if (!company) throw new NotFoundError("Delivery company", id);
+  if (!company.apiToken) {
+    throw new ValidationError(
+      `${company.name} is not connected — add API credentials first`,
+      ERROR_CODES.MISSING_API_CREDENTIALS,
+      { companyId: id },
+    );
+  }
+
+  const run = await syncCompanyStatuses(
+    db,
+    {
+      id: company.id,
+      code: company.code,
+      name: company.name,
+      apiToken: company.apiToken,
+      apiUserGuid: company.apiUserGuid,
+      apiEndpoint: company.apiEndpoint,
+      notes: company.notes,
+      webhookStatusMapping: company.webhookStatusMapping,
+      autoSyncIntervalMin: company.autoSyncIntervalMin,
+    },
+    {
+      trigger: "company",
+      force: query.force === "true",
+      limit: Number(query.limit ?? DEFAULT_SYNC_BATCH_SIZE),
+      onDelivered: makeCapiTrigger(c.env, (p) => c.executionCtx.waitUntil(p)),
+    },
+  );
+
+  if (run.errorMessage) {
+    throw new BusinessLogicError(run.errorMessage, ERROR_CODES.PROVIDER_NOT_SUPPORTED, {
+      companyId: id,
+    });
+  }
+
+  return c.json(
+    {
+      success: true,
+      data: {
+        runId: run.runId,
+        companyCode: run.companyCode,
+        ...run.counters,
+        unmappedStatuses: run.counters.unmappedStatuses,
+        details: run.details,
+      },
+    },
+    200,
+  );
+}
+
+/**
+ * GET /delivery-companies/:id/sync-runs
+ *
+ * The company's sync history — newest first.
+ */
+export async function listCompanySyncRuns(c: Context<AppContext>) {
+  const db = getDb(c.env.DB);
+  const { id } = (c.req as any).valid?.("param") ?? { id: c.req.param("id")! };
+  const query = (c.req as any).valid?.("query") ?? {};
+
+  const company = await queries.getDeliveryCompanyRaw(db, id);
+  if (!company) throw new NotFoundError("Delivery company", id);
+
+  const runs = await listSyncRuns(db, { companyId: id, limit: Number(query.limit ?? 30) });
+
+  return c.json(
+    {
+      success: true,
+      data: {
+        runs: runs.map((run) => ({
+          id: run.id,
+          trigger: run.trigger,
+          mode: run.mode,
+          startedAt: run.startedAt,
+          finishedAt: run.finishedAt,
+          scanned: run.scanned,
+          polled: run.polled,
+          updated: run.updated,
+          unchanged: run.unchanged,
+          unmapped: run.unmapped,
+          errors: run.errors,
+          unmappedStatuses: parseJsonArray(run.unmappedStatuses),
+          error: run.errorMessage,
+        })),
+      },
+    },
+    200,
+  );
+}
+
+function parseJsonArray(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
 }

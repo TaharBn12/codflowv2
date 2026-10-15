@@ -18,6 +18,23 @@ import { getDeliveryCompanyById } from "@/endpoints/delivery-companies/queries";
 import { NotFoundError, ValidationError, BusinessLogicError } from "@/lib/errors/classes";
 import { ERROR_CODES } from "../../../../cod-shared/errors/codes";
 
+async function logAutoConfirmerAssignment(
+  db: ReturnType<typeof getDb>,
+  actor: AppContext["Variables"]["user"],
+  orderId: string,
+  orderNumber: string,
+) {
+  try {
+    const header = await queries.getOrderContactHeader(db, orderId);
+    if (!header?.confirmationAssigneeId) return;
+    await logActivity(db, actor, ACTIONS.ORDER_CONFIRMER_ASSIGNED, {
+      type: "order", id: orderId, label: orderNumber,
+    }, { mode: "auto", assigneeId: header.confirmationAssigneeId, assigneeName: header.confirmationAssigneeName });
+  } catch (err) {
+    console.error("[activity] confirmer assignment lookup failed:", orderId, err);
+  }
+}
+
 /**
  * GET /orders
  * List all orders with optional filters
@@ -212,7 +229,8 @@ export async function createOrder(c: Context<AppContext>) {
     await queries.createOrder(db, orderData, productsData, actor ? { id: actor.id, name: actor.name ?? "Unknown" } : null);
     await logActivity(db, actor, ACTIONS.ORDER_CREATED, {
       type: "order", id: orderId, label: orderNumber,
-    });
+    }, { orderType: validated.orderType, price: validated.price, deliveryFee });
+    await logAutoConfirmerAssignment(db, actor, orderId, orderNumber);
 
     return c.json(
       {

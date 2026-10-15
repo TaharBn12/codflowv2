@@ -117,6 +117,15 @@ export interface DeliveryCompany {
    */
   autoValidate: boolean;
 
+  /**
+   * Poll the carrier's tracking API on the cron tick and apply new statuses
+   * through the forward-only rank guard. The pull counterpart to webhooks —
+   * and the only status source for carriers with no webhook support.
+   */
+  autoSyncEnabled: boolean;
+  /** Minimum minutes between two polls of the same order (5–1440). */
+  autoSyncIntervalMin: number;
+
   notes: string | null;
 
   // Webhook integration

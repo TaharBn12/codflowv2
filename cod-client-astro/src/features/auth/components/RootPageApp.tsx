@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchIdentity } from "@/lib/session";
 import { resolveGate } from "@/lib/gate";
 import OrderDetailPageApp from "@/features/orders/components/OrderDetailPageApp";
+import OrderActivityPageApp from "@/features/orders/components/OrderActivityPageApp";
 import CustomerDetailPageApp from "@/features/customers/components/CustomerDetailPageApp";
 import CustomerFormPageApp from "@/features/customers/components/CustomerFormPageApp";
 import CustomerGroupDetailPageApp from "@/features/customer-groups/components/CustomerGroupDetailPageApp";
@@ -31,6 +32,7 @@ import { parseOfferRoute } from "@/features/offers/model";
 import { parseDriverRoute, parseDeliveryCompanyRoute, parseShippingProfileRoute } from "@/features/delivery/model";
 import { parseTeamRoute } from "@/features/team/model";
 import { parseOperationAgentRoute } from "@/features/operations/model";
+import { parseOrderRoute } from "@/features/orders/model";
 
 /** Public root: routes visitors to the dashboard or sign-in. Silent. */
 export function RootGate() {
@@ -47,10 +49,8 @@ export function RootGate() {
   const shippingProfileRoute = parseShippingProfileRoute(pathname);
   const teamRoute = parseTeamRoute(pathname);
   const operationAgentRoute = parseOperationAgentRoute(pathname);
-  const orderId = pathname.startsWith("/orders/") && pathname !== "/orders/new" && pathname !== "/orders/abandoned"
-    ? pathname.slice("/orders/".length)
-    : null;
-  const dynamicRoute = orderId || customerRoute.kind === "detail" || customerRoute.kind === "edit" || customerGroupRoute.kind === "detail" || customerGroupRoute.kind === "edit" || customerTagRoute.kind === "detail" || customerTagRoute.kind === "edit" || productRoute.kind === "detail" || productRoute.kind === "edit" || productGroupRoute.kind === "edit" || offerRoute.kind === "edit" || driverRoute.kind === "detail" || driverRoute.kind === "edit" || driverRoute.kind === "compensations" || companyRoute.kind === "detail" || companyRoute.kind === "credentials" || companyRoute.kind === "stopDesks" || shippingProfileRoute.kind === "detail" || shippingProfileRoute.kind === "edit" || teamRoute.kind === "detail" || operationAgentRoute.kind === "detail";
+  const orderRoute = parseOrderRoute(pathname);
+  const dynamicRoute = orderRoute.kind !== "none" || customerRoute.kind === "detail" || customerRoute.kind === "edit" || customerGroupRoute.kind === "detail" || customerGroupRoute.kind === "edit" || customerTagRoute.kind === "detail" || customerTagRoute.kind === "edit" || productRoute.kind === "detail" || productRoute.kind === "edit" || productGroupRoute.kind === "edit" || offerRoute.kind === "edit" || driverRoute.kind === "detail" || driverRoute.kind === "edit" || driverRoute.kind === "compensations" || companyRoute.kind === "detail" || companyRoute.kind === "credentials" || companyRoute.kind === "stopDesks" || shippingProfileRoute.kind === "detail" || shippingProfileRoute.kind === "edit" || teamRoute.kind === "detail" || operationAgentRoute.kind === "detail";
 
   useEffect(() => {
     if (dynamicRoute) return;
@@ -65,7 +65,8 @@ export function RootGate() {
     };
   }, [dynamicRoute]);
 
-  if (orderId) return <OrderDetailPageApp orderId={orderId} />;
+  if (orderRoute.kind === "activity") return <OrderActivityPageApp orderId={orderRoute.id} />;
+  if (orderRoute.kind === "detail") return <OrderDetailPageApp orderId={orderRoute.id} />;
   if (customerRoute.kind === "detail") return <CustomerDetailPageApp customerId={customerRoute.id} />;
   if (customerRoute.kind === "edit") return <CustomerFormPageApp customerId={customerRoute.id} />;
   if (customerGroupRoute.kind === "detail") return <CustomerGroupDetailPageApp groupId={customerGroupRoute.id} />;

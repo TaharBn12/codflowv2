@@ -123,7 +123,10 @@
       "expense.updated": "Updated an expense",
       "expense.deleted": "Deleted an expense",
       "daily_report.settings_changed": "Changed daily report settings",
-      "daily_report.sent": "Sent the daily report"
+      "daily_report.sent": "Sent the daily report",
+      "order.contact_attempt": "Logged a contact attempt",
+      "order.note_added": "Added an order note",
+      "order.confirmer_assigned": "Assigned a confirmer to an order"
     },
     "table": {
       "action": "Action",

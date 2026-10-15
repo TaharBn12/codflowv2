@@ -3,3 +3,4 @@
  * the same read/write helpers directly from D1.
  */
 export * from "../../../../cod-shared/queries/orders";
+export * from "../../../../cod-shared/queries/order-contact";

@@ -66,11 +66,19 @@ class_name = "CodLandingPageImageUploadWorkflow"
 [[send_email]]
 name = "SEND_EMAIL_UNUSED"
 
-# Cron Triggers
-# Sweeps pending abandoned orders → abandoned status every hour.
-# Maximum lag from "true abandonment" to "marked abandoned" is ~90 min (pending > 30 min).
+# Cron Triggers (max 3 per Worker — both are used below)
+#
+#   */15 * * * *  carrier status auto-sync: polls each delivery company's
+#                 tracking API for shipped, non-terminal orders and applies the
+#                 carrier status through the forward-only rank guard. Per-order
+#                 throttling lives in delivery_companies.auto_sync_interval_min,
+#                 so a company set to 60 min is polled at most once an hour
+#                 even though the tick fires every 15 minutes.
+#   0 * * * *     maintenance: pending abandoned orders → abandoned, the daily
+#                 report, and OAuth cleanup. Maximum lag from "true
+#                 abandonment" to "marked abandoned" is ~90 min (pending > 30).
 [triggers]
-crons = ["0 * * * *"]
+crons = ["*/15 * * * *", "0 * * * *"]
 
 # Environment variables (non-secret).
 #

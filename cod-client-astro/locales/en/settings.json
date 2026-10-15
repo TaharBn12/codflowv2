@@ -194,7 +194,19 @@
     "approval_action_settings_integrations": "Change integrations and secrets",
     "approval_action_landing_pages_publish": "Publish landing page",
     "approval_action_landing_pages_delete": "Delete landing page",
-    "reports_title": "Daily reports"
+    "reports_title": "Daily reports",
+    "storefront_title": "Storefront texts",
+    "storefront_subtitle": "Edit every text shown in your online store (theme01), per language",
+    "content_hint": "Leave a field untouched (or clear it) to keep the theme default. Changes apply to the selected store language.",
+    "content_reset": "Restore default",
+    "content_reset_lang": "Reset this language",
+    "content_modified": "Customized",
+    "content_placeholder_hint": "Keep placeholder tokens like {n} or {currency} as-is — they are replaced with live values.",
+    "logo_label": "Store logo",
+    "logo_hint": "Shown in the store header and footer. JPG, PNG, WebP or GIF, up to 10 MB. Remove it to fall back to the store name.",
+    "logo_upload": "Upload logo",
+    "logo_remove": "Remove logo",
+    "logo_uploading": "Uploading…"
   },
   "shipping": {
     "title": "Shipping Rates",

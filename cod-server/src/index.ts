@@ -48,6 +48,7 @@ import storeOtpRoutes from "@/endpoints/store-otp/store-routes";
 
 import { sweepAbandonedOrders } from "@/cron/sweep-abandoned-orders";
 import { runDailyReport } from "@/cron/daily-report";
+import { syncCarrierStatuses } from "@/cron/sync-carrier-statuses";
 
 // MCP remote server (remote Model Context Protocol endpoint for Claude / AI agents).
 // The OAuthProvider owns OAuth (discovery, client registration, tokens, revocation)
@@ -220,10 +221,21 @@ export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) =>
     getOAuthProvider(env).fetch(request, env, ctx),
   async scheduled(
-    _event: ScheduledEvent,
+    event: ScheduledController | ScheduledEvent,
     env: Env,
     ctx: ExecutionContext,
   ): Promise<void> {
+    // Two cron triggers (wrangler.toml): the */15 carrier status sync and the
+    // hourly maintenance sweep. ScheduledController.cron carries the expression
+    // that fired; ScheduledEvent (older typings/tests) has none, so an unknown
+    // schedule falls through to the maintenance branch.
+    const cron = "cron" in event ? event.cron : undefined;
+
+    if (cron === "*/15 * * * *") {
+      ctx.waitUntil(syncCarrierStatuses(env, ctx));
+      return;
+    }
+
     ctx.waitUntil(sweepAbandonedOrders(env));
     ctx.waitUntil(runDailyReport(env));
     ctx.waitUntil(

@@ -194,7 +194,19 @@
     "approval_action_settings_integrations": "تغيير إعدادات التكاملات والأسرار",
     "approval_action_landing_pages_publish": "نشر صفحة الهبوط",
     "approval_action_landing_pages_delete": "حذف صفحة الهبوط",
-    "reports_title": "التقارير اليومية"
+    "reports_title": "التقارير اليومية",
+    "storefront_title": "نصوص المتجر",
+    "storefront_subtitle": "تخصيص كل الكتابة الظاهرة في متجرك الإلكتروني (theme01) حسب اللغة",
+    "content_hint": "اترك الحقل كما هو أو امسحه لتبقى القيمة الافتراضية للمظهر. التعديلات تُطبَّق على لغة المتجر المحددة.",
+    "content_reset": "إعادة النص الافتراضي",
+    "content_reset_lang": "إعادة تعيين هذه اللغة",
+    "content_modified": "معدَّل",
+    "content_placeholder_hint": "احتفظ بمتغيرات الأقواس مثل {n} أو {currency} كما هي — تُستبدل بقيم حقيقية أثناء العرض.",
+    "logo_label": "شعار المتجر",
+    "logo_hint": "يظهر في رأس وتذييل متجرك. JPG أو PNG أو WebP أو GIF، بحد أقصى 10 م.ب. احذفه للعودة إلى عرض اسم المتجر.",
+    "logo_upload": "رفع الشعار",
+    "logo_remove": "حذف الشعار",
+    "logo_uploading": "جارٍ الرفع…"
   },
   "shipping": {
     "title": "أسعار التوصيل",

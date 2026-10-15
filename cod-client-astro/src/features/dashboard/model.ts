@@ -233,43 +233,6 @@ export function layoutsEqual(a: LayoutEntry[], b: LayoutEntry[]): boolean {
   return a.length === b.length && a.every((entry, index) => entry.id === b[index].id && entry.hidden === b[index].hidden);
 }
 
-// ─── Wilaya tile map ──────────────────────────────────────────────────────────
-
-/**
- * Tile cartogram of the 58 wilayas: approximate (column, row) positions from
- * the Mediterranean coast (row 0) down to the far south. Good enough to read
- * regional patterns at a glance without shipping GeoJSON.
- */
-export const WILAYA_TILES: Array<{ id: number; col: number; row: number }> = [
-  // Coast
-  { id: 46, col: 0, row: 0 }, { id: 31, col: 1, row: 0 }, { id: 27, col: 2, row: 0 }, { id: 2, col: 3, row: 0 },
-  { id: 42, col: 4, row: 0 }, { id: 16, col: 5, row: 0 }, { id: 35, col: 6, row: 0 }, { id: 15, col: 7, row: 0 },
-  { id: 6, col: 8, row: 0 }, { id: 18, col: 9, row: 0 }, { id: 21, col: 10, row: 0 }, { id: 23, col: 11, row: 0 },
-  { id: 36, col: 12, row: 0 },
-  // Tell
-  { id: 13, col: 0, row: 1 }, { id: 22, col: 1, row: 1 }, { id: 29, col: 2, row: 1 }, { id: 48, col: 3, row: 1 },
-  { id: 44, col: 4, row: 1 }, { id: 9, col: 5, row: 1 }, { id: 10, col: 6, row: 1 }, { id: 34, col: 7, row: 1 },
-  { id: 19, col: 8, row: 1 }, { id: 43, col: 9, row: 1 }, { id: 25, col: 10, row: 1 }, { id: 24, col: 11, row: 1 },
-  { id: 41, col: 12, row: 1 },
-  // High plateaus
-  { id: 45, col: 0, row: 2 }, { id: 20, col: 1, row: 2 }, { id: 14, col: 2, row: 2 }, { id: 38, col: 3, row: 2 },
-  { id: 26, col: 5, row: 2 }, { id: 28, col: 7, row: 2 }, { id: 5, col: 9, row: 2 }, { id: 4, col: 10, row: 2 },
-  { id: 40, col: 11, row: 2 }, { id: 12, col: 12, row: 2 },
-  // Steppe / pre-Sahara
-  { id: 32, col: 1, row: 3 }, { id: 17, col: 4, row: 3 }, { id: 3, col: 5, row: 3 }, { id: 51, col: 7, row: 3 },
-  { id: 7, col: 8, row: 3 }, { id: 57, col: 10, row: 3 }, { id: 39, col: 11, row: 3 },
-  // Northern Sahara
-  { id: 8, col: 0, row: 4 }, { id: 52, col: 1, row: 4 }, { id: 47, col: 5, row: 4 }, { id: 30, col: 8, row: 4 },
-  { id: 55, col: 9, row: 4 },
-  // Central Sahara
-  { id: 49, col: 2, row: 5 }, { id: 56, col: 5, row: 5 }, { id: 58, col: 6, row: 5 }, { id: 33, col: 11, row: 5 },
-  // Deep south
-  { id: 1, col: 1, row: 6 }, { id: 50, col: 2, row: 6 }, { id: 11, col: 6, row: 6 }, { id: 54, col: 10, row: 6 },
-  { id: 53, col: 6, row: 7 },
-];
-
-export const WILAYA_GRID = { cols: 13, rows: 8 };
-
 export type HeatMetric = "orders" | "deliveryRate" | "returnRate" | "revenueDelivered";
 
 /** 0..1 intensity for a metric value against the observed max. */

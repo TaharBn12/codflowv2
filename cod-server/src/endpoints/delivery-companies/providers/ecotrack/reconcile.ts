@@ -34,11 +34,16 @@ export interface ReconcileSummary {
 
 export const DEFAULT_MAX_PAGES = 10;
 
+/** Fired after a reconcile actually advanced an order — lets the caller react (Meta CAPI). */
+export interface ReconcileApplyHook {
+  (order: { id: string; wilayaId: number | null }, newStatus: string): void;
+}
+
 export async function reconcileEcotrackOrders(
   db: AppDb,
   provider: EcotrackProvider,
   companyCode: string,
-  options?: { maxPages?: number }
+  options?: { maxPages?: number; onApplied?: ReconcileApplyHook }
 ): Promise<ReconcileSummary> {
   const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
   const source = `ecotrack-reconcile:${companyCode}`;
@@ -88,6 +93,7 @@ export async function reconcileEcotrackOrders(
       const { updated } = await updateOrderStatusWebhook(db, order.id, mapped, source);
       if (updated) {
         summary.updated += 1;
+        options?.onApplied?.({ id: order.id, wilayaId: order.wilayaId ?? null }, mapped);
       } else {
         summary.unchanged += 1;
       }

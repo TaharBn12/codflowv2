@@ -1,13 +1,15 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import {
   AlertCircle,
+  Download,
   Filter,
   PackageOpen,
+  RefreshCw,
   WandSparkles,
   X,
 } from "lucide-react";
 import { canScope, useIdentity } from "@/features/auth/components/RequireAuth";
-import { useT } from "@/i18n/react";
+import { useLocale, useT } from "@/i18n/react";
 import {
   autoAssignNewOrders,
   bulkAssignConfirmationOrders,
@@ -19,18 +21,29 @@ import {
 import { notify } from "@/lib/notify";
 import { ApiError } from "@/lib/api";
 import {
+  assignDriver,
+  bulkSyncCarrierStatuses,
   listDeliveryCompanies,
   listDrivers,
   listOrders,
+  updateOrderStatus,
 } from "@/features/orders/api";
 import {
   FILTER_STATUSES,
   filterOrders,
+  formatMoney,
   paginateOrders,
   sortOrders,
   type OrderFilters,
   type OrderSortKey,
 } from "@/features/orders/model";
+import {
+  DEFAULT_CSV_COLUMNS,
+  buildOrdersCsv,
+  downloadCsv,
+  orderCsvColumns,
+  ordersCsvFilename,
+} from "@/features/orders/csv";
 import {
   ORDER_STATUSES,
   type DeliveryCompany,
@@ -124,6 +137,7 @@ function FilterSelect({
 
 export function OrdersList() {
   const t = useT("orders");
+  const locale = useLocale();
   const common = useT("common");
   const operations = useT("operations");
   const auth = useT("auth");
@@ -136,6 +150,12 @@ export function OrdersList() {
   const [bulkAgentId, setBulkAgentId] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [autoAssignBusy, setAutoAssignBusy] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkDriverId, setBulkDriverId] = useState("");
+  const [bulkActionBusy, setBulkActionBusy] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportColumns, setExportColumns] = useState<string[]>(DEFAULT_CSV_COLUMNS);
   const [automationEnabled, setAutomationEnabled] = useState(true);
   const [automationBusy, setAutomationBusy] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | Error | null>(null);
@@ -303,6 +323,107 @@ export function OrdersList() {
     }
   }
 
+  /**
+   * Pull the latest statuses from the delivery companies. With a selection it
+   * polls only those orders (throttle bypassed); without one it sweeps every
+   * company that is due. The server applies changes forward-only, so this can
+   * never move an order backwards.
+   */
+  async function syncFromCarriers() {
+    setSyncBusy(true);
+    setActionError(null);
+    try {
+      const orderIds = selectedIds.size ? [...selectedIds] : undefined;
+      const result = await bulkSyncCarrierStatuses({ orderIds, force: !!orderIds });
+      const { totals, companies } = result;
+      const unmapped = companies
+        .flatMap((company) => company.unmappedStatuses)
+        .filter((value, index, all) => all.indexOf(value) === index);
+      const summary = t("carrier_sync.result")
+        .replace("{updated}", String(totals.updated))
+        .replace("{polled}", String(totals.polled))
+        .replace("{errors}", String(totals.errors));
+      if (totals.errors > 0) notify.error(`${summary} — ${t("carrier_sync.errors")}`);
+      else if (unmapped.length > 0)
+        notify.success(`${summary} — ${t("carrier_sync.unmapped")}: ${unmapped.join(", ")}`);
+      else notify.success(summary);
+      setSelectedIds(new Set());
+      await load();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  /**
+   * Bulk status change / driver assignment.
+   *
+   * These run per order rather than through one endpoint on purpose: the
+   * single-order handlers own the state-machine and dispatch side effects
+   * (shipment creation, activity log, notifications), and an order whose
+   * transition is rejected must not abort the rest of the batch. The tally
+   * is reported back so a partial run is never silent.
+   */
+  async function bulkUpdate(mode: "status" | "driver") {
+    const target = mode === "status" ? bulkStatus : bulkDriverId;
+    if (!target || selectedIds.size === 0 || bulkActionBusy) return;
+    setBulkActionBusy(true);
+    let ok = 0;
+    let failed = 0;
+    let lastError = "";
+    for (const id of [...selectedIds]) {
+      try {
+        if (mode === "status") await updateOrderStatus(id, target);
+        else await assignDriver(id, target);
+        ok += 1;
+      } catch (error) {
+        failed += 1;
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+    }
+    setBulkActionBusy(false);
+    setSelectedIds(new Set());
+    if (mode === "status") setBulkStatus("");
+    else setBulkDriverId("");
+    await load();
+    const summary = t(
+      mode === "status" ? "bulk.done_status" : "bulk.done_driver",
+    ).replace("{ok}", String(ok));
+    if (failed === 0) {
+      notify.success(summary);
+      return;
+    }
+    const failure = t("bulk.failed").replace("{count}", String(failed));
+    notify.error(
+      ok > 0
+        ? `${t("bulk.partial").replace("{ok}", String(ok)).replace("{count}", String(failed))} — ${lastError}`
+        : `${failure} — ${lastError}`,
+    );
+  }
+
+  /** Export the current filter + sort — not the whole table. */
+  function exportCsv(rows: OrderListItem[]) {
+    const labels = new Proxy({} as Record<string, string>, {
+      get: (_target, key: string) => t(`export.columns.${key}`),
+    });
+    const columns = orderCsvColumns(
+      labels,
+      (status) => t(`status.${status}`),
+      (value) => formatMoney(value, locale),
+    ).filter((column) => exportColumns.includes(column.key));
+
+    if (rows.length === 0) {
+      notify.error(t("export.export_empty"));
+      return;
+    }
+    if (columns.length === 0) {
+      notify.error(t("export.export_columns_title"));
+      return;
+    }
+    downloadCsv(ordersCsvFilename("orders"), buildOrdersCsv(rows, columns));
+  }
+
   async function toggleAutomation() {
     setAutomationBusy(true);
     try {
@@ -366,6 +487,59 @@ export function OrdersList() {
           </button>
           <button
             type="button"
+            disabled={syncBusy}
+            onClick={() => void syncFromCarriers()}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 text-sm font-semibold disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={syncBusy ? "animate-spin" : undefined} />
+            {syncBusy ? t("carrier_sync.syncing") : t("carrier_sync.bulk_button")}
+          </button>
+          <Select
+            aria-label={t("bulk.status_title")}
+            value={bulkStatus}
+            onChange={(event) => setBulkStatus(event.target.value)}
+            className="h-10 min-w-44 rounded-lg border border-input bg-background px-3 text-sm"
+          >
+            <option value="">{t("bulk.pick_status")}</option>
+            {FILTER_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {t(`status.${status}`)}
+              </option>
+            ))}
+          </Select>
+          <button
+            type="button"
+            disabled={!bulkStatus || bulkActionBusy}
+            onClick={() => void bulkUpdate("status")}
+            className="h-10 rounded-lg border border-input bg-background px-4 text-sm font-semibold disabled:opacity-50"
+          >
+            {t("bulk.apply")}
+          </button>
+          <Select
+            aria-label={t("bulk.driver_title")}
+            value={bulkDriverId}
+            onChange={(event) => setBulkDriverId(event.target.value)}
+            className="h-10 min-w-44 rounded-lg border border-input bg-background px-3 text-sm"
+          >
+            <option value="">{t("bulk.pick_driver")}</option>
+            {drivers
+              .filter((driver) => driver.status !== "inactive")
+              .map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.firstName} {driver.lastName}
+                </option>
+              ))}
+          </Select>
+          <button
+            type="button"
+            disabled={!bulkDriverId || bulkActionBusy}
+            onClick={() => void bulkUpdate("driver")}
+            className="h-10 rounded-lg border border-input bg-background px-4 text-sm font-semibold disabled:opacity-50"
+          >
+            {t("bulk.apply")}
+          </button>
+          <button
+            type="button"
             onClick={() => setSelectedIds(new Set())}
             className="h-10 px-3 text-sm font-semibold text-muted-foreground"
           >
@@ -417,6 +591,27 @@ export function OrdersList() {
                 </button>
               </>
             )}
+            {canScope(identity, "orders:update") && (
+              <button
+                type="button"
+                disabled={syncBusy}
+                onClick={() => void syncFromCarriers()}
+                title={t("carrier_sync.toolbar_hint")}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-semibold disabled:opacity-60"
+              >
+                <RefreshCw size={16} className={syncBusy ? "animate-spin" : undefined} />
+                {syncBusy ? t("carrier_sync.syncing") : t("carrier_sync.toolbar_button")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setExportOpen((open) => !open)}
+              aria-expanded={exportOpen}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-semibold"
+            >
+              <Download size={16} />
+              {t("export.export_button")}
+            </button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <FilterSelect
@@ -505,6 +700,48 @@ export function OrdersList() {
               </button>
             )}
           </div>
+          {exportOpen && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                {t("export.export_columns_title")}
+              </p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                {orderCsvColumns(
+                  new Proxy({} as Record<string, string>, {
+                    get: (_target, key: string) => t(`export.columns.${key}`),
+                  }),
+                  (status) => t(`status.${status}`),
+                  (value) => formatMoney(value, locale),
+                ).map((column) => (
+                  <label
+                    key={column.key}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={exportColumns.includes(column.key)}
+                      onChange={(event) =>
+                        setExportColumns((current) =>
+                          event.target.checked
+                            ? [...current, column.key]
+                            : current.filter((key) => key !== column.key),
+                        )
+                      }
+                    />
+                    {column.header}
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => exportCsv(sortedOrders)}
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+              >
+                <Download size={15} />
+                {t("export.export_run").replace("{count}", String(sortedOrders.length))}
+              </button>
+            </div>
+          )}
         </div>
 
         {filteredOrders.length === 0 ? (

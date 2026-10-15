@@ -155,6 +155,42 @@ describe("Stores routes (OpenAPIHono)", () => {
       });
     });
 
+    it("returns 400 for malformed contentJson", async () => {
+      vi.mocked(queries.getStore).mockResolvedValue(storeRow());
+
+      for (const contentJson of ["not json", "[1,2]", '{"heroTitle": 42}']) {
+        const res = await app.request("/api/stores/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentJson }),
+        });
+
+        expect(res.status, contentJson).toBe(400);
+        const body: any = await res.json();
+        expect(body, contentJson).toMatchObject({
+          category: ERROR_CATEGORIES.VALIDATION,
+        });
+      }
+    });
+
+    it("accepts per-language and flat contentJson", async () => {
+      vi.mocked(queries.getStore).mockResolvedValue(storeRow());
+      vi.mocked(queries.updateStore).mockImplementation(
+        async (_db, _id, data: any) => storeRow({ contentJson: data.contentJson })
+      );
+
+      const perLang = JSON.stringify({ ar: { heroTitle: "عنوان" }, en: {} });
+      const res = await app.request("/api/stores/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentJson: perLang }),
+      });
+
+      expect(res.status).toBe(200);
+      const body: any = await res.json();
+      expect(body.data.contentJson).toBe(perLang);
+    });
+
     it("returns 404 when no store exists", async () => {
       vi.mocked(queries.getStore).mockResolvedValue(undefined);
 

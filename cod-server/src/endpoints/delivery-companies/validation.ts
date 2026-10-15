@@ -29,6 +29,11 @@ export const createDeliveryCompanySchema = z.object({
    */
   autoValidate: z.boolean().optional(),
 
+  /** Poll this company's tracking API on the cron tick and apply status changes. */
+  autoSyncEnabled: z.boolean().optional(),
+  /** Minimum minutes between two polls of the same order (5 min – 24 h). */
+  autoSyncIntervalMin: z.number().int().min(5).max(1440).optional(),
+
   notes: z.string().optional().nullable(),
 });
 
@@ -50,6 +55,10 @@ export const updateDeliveryCompanySchema = z.object({
   supportsTracking: z.boolean().optional(),
   /** Toggle the post-dispatch auto-validate behavior. See create schema for semantics. */
   autoValidate: z.boolean().optional(),
+  /** Toggle carrier status auto-sync (tracking polling). */
+  autoSyncEnabled: z.boolean().optional(),
+  /** Minimum minutes between two polls of the same order (5 min – 24 h). */
+  autoSyncIntervalMin: z.number().int().min(5).max(1440).optional(),
   notes: z.string().optional().nullable(),
 });
 

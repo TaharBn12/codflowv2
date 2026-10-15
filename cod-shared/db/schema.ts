@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, real, uniqueIndex, index, primaryKey } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import { CONTACT_CHANNELS, CONTACT_OUTCOMES } from "../lib/order-contact";
 
 const authNow = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
 
@@ -396,6 +397,17 @@ export const deliveryCompanies = sqliteTable("delivery_companies", {
    */
   webhookStatusMapping: text("webhook_status_mapping"),
 
+  // ── Carrier status auto-sync (polling) ──────────────────────────────────
+  /**
+   * Poll this company's tracking API on the cron tick and apply status
+   * changes through the shared forward-only rank guard. ON by default:
+   * it is the only status source for NOEST/EcoTrack (no inbound webhooks)
+   * and the catch-up path when a Yalidine/ZR webhook is missed.
+   */
+  autoSyncEnabled: integer("auto_sync_enabled", { mode: "boolean" }).notNull().default(true),
+  /** Minimum minutes between two polls of the same order for this company. */
+  autoSyncIntervalMin: integer("auto_sync_interval_min").notNull().default(30),
+
   /**
    * If true, our dispatcher calls valid/order immediately after create/order (default).
    * If false, the team must manually validate via POST /orders/:id/validate-shipment.
@@ -527,6 +539,14 @@ export const orders = sqliteTable("orders", {
 
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+
+  // ── Carrier status auto-sync (migration 0035 appends these — keep last) ──
+  /** When the tracking API was last polled for this order (throttle cursor). */
+  lastTrackingSyncAt: text("last_tracking_sync_at"),
+  /** Raw carrier status string seen at the last poll — audit for unmapped values. */
+  lastCarrierStatus: text("last_carrier_status"),
+  /** Consecutive poll failures; the engine backs off and surfaces this in the UI. */
+  trackingSyncFails: integer("tracking_sync_fails").notNull().default(0),
 });
 
 export const adminApprovalRequests = sqliteTable("admin_approval_requests", {
@@ -545,6 +565,18 @@ export const adminApprovalRequests = sqliteTable("admin_approval_requests", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (t) => ({ statusExpiryIdx: index("admin_approvals_status_expiry_idx").on(t.status, t.expiresAt) }));
+
+export const orderContactAttempts = sqliteTable("order_contact_attempts", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  channel: text("channel", { enum: CONTACT_CHANNELS }).notNull(),
+  outcome: text("outcome", { enum: CONTACT_OUTCOMES }).notNull(),
+  note: text("note"),
+  callbackAt: text("callback_at"),
+  createdBy: text("created_by").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (t) => ({ orderCreatedIdx: index("order_contact_attempts_order_created_idx").on(t.orderId, t.createdAt) }));
 
 export const orderConfirmationAssignments = sqliteTable("order_confirmation_assignments", {
   orderId: text("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
@@ -1154,6 +1186,45 @@ export const webhookEvents = sqliteTable("webhook_events", {
   createdAt: text("created_at").notNull(),
 }, (t) => ({
   providerEventUnique: uniqueIndex("webhook_events_provider_event_unique").on(t.provider, t.eventId),
+}));
+
+/**
+ * One row per auto-sync run (cron tick, manual trigger, or per-company trigger).
+ *
+ * Summary only — per-order outcomes live on orders (last_tracking_sync_at,
+ * last_carrier_status, tracking_sync_fails) and per-call detail in
+ * company_api_logs. `unmapped_statuses` keeps the distinct raw carrier
+ * strings that had no mapping so the admin knows what to add.
+ */
+export const carrierSyncRuns = sqliteTable("carrier_sync_runs", {
+  id: text("id").primaryKey(),
+  companyId: text("company_id")
+    .notNull()
+    .references(() => deliveryCompanies.id, { onDelete: "cascade" }),
+  /** 'cron' | 'manual' | 'company' */
+  trigger: text("trigger").notNull().default("cron"),
+  /** 'poll' = one tracking call per order; 'reconcile' = carrier list endpoint (EcoTrack). */
+  mode: text("mode").notNull().default("poll"),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+  /** Orders with a tracking number that matched the run's selection. */
+  scanned: integer("scanned").notNull().default(0),
+  /** Orders actually polled at the carrier (scanned minus throttled/failed-adapter). */
+  polled: integer("polled").notNull().default(0),
+  /** Orders whose status actually advanced. */
+  updated: integer("updated").notNull().default(0),
+  /** Polled, no status change (same rank or non-status transit events). */
+  unchanged: integer("unchanged").notNull().default(0),
+  /** Orders whose newest carrier status had no mapping. */
+  unmapped: integer("unmapped").notNull().default(0),
+  /** Orders whose carrier call threw. */
+  errors: integer("errors").notNull().default(0),
+  /** JSON array of distinct raw carrier strings with no mapping. */
+  unmappedStatuses: text("unmapped_statuses"),
+  /** Run-level failure (adapter construction, DB) — the run aborted. */
+  errorMessage: text("error_message"),
+}, (t) => ({
+  companyStartedIdx: index("idx_carrier_sync_runs_company").on(t.companyId, t.startedAt),
 }));
 
 // ─── Offers ───────────────────────────────────────────────────────────────────

@@ -107,8 +107,12 @@ export async function updateStatus(c: Context<AppContext>) {
   }
 
   await logActivity(db, user, ACTIONS.ORDER_STATUS_CHANGED, {
-    type: "order", id: orderId,
+    type: "order", id: orderId, label: order.orderNumber,
   }, { from: order.status, to: validated.status });
+
+  if (validated.status === "confirmed" || validated.status === "cancelled") {
+    await queries.completeOrderCallbacks(db, orderId);
+  }
 
   return c.json({
     success: true,
@@ -167,7 +171,7 @@ export async function assignDriver(c: Context<AppContext>) {
 
   // Check if driver exists
   const driver = await db
-    .select({ id: drivers.id })
+    .select({ id: drivers.id, firstName: drivers.firstName, lastName: drivers.lastName })
     .from(drivers)
     .where(eq(drivers.id, validated.driverId))
     .get();
@@ -181,7 +185,10 @@ export async function assignDriver(c: Context<AppContext>) {
   const actor = c.get("user");
   await logActivity(db, actor, ACTIONS.ORDER_DRIVER_ASSIGNED, {
     type: "order", id: orderId, label: order.orderNumber,
-  }, { driverId: validated.driverId });
+  }, {
+    driverId: validated.driverId,
+    driverName: [driver.firstName, driver.lastName].filter(Boolean).join(" ") || null,
+  });
 
   return c.json({ success: true, message: "Driver assigned successfully" }, 200);
 }
@@ -237,7 +244,7 @@ export async function unassignDriver(c: Context<AppContext>) {
   const actor = c.get("user");
   await logActivity(db, actor, ACTIONS.ORDER_DRIVER_ASSIGNED, {
     type: "order", id: orderId, label: order.orderNumber,
-  }, { driverId: null, previousDriverId });
+  }, { driverId: null, previousDriverId, previousDriverName: order.driverName ?? null });
 
   return c.json({ success: true, message: "Driver unassigned" }, 200);
 }

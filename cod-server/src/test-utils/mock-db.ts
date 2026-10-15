@@ -224,6 +224,10 @@ export function orderRow(overrides: Record<string, unknown> = {}): Record<string
     landing_page_id: null,
     created_at: NOW,
     updated_at: NOW,
+    // Migration 0035 appends the carrier auto-sync columns last.
+    last_tracking_sync_at: null,
+    last_carrier_status: null,
+    tracking_sync_fails: 0,
     ...overrides,
   };
 }

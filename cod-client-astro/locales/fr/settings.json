@@ -194,7 +194,19 @@
     "approval_action_settings_integrations": "Modifier les intégrations et secrets",
     "approval_action_landing_pages_publish": "Publier une landing page",
     "approval_action_landing_pages_delete": "Supprimer une landing page",
-    "reports_title": "Rapports quotidiens"
+    "reports_title": "Rapports quotidiens",
+    "storefront_title": "Textes de la boutique",
+    "storefront_subtitle": "Personnalisez tous les textes affichés dans votre boutique en ligne (theme01), par langue",
+    "content_hint": "Laissez un champ tel quel (ou videz-le) pour conserver le texte par défaut du thème. Les modifications s'appliquent à la langue de la boutique sélectionnée.",
+    "content_reset": "Restaurer le texte par défaut",
+    "content_reset_lang": "Réinitialiser cette langue",
+    "content_modified": "Personnalisé",
+    "content_placeholder_hint": "Gardez les jetons de type {n} ou {currency} tels quels — ils sont remplacés par des valeurs réelles.",
+    "logo_label": "Logo de la boutique",
+    "logo_hint": "Affiché dans l'en-tête et le pied de page. JPG, PNG, WebP ou GIF, 10 Mo max. Supprimez-le pour revenir au nom de la boutique.",
+    "logo_upload": "Téléverser le logo",
+    "logo_remove": "Supprimer le logo",
+    "logo_uploading": "Téléversement…"
   },
   "shipping": {
     "title": "Tarifs de livraison",
