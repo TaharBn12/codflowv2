@@ -15,6 +15,7 @@ import {
   filterOrders,
   formatMoney,
   orderSla,
+  orderSlaCompactLabel,
   orderTotal,
   orderStatusFlow,
   orderStatusOptions,
@@ -331,6 +332,26 @@ describe("orderSla", () => {
 
   it("tolerates an unparsable createdAt", () => {
     expect(orderSla({ status: "new", createdAt: "not-a-date" }, NOW).level).toBe("ok");
+  });
+
+  it("compacts an unconfirmed order older than a day to >{days}J", () => {
+    const sla = orderSla({ status: "new", createdAt: hoursAgo(24 * 3 + 5) }, NOW);
+    expect(orderSlaCompactLabel(sla)).toBe(">3J");
+  });
+
+  it("compacts a stuck delivery to >{days}J", () => {
+    const sla = orderSla({ status: "out_for_delivery", createdAt: hoursAgo(24 * 4) }, NOW);
+    expect(orderSlaCompactLabel(sla)).toBe(">4J");
+  });
+
+  it("keeps hours for an unconfirmed order younger than a day", () => {
+    const sla = orderSla({ status: "new", createdAt: hoursAgo(13) }, NOW);
+    expect(orderSlaCompactLabel(sla)).toBe("13h");
+  });
+
+  it("has no compact label while the order is on time", () => {
+    const sla = orderSla({ status: "new", createdAt: hoursAgo(2) }, NOW);
+    expect(orderSlaCompactLabel(sla)).toBeNull();
   });
 });
 
