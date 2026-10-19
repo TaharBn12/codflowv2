@@ -206,7 +206,8 @@
     "logo_hint": "يظهر في رأس وتذييل متجرك. JPG أو PNG أو WebP أو GIF، بحد أقصى 10 م.ب. احذفه للعودة إلى عرض اسم المتجر.",
     "logo_upload": "رفع الشعار",
     "logo_remove": "حذف الشعار",
-    "logo_uploading": "جارٍ الرفع…"
+    "logo_uploading": "جارٍ الرفع…",
+    "telegram_open_center": "مركز بوت Telegram: الروابط، الموافقات، التقارير والتنبيهات"
   },
   "shipping": {
     "title": "أسعار التوصيل",

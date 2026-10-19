@@ -206,7 +206,8 @@
     "logo_hint": "Affiché dans l'en-tête et le pied de page. JPG, PNG, WebP ou GIF, 10 Mo max. Supprimez-le pour revenir au nom de la boutique.",
     "logo_upload": "Téléverser le logo",
     "logo_remove": "Supprimer le logo",
-    "logo_uploading": "Téléversement…"
+    "logo_uploading": "Téléversement…",
+    "telegram_open_center": "Centre du bot Telegram : liens, approbations, rapports et alertes"
   },
   "shipping": {
     "title": "Tarifs de livraison",

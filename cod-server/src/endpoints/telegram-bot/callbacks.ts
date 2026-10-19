@@ -80,6 +80,7 @@ export type BotCallback =
   | { type: "orders_list"; filter: OrderFilter; page: number }
   | { type: "order_view"; orderId: string }
   | { type: "order_status"; orderId: string; status: BotOrderStatus }
+  | { type: "order_status_confirm"; orderId: string; status: BotOrderStatus }
   | { type: "approvals_list"; page: number }
   | { type: "approval_view"; id: string }
   | { type: "approval_decision"; id: string; decision: "approve" | "reject" | "reject_with_reason" }
@@ -100,6 +101,7 @@ export const CALLBACK_PREFIX = {
   ordersList: "ol",
   orderView: "ov",
   orderStatus: "os",
+  orderStatusConfirm: "oc",
   approvalsList: "al",
   approvalView: "aw",
   approvalDecision: "ad",
@@ -127,6 +129,8 @@ export function encodeCallback(callback: BotCallback): string {
       return `${CALLBACK_PREFIX.orderView}:${callback.orderId}`;
     case "order_status":
       return `${CALLBACK_PREFIX.orderStatus}:${callback.orderId}:${STATUS_CODE[callback.status]}`;
+    case "order_status_confirm":
+      return `${CALLBACK_PREFIX.orderStatusConfirm}:${callback.orderId}:${STATUS_CODE[callback.status]}`;
     case "approvals_list":
       return `${CALLBACK_PREFIX.approvalsList}:${Math.max(0, callback.page)}`;
     case "approval_view":
@@ -182,10 +186,15 @@ export function decodeCallback(data: string | undefined | null): BotCallback | n
     }
     case CALLBACK_PREFIX.orderView:
       return rest[0] ? { type: "order_view", orderId: rest[0] } : null;
-    case CALLBACK_PREFIX.orderStatus: {
+    case CALLBACK_PREFIX.orderStatus:
+    case CALLBACK_PREFIX.orderStatusConfirm: {
       const status = statusFromCode(rest[1] ?? "");
       if (!rest[0] || !status) return null;
-      return { type: "order_status", orderId: rest[0], status };
+      return {
+        type: prefix === CALLBACK_PREFIX.orderStatusConfirm ? "order_status_confirm" : "order_status",
+        orderId: rest[0],
+        status,
+      };
     }
     case CALLBACK_PREFIX.approvalsList: {
       const page = Number.parseInt(rest[0] ?? "0", 10);

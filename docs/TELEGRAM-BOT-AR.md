@@ -84,6 +84,12 @@ out_for_delivery → delivered | returned
 delivered | returned | cancelled → (نهائي)
 ```
 
+### الحالات مباشرة من القائمة
+
+تحت نتائج «طلبات» يظهر لكل صف زر الطلب + **حتى إجرائين مسموحين لحالته**، فلا
+حاجة لفتح البطاقة لتأكيد طلب جديد أو نقله للتحضير. الإلغاء والاسترجاع
+لا يظهران في القائمة: يظهران داخل البطاقة ويطلبان **تأكيداً صريحاً** (`oc`).
+
 - تغيير الحالة يمرّ عبر `updateOrderStatus` نفسها المستخدمة في اللوحة:
   تحديث قاعدة البيانات + منع التكرار (idempotency) + سجل النشاط + خطّافات
   CAPI Meta + المسارات اللاحقة (إرجاع المخزون، رصيد السائق…).
@@ -222,8 +228,8 @@ delivered | returned | cancelled → (نهائي)
 
 | الملف | التغطية |
 |---|---|
-| `cod-server/src/endpoints/telegram-bot/telegram-bot.test.ts` | تكويد الـ callback، الصلاحيات، الانتقالات، اللغات، البطاقات |
-| `cod-server/src/endpoints/telegram-approvals/*.test.ts` | قرار الموافقة، السياسات، أمن الـ Webhook |
+| `cod-server/src/endpoints/telegram-bot/telegram-bot.test.ts` | تكويد الـ callback، الصلاحيات، الانتقالات، اللغات، البطاقات، أزرار الحالة داخل القائمة، القائمة حسب الصلاحيات (45 اختباراً) |
+| `cod-server/src/endpoints/telegram-approvals/*.test.ts` | قرار الموافقة، السياسات، أمن الـ Webhook (10 اختبارات) |
 | `cod-client-astro/src/i18n/i18n-guard.test.ts` | تطابق مفاتيح اللغات الثلاث لكل نطاق |
 
 لتشغيل الكل:

@@ -115,6 +115,16 @@ export function TelegramSettings() {
           {t("store.telegram_environment")}
         </p>
       )}
+      <a
+        href="/telegram"
+        className="flex items-center justify-between gap-3 rounded-lg border border-brand/25 bg-brand/5 px-4 py-3 text-sm font-semibold text-brand transition-colors hover:bg-brand/10"
+      >
+        <span className="flex items-center gap-2">
+          <Bot size={16} />
+          {t("store.telegram_open_center")}
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
     </SettingsSection>
   );
 }

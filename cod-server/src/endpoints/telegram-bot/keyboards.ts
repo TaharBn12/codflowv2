@@ -13,8 +13,9 @@ import { encodeCallback, ORDER_FILTERS, type OrderFilter } from "./callbacks";
 import { alertKindLabel } from "./render";
 import type { InlineKeyboard, InlineKeyboardButton } from "./api";
 import type { BotOrderRow } from "./order-queries";
-import type { TelegramLinkRow } from "./store";
 import type { OrderStatus } from "../orders/transitions";
+import type { LinkedUser, TelegramLinkRow } from "./store";
+import { can } from "./permissions";
 import type { ApprovalRowView } from "./render";
 
 function button(text: string, callback: Parameters<typeof encodeCallback>[0]): InlineKeyboardButton {
@@ -25,12 +26,32 @@ function urlButton(text: string, url: string): InlineKeyboardButton {
   return { text, url };
 }
 
-export function mainMenuKeyboard(language: BotLanguage): InlineKeyboard {
-  return [
-    [button(botText(language, "menu_orders"), { type: "menu", view: "orders" }), button(botText(language, "menu_reports"), { type: "menu", view: "reports" })],
-    [button(botText(language, "menu_approvals"), { type: "menu", view: "approvals" }), button(botText(language, "menu_alerts"), { type: "menu", view: "alerts" })],
-    [button(botText(language, "menu_settings"), { type: "menu", view: "settings" }), button(botText(language, "menu_help"), { type: "menu", view: "help" })],
-  ];
+/**
+ * Main menu. When an identity is supplied only the sections it may open are
+ * rendered — a confirmer never sees «Approvals», a warehouse user never sees
+ * «Finance». Without an identity the full catalog is returned (tests/setup).
+ */
+export function mainMenuKeyboard(language: BotLanguage, identity?: LinkedUser | null): InlineKeyboard {
+  const rows: InlineKeyboard = [];
+  const allow = (permission: Parameters<typeof can>[1]) => !identity || can(identity, permission);
+  const first: InlineKeyboardButton[] = [];
+  if (allow("orders.read")) first.push(button(botText(language, "menu_orders"), { type: "menu", view: "orders" }));
+  if (allow("reports.view")) first.push(button(botText(language, "menu_reports"), { type: "menu", view: "reports" }));
+  if (first.length) rows.push(first);
+  const second: InlineKeyboardButton[] = [];
+  if (allow("approvals.view")) second.push(button(botText(language, "menu_approvals"), { type: "menu", view: "approvals" }));
+  second.push(button(botText(language, "menu_alerts"), { type: "menu", view: "alerts" }));
+  rows.push(second);
+  const third: InlineKeyboardButton[] = [];
+  if (allow("stock.view") && allow("reports.view"))
+    third.push(button(botText(language, "menu_stock"), { type: "report", period: "stock" }));
+  if (allow("orders.read")) third.push(button(botText(language, "menu_search"), { type: "search", target: "orders" }));
+  if (third.length) rows.push(third);
+  rows.push([
+    button(botText(language, "menu_settings"), { type: "menu", view: "settings" }),
+    button(botText(language, "menu_help"), { type: "menu", view: "help" }),
+  ]);
+  return rows;
 }
 
 const FILTER_LAYOUT: OrderFilter[] = [...ORDER_FILTERS];
@@ -63,16 +84,37 @@ export function ordersMenuKeyboard(language: BotLanguage, counts: Record<string,
   return rows;
 }
 
+/**
+ * Results list with the status actions attached to each result, so a status is
+ * one tap away without opening the card. Only targets the caller may actually
+ * apply are passed in (`allowedStatusTargets`), and "cancelled" is left to the
+ * card where it gets an explicit confirmation.
+ */
 export function ordersListKeyboard(
   language: BotLanguage,
-  input: { rows: BotOrderRow[]; filter: OrderFilter; page: number; total: number; pageSize: number },
+  input: {
+    rows: BotOrderRow[];
+    filter: OrderFilter;
+    page: number;
+    total: number;
+    pageSize: number;
+    quickTargets?: Record<string, OrderStatus[]>;
+  },
 ): InlineKeyboard {
-  const rows: InlineKeyboardButton[][] = input.rows.map((row, index) => [
-    button(
-      `${input.page * input.pageSize + index + 1}. ${row.orderNumber} · ${row.customerName}`.slice(0, 60),
-      { type: "order_view", orderId: row.id },
-    ),
-  ]);
+  const rows: InlineKeyboardButton[][] = input.rows.map((row, index) => {
+    const quick = (input.quickTargets?.[row.id] ?? []).filter((status) => status !== "cancelled").slice(0, 2);
+    const label = `${input.page * input.pageSize + index + 1}. ${row.orderNumber} · ${row.customerName}`;
+    return [
+      button(label.slice(0, quick.length ? 34 : 60), { type: "order_view", orderId: row.id }),
+      ...quick.map((status) =>
+        button(`${STATUS_EMOJI[status] ?? ""} ${statusLabel(language, status)}`.slice(0, 20), {
+          type: "order_status",
+          orderId: row.id,
+          status,
+        }),
+      ),
+    ];
+  });
   const pages = Math.max(1, Math.ceil(input.total / input.pageSize));
   const paging: InlineKeyboardButton[] = [];
   if (input.page > 0)

@@ -25,7 +25,13 @@ import {
 import { allowedStatusTargets, alertTogglePatch, can } from "./permissions";
 import { botText, ORDER_STATUSES, statusLabel } from "./i18n";
 import { escapeHtml, renderOrderCard, renderOrdersList, renderMainMenu } from "./render";
-import { mainMenuKeyboard, ordersMenuKeyboard, orderCardKeyboard, approvalsKeyboard } from "./keyboards";
+import {
+  mainMenuKeyboard,
+  ordersListKeyboard,
+  ordersMenuKeyboard,
+  orderCardKeyboard,
+  approvalsKeyboard,
+} from "./keyboards";
 import { generateLinkCode, roleCanReceive, DEFAULT_BOT_CONFIG, type LinkedUser } from "./store";
 import { normalizePhoneQuery } from "./order-queries";
 import { canTransition, allowedNextStatuses, type OrderStatus } from "../orders/transitions";
@@ -294,8 +300,33 @@ describe("keyboards", () => {
 
   it("builds the main menu with one row per pair", () => {
     const rows = mainMenuKeyboard("ar");
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     noEmptyRows(rows);
+  });
+
+  it("hides the sections a member cannot open", () => {
+    const confirmer = identity("confirmer");
+    const callbacks = mainMenuKeyboard("en", confirmer)
+      .flat()
+      .map((button) => button.callback_data ?? "");
+    expect(callbacks).toContain("mn:orders");
+    expect(callbacks).not.toContain("mn:approvals");
+    expect(callbacks).not.toContain("rp:stock");
+    const adminCallbacks = mainMenuKeyboard("en", identity("admin"))
+      .flat()
+      .map((button) => button.callback_data ?? "");
+    expect(adminCallbacks).toContain("mn:approvals");
+    expect(adminCallbacks).toContain("rp:stock");
+  });
+
+  it("exposes orders, reports, approvals, alerts, stock and search from the menu", () => {
+    const callbacks = mainMenuKeyboard("en").flat().map((button) => button.callback_data ?? "");
+    expect(callbacks).toContain("mn:orders");
+    expect(callbacks).toContain("mn:reports");
+    expect(callbacks).toContain("mn:approvals");
+    expect(callbacks).toContain("mn:alerts");
+    expect(callbacks).toContain("rp:stock");
+    expect(callbacks).toContain("sr:o");
   });
 
   it("shows counts on every filter button", () => {
@@ -317,6 +348,67 @@ describe("keyboards", () => {
     expect(rows[0][0].callback_data).toBe(`os:${ORDER_ID}:cf`);
     expect(rows[1].some((button) => button.url?.includes("wa.me/213"))).toBe(true);
     noEmptyRows(rows);
+  });
+
+  it("attaches the allowed status actions to each result in the list", () => {
+    const rows = ordersListKeyboard("ar", {
+      rows: [
+        {
+          id: ORDER_ID,
+          orderNumber: "ORD-20261019-0042",
+          customerName: "أمين",
+          phone: "0550123456",
+          status: "new",
+          price: 5000,
+          deliveryFee: 500,
+          codAmount: 5500,
+          createdAt: "2026-10-19T09:00:00.000Z",
+          wilayaId: 19,
+          wilayaName: "Sétif",
+          wilayaNameAr: "سطيف",
+        },
+      ],
+      filter: "new",
+      page: 0,
+      total: 1,
+      pageSize: 8,
+      // "cancelled" is intentionally dropped from the list (card confirms it).
+      quickTargets: { [ORDER_ID]: ["confirmed", "unreachable", "cancelled"] as OrderStatus[] },
+    });
+    expect(rows[0]).toHaveLength(3);
+    expect(rows[0][0].callback_data).toBe(`ov:${ORDER_ID}`);
+    expect(rows[0][1].callback_data).toBe(`os:${ORDER_ID}:cf`);
+    expect(rows[0][2].callback_data).toBe(`os:${ORDER_ID}:un`);
+    noEmptyRows(rows);
+  });
+
+  it("keeps every list callback inside the 64-byte budget", () => {
+    const rows = ordersListKeyboard("en", {
+      rows: Array.from({ length: 8 }, (_, index) => ({
+        id: ORDER_ID,
+        orderNumber: `ORD-2026101${index}-0042`,
+        customerName: "A customer",
+        phone: "0550123456",
+        status: "new" as OrderStatus,
+        price: 5000,
+        deliveryFee: 0,
+        codAmount: 5000,
+        createdAt: "2026-10-19T09:00:00.000Z",
+        wilayaId: 19,
+        wilayaName: "Sétif",
+        wilayaNameAr: "سطيف",
+      })),
+      filter: "all",
+      page: 0,
+      total: 8,
+      pageSize: 8,
+      quickTargets: {},
+    });
+    for (const row of rows) {
+      for (const button of row) {
+        expect(Buffer.byteLength(button.callback_data ?? "", "utf8")).toBeLessThanOrEqual(64);
+      }
+    }
   });
 
   it("sizes approval buttons for the 64-byte callback budget", () => {

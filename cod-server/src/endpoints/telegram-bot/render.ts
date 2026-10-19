@@ -118,7 +118,7 @@ export function renderOrdersList(
     return `${start}. ${statusLabel(language, row.status)} · <code>${escapeHtml(row.orderNumber)}</code>\n` +
       `   ${escapeHtml(cut(row.customerName, 26))} · ${money(language, row.price)} · ${timeOnly(row.createdAt)}`;
   });
-  return `${header}\n\n${lines.join("\n")}`;
+  return `${header}\n\n${lines.join("\n")}\n\n<i>${botText(language, "orders_quick_hint")}</i>`;
 }
 
 const DELIVERY_TYPE_LABEL: Record<BotLanguage, Record<string, string>> = {

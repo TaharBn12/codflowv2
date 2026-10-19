@@ -12,7 +12,7 @@
 
 import type { Env, AuthUser } from "@/types";
 import { getDb, type AppDb } from "@/db";
-import { telegramUserLinks } from "@/db/schema";
+import { telegramUserLinks, type OrderStatus } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import {
   answerCallback as apiAnswerCallback,
@@ -351,7 +351,7 @@ async function redeemLinkCode(ctx: Ctx, rawCode: string): Promise<void> {
       name: identity.user.name,
       role: roleLabel(ctx.language, identity.user.role),
     }),
-    mainMenuKeyboard(ctx.language),
+    mainMenuKeyboard(ctx.language, identity),
   );
   await recordBotEvent(
     ctx.db,
@@ -374,7 +374,7 @@ async function showMainMenu(ctx: Ctx, identity: LinkedUser, messageId?: number) 
   await reply(
     ctx,
     renderMainMenu(ctx.language, identity, counts),
-    mainMenuKeyboard(ctx.language),
+    mainMenuKeyboard(ctx.language, identity),
     messageId,
   );
 }
@@ -404,10 +404,13 @@ async function showOrdersList(
     countOrders(ctx.db, filter),
   ]);
   await setSession(ctx.db, ctx.telegramUserId, "idle", { filter, page }, ctx.now);
+  // Per-row allowed targets keep the list's quick actions identical to the card.
+  const quickTargets: Record<string, OrderStatus[]> = {};
+  for (const row of rows) quickTargets[row.id] = allowedStatusTargets(identity, row.status);
   await reply(
     ctx,
     renderOrdersList(ctx.language, { filter, page, total, rows, pageSize: BOT_PAGE_SIZE }),
-    ordersListKeyboard(ctx.language, { rows, filter, page, total, pageSize: BOT_PAGE_SIZE }),
+    ordersListKeyboard(ctx.language, { rows, filter, page, total, pageSize: BOT_PAGE_SIZE, quickTargets }),
     messageId,
   );
 }
@@ -583,11 +586,61 @@ async function showReport(
 
 // ─── Order actions ───────────────────────────────────────────────────────────
 
+/** Irreversible targets need an explicit second tap. */
+const DESTRUCTIVE_TARGETS: OrderStatus[] = ["cancelled", "returned"];
+
 async function applyStatus(
   ctx: Ctx,
   identity: LinkedUser,
   orderId: string,
-  target: BotOrderDetail["order"]["status"],
+  target: OrderStatus,
+  callbackId: string,
+  messageId?: number,
+) {
+  if (DESTRUCTIVE_TARGETS.includes(target)) {
+    const detail = await getOrderDetail(ctx.db, orderId);
+    if (!detail) {
+      await toast(ctx, callbackId, botText(ctx.language, "order_not_found"), true);
+      return;
+    }
+    if (!allowedStatusTargets(identity, detail.order.status).includes(target)) {
+      await audit(ctx, "order.status_denied", { type: "order", id: orderId }, "denied", target);
+      await toast(ctx, callbackId, botText(ctx.language, "permission_denied"), true);
+      return;
+    }
+    await reply(
+      ctx,
+      `⚠️ <b>${statusLabel(ctx.language, target)}</b>\n\n${botText(ctx.language, "confirm_status_body", {
+        order: detail.order.orderNumber,
+        status: statusLabel(ctx.language, target),
+      })}`,
+      [
+        [
+          {
+            text: botText(ctx.language, "confirm_status_yes"),
+            callback_data: encodeCallback({ type: "order_status_confirm", orderId, status: target }),
+          },
+        ],
+        [
+          {
+            text: botText(ctx.language, "confirm_status_no"),
+            callback_data: encodeCallback({ type: "order_view", orderId }),
+          },
+        ],
+      ],
+      messageId,
+    );
+    await toast(ctx, callbackId, "");
+    return;
+  }
+  await commitStatus(ctx, identity, orderId, target, callbackId, messageId);
+}
+
+async function commitStatus(
+  ctx: Ctx,
+  identity: LinkedUser,
+  orderId: string,
+  target: OrderStatus,
   callbackId: string,
   messageId?: number,
 ) {
@@ -754,6 +807,9 @@ async function handleCallback(
     }
     case "order_status":
       await applyStatus(ctx, identity, decoded.orderId, decoded.status, callback.id, messageId);
+      return;
+    case "order_status_confirm":
+      await commitStatus(ctx, identity, decoded.orderId, decoded.status, callback.id, messageId);
       return;
     case "show_phone": {
       const detail = await getOrderDetail(ctx.db, decoded.orderId);
@@ -1082,7 +1138,7 @@ async function handleMessage(
         await reply(ctx, `<code>${ctx.telegramUserId}</code>`);
         return;
       default:
-        await reply(ctx, botText(ctx.language, "unknown_command"), mainMenuKeyboard(ctx.language));
+        await reply(ctx, botText(ctx.language, "unknown_command"), mainMenuKeyboard(ctx.language, identity));
         return;
     }
   }
