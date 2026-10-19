@@ -21,10 +21,23 @@ import { chooseLeastLoadedConfirmer, createStaffCommissionStages } from "../../.
 import {
   APPROVAL_ACTIONS,
   configureTelegramWebhook,
+  decideApproval,
+  listApprovals,
   requestCommissionPayoutApproval,
   requiresTelegramApproval,
   resolveTelegramConfig,
 } from "@/endpoints/telegram-approvals/service";
+import {
+  createLinkCode,
+  getBotConfig,
+  listBotEvents,
+  listLinkedUsers,
+  revokeLink,
+  saveBotConfig,
+  type BotConfigRow,
+} from "@/endpoints/telegram-bot/store";
+import { getBotIdentity } from "@/endpoints/telegram-bot/api";
+import { sendTestMessage } from "@/endpoints/telegram-bot/notify";
 
 const routes = new OpenAPIHono<AppContext>();
 const activeOrderStatuses = ["new", "confirmed", "unreachable"] as const;
@@ -894,6 +907,170 @@ routes.get("/performance", async (c) => {
     data: result.results,
     count: result.results.length,
   });
+});
+
+// ─── Telegram bot management (dashboard) ─────────────────────────────────────
+
+routes.get("/telegram/bot/overview", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const db = getDb(c.env.DB);
+  const config = await resolveTelegramConfig(c.env);
+  const [bot, botConfig, links, events, approvals, members] = await Promise.all([
+    config ? getBotIdentity(config) : Promise.resolve(null),
+    getBotConfig(db),
+    listLinkedUsers(db),
+    listBotEvents(db, 40),
+    listApprovals(db, { status: "pending", limit: 20 }),
+    db
+      .select({ id: users.id, name: users.name, email: users.email, role: users.role, status: users.status })
+      .from(users)
+      .orderBy(users.role, users.name)
+      .all(),
+  ]);
+  const origin = c.env.WORKER_SELF_URL ? new URL(c.env.WORKER_SELF_URL).origin : null;
+  return c.json({
+    success: true,
+    data: {
+      connected: Boolean(config),
+      source: config?.source ?? null,
+      chatId: config?.chatId ?? null,
+      botUsername: bot?.username ?? null,
+      webhookUrl: origin ? `${origin}/webhooks/telegram` : null,
+      config: botConfig,
+      links,
+      events,
+      approvals,
+      members,
+      deepLinkBase: bot?.username ? `https://t.me/${bot.username}` : null,
+    },
+  });
+});
+
+routes.put("/telegram/bot/config", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z
+    .object({
+      enabled: z.boolean().optional(),
+      defaultLanguage: z.enum(["ar", "fr", "en"]).optional(),
+      quietHoursStart: z.number().int().min(0).max(23).optional(),
+      quietHoursEnd: z.number().int().min(0).max(23).optional(),
+      digestIntervalMinutes: z.number().int().min(5).max(1440).optional(),
+      weeklyReportEnabled: z.boolean().optional(),
+      weeklyReportDay: z.number().int().min(0).max(6).optional(),
+      weeklyReportHour: z.number().int().min(0).max(23).optional(),
+      monthlyReportEnabled: z.boolean().optional(),
+      monthlyReportHour: z.number().int().min(0).max(23).optional(),
+    })
+    .safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  }
+  const db = getDb(c.env.DB);
+  const next = await saveBotConfig(db, parsed.data as Partial<BotConfigRow>);
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, {
+    type: "operations",
+    id: "telegram-bot",
+    label: "Telegram bot settings",
+  }, { setting: "telegramBotConfig", ...parsed.data });
+  return c.json({ success: true, data: next });
+});
+
+routes.post("/telegram/bot/link-codes", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z
+    .object({ userId: z.string().min(1), ttlMinutes: z.number().int().min(5).max(1440).optional() })
+    .safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  }
+  const db = getDb(c.env.DB);
+  const member = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(eq(users.id, parsed.data.userId))
+    .get();
+  if (!member) return c.json({ success: false, code: "NOT_FOUND", error: "Team member not found" }, 404);
+  const result = await createLinkCode(db, {
+    userId: member.id,
+    createdBy: c.get("user").id,
+    ttlMinutes: parsed.data.ttlMinutes,
+  });
+  const config = await resolveTelegramConfig(c.env);
+  const bot = config ? await getBotIdentity(config) : null;
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, {
+    type: "operations",
+    id: member.id,
+    label: "Telegram link code",
+  }, { setting: "telegramLinkCode", userId: member.id });
+  return c.json({
+    success: true,
+    data: {
+      ...result,
+      userId: member.id,
+      userName: member.name,
+      command: `/link ${result.code}`,
+      deepLink: bot?.username ? `https://t.me/${bot.username}?start=${result.code}` : null,
+    },
+  });
+});
+
+routes.delete("/telegram/bot/links/:telegramUserId", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const db = getDb(c.env.DB);
+  const telegramUserId = c.req.param("telegramUserId");
+  const revoked = await revokeLink(db, telegramUserId);
+  if (!revoked) return c.json({ success: false, code: "NOT_FOUND", error: "Link not found" }, 404);
+  await logActivity(db, c.get("user"), ACTIONS.OPERATIONS_SETTINGS_CHANGED, {
+    type: "operations",
+    id: telegramUserId,
+    label: "Telegram link revoked",
+  }, { setting: "telegramLink", telegramUserId });
+  return c.json({ success: true, data: { telegramUserId, revoked: true } });
+});
+
+routes.post("/telegram/bot/test", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z.object({ telegramUserId: z.string().min(1) }).safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  }
+  const sent = await sendTestMessage(c.env, parsed.data.telegramUserId);
+  return c.json({ success: sent, data: { sent } }, sent ? 200 : 502);
+});
+
+// ─── Approval inbox (dashboard) ──────────────────────────────────────────────
+
+routes.get("/approvals", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const status = (c.req.query("status") ?? "pending") as "pending" | "approved" | "rejected" | "expired" | "failed" | "all";
+  const allowed = ["pending", "approved", "rejected", "expired", "failed", "all"];
+  if (!allowed.includes(status)) return c.json({ success: false, code: "VALIDATION_FAILED", error: "Unknown status" }, 400);
+  const limit = Math.min(Number.parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  const offset = Math.max(Number.parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
+  const result = await listApprovals(getDb(c.env.DB), { status, limit, offset });
+  return c.json({ success: true, data: result });
+});
+
+routes.post("/approvals/:id/decision", async (c) => {
+  if (!isAdmin(c)) return forbidden(c);
+  const parsed = z
+    .object({ decision: z.enum(["approve", "reject"]), note: z.string().trim().max(500).optional() })
+    .safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ success: false, code: "VALIDATION_FAILED", error: parsed.error.flatten() }, 400);
+  }
+  const actor = c.get("user");
+  const result = await decideApproval(c.env, c.req.param("id"), parsed.data.decision, `dashboard:${actor.id}`, {
+    actorUserId: actor.id,
+    note: parsed.data.note ?? null,
+    waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+  });
+  await logActivity(getDb(c.env.DB), actor, ACTIONS.OPERATIONS_SETTINGS_CHANGED, {
+    type: "approval",
+    id: c.req.param("id"),
+    label: parsed.data.decision,
+  }, { setting: "approvalDecision", decision: parsed.data.decision, ok: result.ok });
+  return c.json({ success: result.ok, message: result.text }, result.ok ? 200 : 409);
 });
 
 export default routes;

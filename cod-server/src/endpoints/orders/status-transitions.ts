@@ -15,6 +15,7 @@ import { logActivity, ACTIONS } from "@/lib/activity";
 import { NotFoundError, BusinessLogicError, ValidationError } from "@/lib/errors/classes";
 import { ERROR_CODES, ERROR_CATEGORIES } from "../../../../cod-shared/errors/codes";
 import { shouldTriggerCapiPurchase, shouldTriggerCapiConfirmed, getCapiWorkflowId } from "@/workflows/capi-helpers";
+import { ALLOWED_TRANSITIONS } from "./transitions";
 
 /**
  * PATCH /orders/:id/status
@@ -42,20 +43,6 @@ export async function updateStatus(c: Context<AppContext>) {
   }
 
   // Guard: enforce valid forward transitions — prevents backward moves and invalid jumps
-  const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    new:              ["confirmed", "unreachable", "cancelled"],
-    confirmed:        ["preparing", "unreachable", "cancelled"],
-    unreachable:      ["confirmed", "cancelled"],
-    preparing:        ["ready", "cancelled"],
-    ready:            ["out_for_delivery", "dispatched", "cancelled"],
-    assigned:         ["out_for_delivery", "dispatched", "cancelled"],
-    dispatched:       ["out_for_delivery", "cancelled"],
-    out_for_delivery: ["delivered", "returned"],
-    delivered:        [],
-    returned:         [],
-    cancelled:        [],
-  };
-
   const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
   if (!allowed.includes(validated.status)) {
     return c.json({

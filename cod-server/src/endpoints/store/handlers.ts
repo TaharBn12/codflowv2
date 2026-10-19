@@ -11,6 +11,7 @@ import { getPixelConfig } from "../../../../cod-shared/queries/pixel-config";
 import { resolveConversionForStage, getCapiWorkflowId } from "@/workflows/capi-helpers";
 import { stores } from "../../../../cod-shared/db/schema";
 import { eq } from "drizzle-orm";
+import { notifyNewOrder } from "@/endpoints/telegram-bot/notify";
 
 export async function getStoreConfig(c: Context<AppContext>) {
   const storeId = c.get("storeId")!;
@@ -223,6 +224,16 @@ export async function createStoreOrder(c: Context<AppContext>) {
     ipAddress,
     userAgent,
   });
+
+  // New-order Telegram ping (fire-and-forget). A notification failure must
+  // never turn a successful storefront order into a 500.
+  if (order && typeof order === "object" && "id" in order && typeof order.id === "string") {
+    try {
+      c.executionCtx.waitUntil(notifyNewOrder(c.env, order.id));
+    } catch {
+      void notifyNewOrder(c.env, order.id);
+    }
+  }
 
   // Meta CAPI conversion event at checkout — evaluated against merchant's tracking mode.
   // When mode is instant "Purchase", sends Purchase (matching the thank-you Pixel).

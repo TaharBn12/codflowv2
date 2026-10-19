@@ -17,6 +17,7 @@ import {
   Tag,
   Truck,
   Users,
+  Bot,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { canScope, useIdentity } from "@/features/auth/components/RequireAuth";
@@ -222,6 +223,13 @@ export function useNavSections(): NavSection[] {
           label: tN("sidebar.mcp"),
           icon: Sparkles,
           scope: "mcp:view",
+        },
+        {
+          kind: "leaf",
+          href: "/telegram",
+          label: tN("sidebar.telegram"),
+          icon: Bot,
+          scope: "admin",
         },
         {
           kind: "leaf",

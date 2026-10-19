@@ -28,7 +28,8 @@
     "api_reference": "مرجع API",
     "mcp": "وكلاء الذكاء الاصطناعي",
     "operations": "العمليات والمهام",
-    "support": "دعم العملاء"
+    "support": "دعم العملاء",
+    "telegram": "بوت Telegram"
   },
   "navbar": {
     "search_placeholder": "البحث عن طلبات، عملاء...",

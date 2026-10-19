@@ -560,6 +560,8 @@ export const adminApprovalRequests = sqliteTable("admin_approval_requests", {
   decidedByTelegramId: text("decided_by_telegram_id"),
   decisionNote: text("decision_note"),
   telegramMessageId: text("telegram_message_id"),
+  reminderSentAt: text("reminder_sent_at"),
+  escalatedAt: text("escalated_at"),
   expiresAt: text("expires_at").notNull(),
   decidedAt: text("decided_at"),
   createdAt: text("created_at").notNull(),
@@ -1772,4 +1774,114 @@ export const dashboardReportConfig = sqliteTable("dashboard_report_config", {
   updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+// ─── Interactive Telegram bot ────────────────────────────────────────────────
+
+/**
+ * One CodFlow user ↔ one Telegram account. Binding happens from the dashboard
+ * (one-time code) or from the bot (`/link CODE`), never by typing a user id.
+ * Preferences live here so each teammate picks their own alerts and language.
+ */
+export const telegramUserLinks = sqliteTable("telegram_user_links", {
+  telegramUserId: text("telegram_user_id").primaryKey(),
+  chatId: text("chat_id").notNull(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  username: text("username"),
+  firstName: text("first_name"),
+  language: text("language", { enum: ["ar", "fr", "en"] }).notNull().default("ar"),
+  notifyOrders: integer("notify_orders", { mode: "boolean" }).notNull().default(true),
+  notifyShipping: integer("notify_shipping", { mode: "boolean" }).notNull().default(true),
+  notifyStock: integer("notify_stock", { mode: "boolean" }).notNull().default(true),
+  notifyFinance: integer("notify_finance", { mode: "boolean" }).notNull().default(true),
+  notifySupport: integer("notify_support", { mode: "boolean" }).notNull().default(false),
+  notifyApprovals: integer("notify_approvals", { mode: "boolean" }).notNull().default(true),
+  notifyReports: integer("notify_reports", { mode: "boolean" }).notNull().default(true),
+  digestMode: text("digest_mode", { enum: ["instant", "hourly", "daily"] }).notNull().default("instant"),
+  mutedUntil: text("muted_until"),
+  linkedAt: text("linked_at").notNull(),
+  lastSeenAt: text("last_seen_at"),
+  revokedAt: text("revoked_at"),
+}, (t) => ({
+  userIdx: uniqueIndex("telegram_user_links_user_idx").on(t.userId),
+  chatIdx: index("telegram_user_links_chat_idx").on(t.chatId),
+}));
+
+/** Short-lived one-time code that binds a Telegram account to a CodFlow user. */
+export const telegramLinkCodes = sqliteTable("telegram_link_codes", {
+  code: text("code").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  usedByTelegramId: text("used_by_telegram_id"),
+  createdAt: text("created_at").notNull(),
+}, (t) => ({ userIdx: index("telegram_link_codes_user_idx").on(t.userId, t.expiresAt) }));
+
+/** Conversation state for multi-step bot flows. */
+export const telegramBotSessions = sqliteTable("telegram_bot_sessions", {
+  telegramUserId: text("telegram_user_id").primaryKey(),
+  state: text("state").notNull().default("idle"),
+  payload: text("payload"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** Telegram `update_id` dedupe — a retried webhook must never act twice. */
+export const telegramUpdateLog = sqliteTable("telegram_update_log", {
+  updateId: text("update_id").primaryKey(),
+  telegramUserId: text("telegram_user_id"),
+  kind: text("kind"),
+  receivedAt: text("received_at").notNull(),
+});
+
+/** Audit trail for every bot action (who, what, on which order, outcome). */
+export const telegramBotEvents = sqliteTable("telegram_bot_events", {
+  id: text("id").primaryKey(),
+  telegramUserId: text("telegram_user_id"),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: text("target_id"),
+  status: text("status", { enum: ["ok", "denied", "failed"] }).notNull().default("ok"),
+  detail: text("detail"),
+  createdAt: text("created_at").notNull(),
+}, (t) => ({
+  createdIdx: index("telegram_bot_events_created_idx").on(t.createdAt),
+  userIdx: index("telegram_bot_events_user_idx").on(t.userId, t.createdAt),
+}));
+
+/** Alerts queued while a user is in digest mode or inside quiet hours. */
+export const telegramDigestQueue = sqliteTable("telegram_digest_queue", {
+  id: text("id").primaryKey(),
+  telegramUserId: text("telegram_user_id").notNull(),
+  kind: text("kind").notNull(),
+  text: text("text").notNull(),
+  createdAt: text("created_at").notNull(),
+  sentAt: text("sent_at"),
+}, (t) => ({ pendingIdx: index("telegram_digest_queue_pending_idx").on(t.telegramUserId, t.sentAt, t.createdAt) }));
+
+/** Single-row bot behaviour settings (enabled, quiet hours, digests, reports). */
+export const telegramBotConfig = sqliteTable("telegram_bot_config", {
+  id: text("id").primaryKey().default("default"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  defaultLanguage: text("default_language", { enum: ["ar", "fr", "en"] }).notNull().default("ar"),
+  quietHoursStart: integer("quiet_hours_start").notNull().default(23),
+  quietHoursEnd: integer("quiet_hours_end").notNull().default(7),
+  digestIntervalMinutes: integer("digest_interval_minutes").notNull().default(60),
+  weeklyReportEnabled: integer("weekly_report_enabled", { mode: "boolean" }).notNull().default(true),
+  weeklyReportDay: integer("weekly_report_day").notNull().default(6),
+  weeklyReportHour: integer("weekly_report_hour").notNull().default(20),
+  monthlyReportEnabled: integer("monthly_report_enabled", { mode: "boolean" }).notNull().default(true),
+  monthlyReportHour: integer("monthly_report_hour").notNull().default(20),
+  lastWeeklySentOn: text("last_weekly_sent_on"),
+  lastMonthlySentOn: text("last_monthly_sent_on"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** Per-alert-key dedupe (one stuck-shipment notice per day, not per hour). */
+export const telegramAlertState = sqliteTable("telegram_alert_state", {
+  key: text("key").primaryKey(),
+  severity: text("severity").notNull().default("warning"),
+  lastSentAt: text("last_sent_at").notNull(),
+  detail: text("detail"),
 });

@@ -14,6 +14,7 @@ import * as queries from "./queries";
 import * as validation from "./validation";
 import { resolveDeliveryFee, applyFreeShippingOffer } from "./resolve-fee";
 import { logActivity, ACTIONS } from "@/lib/activity";
+import { notifyNewOrder } from "@/endpoints/telegram-bot/notify";
 import { getDeliveryCompanyById } from "@/endpoints/delivery-companies/queries";
 import { NotFoundError, ValidationError, BusinessLogicError } from "@/lib/errors/classes";
 import { ERROR_CODES } from "../../../../cod-shared/errors/codes";
@@ -231,6 +232,14 @@ export async function createOrder(c: Context<AppContext>) {
       type: "order", id: orderId, label: orderNumber,
     }, { orderType: validated.orderType, price: validated.price, deliveryFee });
     await logAutoConfirmerAssignment(db, actor, orderId, orderNumber);
+
+    // Telegram ping — best-effort, never blocks the response. waitUntil keeps
+    // the promise alive after the response is returned.
+    try {
+      c.executionCtx.waitUntil(notifyNewOrder(c.env, orderId));
+    } catch {
+      void notifyNewOrder(c.env, orderId);
+    }
 
     return c.json(
       {

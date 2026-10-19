@@ -353,6 +353,7 @@ astro check + tests for theme01.
 | **[docs/WHATSAPP-OTP-VERIFICATION.md](./docs/WHATSAPP-OTP-VERIFICATION.md)** | WhatsApp OTP verification feature |
 | **[docs/TURNSTILE.md](./docs/TURNSTILE.md)** | Cloudflare Turnstile checkout bot protection |
 | **[docs/EMAIL-SENDING.md](./docs/EMAIL-SENDING.md)** | Transactional email feature (Sendili) |
+| **[docs/TELEGRAM-BOT-AR.md](./docs/TELEGRAM-BOT-AR.md)** | Telegram bot: orders, reports, approvals, alerts |
 | **[CONTRIBUTING.md](./CONTRIBUTING.md)** | Development standards and PR workflow |
 | **[AGENTS.md](./AGENTS.md)** | Repository instructions for AI coding assistants |
 ### 🎬 Video Tutorial

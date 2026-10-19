@@ -28,7 +28,8 @@
     "api_reference": "API Reference",
     "mcp": "AI Agents",
     "operations": "Operations & tasks",
-    "support": "Customer support"
+    "support": "Customer support",
+    "telegram": "Telegram bot"
   },
   "navbar": {
     "search_placeholder": "Search for orders, customers...",

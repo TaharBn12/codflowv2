@@ -28,7 +28,8 @@
     "api_reference": "Référence API",
     "mcp": "Agents IA",
     "operations": "Opérations et tâches",
-    "support": "Support client"
+    "support": "Support client",
+    "telegram": "Bot Telegram"
   },
   "navbar": {
     "search_placeholder": "Rechercher des commandes, clients...",

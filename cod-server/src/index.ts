@@ -49,6 +49,7 @@ import storeOtpRoutes from "@/endpoints/store-otp/store-routes";
 import { sweepAbandonedOrders } from "@/cron/sweep-abandoned-orders";
 import { runDailyReport } from "@/cron/daily-report";
 import { syncCarrierStatuses } from "@/cron/sync-carrier-statuses";
+import { runTelegramBotMaintenance } from "@/cron/telegram-bot";
 
 // MCP remote server (remote Model Context Protocol endpoint for Claude / AI agents).
 // The OAuthProvider owns OAuth (discovery, client registration, tokens, revocation)
@@ -238,6 +239,7 @@ export default {
 
     ctx.waitUntil(sweepAbandonedOrders(env));
     ctx.waitUntil(runDailyReport(env));
+    ctx.waitUntil(runTelegramBotMaintenance(env));
     ctx.waitUntil(
       getOAuthProvider(env).purgeExpiredData(env, { batchSize: 50 }),
     );
