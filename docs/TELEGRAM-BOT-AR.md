@@ -4,8 +4,10 @@
 مخزون، تقارير، موافقات وتنبيهات — كلها بأزرار داخل المحادثة، بثلاث لغات
 (العربية، الفرنسية، الإنجليزية) واتجاه RTL/LTR تلقائي.
 
-> هذا المستند يصف **ما تم تنفيذه فعلياً**. الكتالوج الأصلي وأولوياته في
-> [`TELEGRAM-BOT-FEATURES-AR.md`](./TELEGRAM-BOT-FEATURES-AR.md).
+> هذا المستند يصف **ما تم تنفيذه فعلياً** من ناحية التشغيل. الكتالوج الأصلي
+> وأولوياته في [`TELEGRAM-BOT-FEATURES-AR.md`](./TELEGRAM-BOT-FEATURES-AR.md)،
+> والشرح التقني العميق (كيف تم الربط وكيف بُرمجت الأزرار) في
+> [`TELEGRAM-BOT-INTERNALS-AR.md`](./TELEGRAM-BOT-INTERNALS-AR.md).
 
 ---
 
@@ -28,7 +30,7 @@
 | المتغيّر | الاستخدام |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | رمز البوت (بديل عن إعدادات اللوحة) |
-| `TELEGRAM_ADMIN_CHAT_ID` | محادثة المسؤول الاحتياطية |
+| `TELEGRAM_APPROVAL_CHAT_ID` | محادثة المسؤول الاحتياطية |
 | `TELEGRAM_WEBHOOK_SECRET` | سر التحقق من الـ Webhook (يُولَّد تلقائياً عند التسجيل) |
 | `WORKER_SELF_URL` | أصل الـ Worker العام لتسجيل الـ Webhook |
 
