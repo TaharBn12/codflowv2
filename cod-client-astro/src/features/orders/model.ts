@@ -5,6 +5,7 @@ import type {
   OrderListItem,
   OrderStatus,
 } from "./types";
+import { ALLOWED_ORDER_TRANSITIONS } from "../../../../cod-shared/lib/order-status";
 
 export const FILTER_STATUSES: OrderStatus[] = [
   "new",
@@ -20,19 +21,12 @@ export const FILTER_STATUSES: OrderStatus[] = [
   "cancelled",
 ];
 
-export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  new: ["confirmed", "unreachable", "cancelled"],
-  confirmed: ["preparing", "unreachable", "cancelled"],
-  unreachable: ["confirmed", "cancelled"],
-  preparing: ["ready", "cancelled"],
-  ready: ["out_for_delivery", "dispatched", "cancelled"],
-  assigned: ["out_for_delivery", "dispatched", "cancelled"],
-  dispatched: ["out_for_delivery", "cancelled"],
-  out_for_delivery: ["delivered", "returned"],
-  delivered: [],
-  returned: [],
-  cancelled: [],
-};
+/**
+ * Forward-only status machine — re-exported from cod-shared so the dashboard,
+ * the single-order endpoint, and the bulk endpoints cannot drift apart.
+ */
+export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> =
+  ALLOWED_ORDER_TRANSITIONS as Record<OrderStatus, OrderStatus[]>;
 
 export function orderStatusOptions(status: OrderStatus): OrderStatus[] {
   return [status, ...ALLOWED_TRANSITIONS[status]];

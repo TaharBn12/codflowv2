@@ -45,6 +45,8 @@ import supportRoutes from "@/endpoints/support/routes";
 import operationsRoutes from "@/endpoints/operations/routes";
 import storeAbandonedRoutes from "@/endpoints/abandoned-orders/store-routes";
 import storeOtpRoutes from "@/endpoints/store-otp/store-routes";
+import blacklistRoutes from "@/endpoints/blacklist/routes";
+import savedViewsRoutes from "@/endpoints/saved-views/routes";
 
 import { sweepAbandonedOrders } from "@/cron/sweep-abandoned-orders";
 import { runDailyReport } from "@/cron/daily-report";
@@ -158,6 +160,8 @@ app.route("/api/analytics", analyticsRoutes);
 app.route("/api/abandoned-orders", abandonedOrdersRoutes);
 app.route("/api/operations", operationsRoutes);
 app.route("/api/support", supportRoutes);
+app.route("/api/blacklist", blacklistRoutes);
+app.route("/api/saved-views", savedViewsRoutes);
 
 // 404 handler
 app.notFound((c) => {

@@ -18,6 +18,7 @@ import { hasPermission } from "../../../../cod-shared/rbac/utils";
 import { SCOPES } from "../../../../cod-shared/rbac/scopes";
 import { logActivity, logActivities, ACTIONS } from "@/lib/activity";
 import { chooseLeastLoadedConfirmer, createStaffCommissionStages } from "../../../../cod-shared/queries/orders";
+import { blacklistedFlag } from "../../../../cod-shared/queries/blacklist";
 import {
   APPROVAL_ACTIONS,
   configureTelegramWebhook,
@@ -303,6 +304,7 @@ routes.post("/orders/auto-assign", async (c) => {
       id: orders.id,
       orderNumber: orders.orderNumber,
       customerId: orders.customerId,
+      blacklisted: blacklistedFlag(orders.phone),
     })
     .from(orders)
     .leftJoin(
@@ -315,7 +317,14 @@ routes.post("/orders/auto-assign", async (c) => {
     .all();
   let assigned = 0;
   const assignedOrders: Parameters<typeof logActivities>[3] = [];
+  let skippedBlacklisted = 0;
   for (const order of pending) {
+    // A banned number never enters the confirmation queue: the order stays
+    // visible to admins (with its badge) but nobody is asked to call it.
+    if (order.blacklisted) {
+      skippedBlacklisted += 1;
+      continue;
+    }
     const agent = await chooseLeastLoadedConfirmer(db);
     if (!agent) break;
     const now = new Date().toISOString();
@@ -350,7 +359,11 @@ routes.post("/orders/auto-assign", async (c) => {
   await logActivities(db, c.get("user"), ACTIONS.ORDER_CONFIRMER_ASSIGNED, assignedOrders);
   return c.json({
     success: true,
-    data: { assigned, remaining: pending.length - assigned },
+    data: {
+      assigned,
+      remaining: pending.length - assigned - skippedBlacklisted,
+      skippedBlacklisted,
+    },
   });
 });
 
