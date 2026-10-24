@@ -43,6 +43,14 @@ maintainers at `124762008+bighadj22@users.noreply.github.com`.
 - If the issue is validated, a GitHub Security Advisory may be published once
   remediation details are ready
 
+## Implemented controls
+
+The repository documents every enforced control — response headers, CORS
+fail-closed behaviour, JWT/JWKS verification, API-key handling, rate limits,
+webhook signature checks, and the CI dependency gate — in
+[docs/SECURITY-HARDENING.md](./docs/SECURITY-HARDENING.md), together with the
+residual risks that are accepted on purpose.
+
 ## Scope
 
 Everything under `cod-server/`, `cod-client-astro/`, `cod-shared/`, and the

@@ -338,7 +338,8 @@ cd cod-client-astro && npm run typecheck
 ```
 
 CI runs typecheck + tests for cod-server and cod-client-astro, plus
-astro check + tests for theme01.
+astro check + tests for theme01, and a `npm audit --audit-level=high`
+dependency gate.
 
 ---
 
@@ -350,6 +351,7 @@ astro check + tests for theme01.
 | **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** | System map and data flows |
 | **[docs/CONFIGURATION.md](./docs/CONFIGURATION.md)** | All environment variables and configs |
 | **[docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md)** | Incomplete features and platform constraints |
+| **[docs/SECURITY-HARDENING.md](./docs/SECURITY-HARDENING.md)** | Implemented security controls and accepted risks |
 | **[docs/WHATSAPP-OTP-VERIFICATION.md](./docs/WHATSAPP-OTP-VERIFICATION.md)** | WhatsApp OTP verification feature |
 | **[docs/TURNSTILE.md](./docs/TURNSTILE.md)** | Cloudflare Turnstile checkout bot protection |
 | **[docs/EMAIL-SENDING.md](./docs/EMAIL-SENDING.md)** | Transactional email feature (Sendili) |

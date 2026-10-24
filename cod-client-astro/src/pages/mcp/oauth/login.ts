@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { createAuth, type AuthEnv } from "@/lib/auth/server";
+import { withSecurityHeaders } from "@/lib/security-headers";
 import {
   mintLoginTicket,
   LOGIN_TICKET_MIN_KEY_BYTES,
@@ -23,28 +24,28 @@ const ALL: APIRoute = async (ctx) => {
   const secret = authEnv.MCP_LOGIN_TICKET_SECRET;
 
   if (!secret || secret.length < LOGIN_TICKET_MIN_KEY_BYTES) {
-    return new Response("MCP OAuth relay not configured", { status: 503 });
+    return withSecurityHeaders(new Response("MCP OAuth relay not configured", { status: 503 }));
   }
 
   const next = ctx.url.searchParams.get("next");
   if (!next || !isAuthorizeUrl(next, authEnv.PUBLIC_API_URL)) {
-    return new Response("Invalid next URL", { status: 400 });
+    return withSecurityHeaders(new Response("Invalid next URL", { status: 400 }));
   }
 
   const auth = createAuth(authEnv, { cf: req.cf });
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session?.user) {
     const back = `${ctx.url.pathname}?next=${encodeURIComponent(next)}`;
-    return new Response(null, {
+    return withSecurityHeaders(new Response(null, {
       status: 302,
       headers: { Location: `/sign-in?next=${encodeURIComponent(back)}` },
-    });
+    }));
   }
 
   const ticket = await mintLoginTicket(secret, session.user.id);
   const target = new URL(next);
   target.searchParams.set("ticket", ticket);
-  return new Response(null, { status: 302, headers: { Location: target.toString() } });
+  return withSecurityHeaders(new Response(null, { status: 302, headers: { Location: target.toString() } }));
 };
 
 function isAuthorizeUrl(value: string, apiBase: string): boolean {

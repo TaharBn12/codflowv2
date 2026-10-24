@@ -1,0 +1,17 @@
+# Security headers for the storefront theme.
+#
+# No Content-Security-Policy is shipped here on purpose: a storefront loads
+# merchant-controlled tags (Meta pixel, Google Fonts, Turnstile) and custom
+# domains, so a policy guessed in this template would break live stores. The
+# headers below are the ones that are always safe to send.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Permitted-Cross-Domain-Policies: none
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+
+# Hashed build assets never change under the same name.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable

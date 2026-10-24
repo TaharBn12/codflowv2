@@ -1,0 +1,21 @@
+# Security headers for every static asset the dashboard serves.
+#
+# This file is copied into `dist/` by Astro and merged with the immutable
+# Cache-Control rules the Cloudflare adapter injects for `/_astro/*`.
+#
+# CSP notes:
+# - `script-src 'unsafe-inline'` is required by the two prerendered inline
+#   scripts (locale/theme bootstrap in BaseLayout.astro and the delivery page
+#   tab switcher). Everything else loads from `/_astro/*` (self).
+# - `connect-src` must reach the API Worker, which lives on another origin in
+#   production (`PUBLIC_API_URL`) and on localhost:8787 in development.
+# - `img-src https:` keeps merchant product images (R2 media domain) working.
+# - `frame-ancestors 'none'` + DENY: the dashboard is never embedded.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Permitted-Cross-Domain-Policies: none
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: http://localhost:*; frame-src 'self' https://challenges.cloudflare.com; manifest-src 'self'

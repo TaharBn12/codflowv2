@@ -7,6 +7,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppContext, Env } from "@/types";
 import { corsMiddleware } from "@/middleware/cors";
+import { securityHeadersMiddleware } from "@/middleware/security-headers";
 import { authMiddleware } from "@/middleware/auth";
 import { storeAuthMiddleware } from "@/middleware/storeAuth";
 import { errorHandler } from "@/middleware/error";
@@ -77,6 +78,7 @@ export { CodLandingPageImageUploadWorkflow } from "@/workflows/landing-page-imag
 const app = new OpenAPIHono<AppContext>({ defaultHook: openApiValidationHook });
 
 // Global middleware
+app.use("*", securityHeadersMiddleware);
 app.use("*", corsMiddleware);
 app.onError(errorHandler);
 

@@ -104,7 +104,7 @@ describe("CORS Middleware", () => {
       expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
     });
 
-    it("should reject non-whitelisted origin by returning first allowed origin", async () => {
+    it("fails closed for a non-whitelisted origin", async () => {
       const res = await app.request("/test", {
         method: "GET",
         headers: {
@@ -113,8 +113,28 @@ describe("CORS Middleware", () => {
       });
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://app.example.com");
-      // Browser will reject this response due to origin mismatch
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+      expect(res.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+      expect(res.headers.get("Vary")).toContain("Origin");
+    });
+
+    it("fails closed for a non-whitelisted origin on preflight", async () => {
+      const res = await app.request("/test", {
+        method: "OPTIONS",
+        headers: { origin: "https://evil.com" },
+      });
+
+      expect(res.status).toBe(204);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+
+    it("adds Vary: Origin to whitelisted responses", async () => {
+      const res = await app.request("/test", {
+        method: "GET",
+        headers: { origin: "https://app.example.com" },
+      });
+
+      expect(res.headers.get("Vary")).toContain("Origin");
     });
 
     it("should handle requests without origin header", async () => {
@@ -153,7 +173,7 @@ describe("CORS Middleware", () => {
       app.get("/test", (c) => c.json({ ok: true }));
     });
 
-    it("should fall back to wildcard if no ALLOWED_ORIGINS set", async () => {
+    it("fails closed when no ALLOWED_ORIGINS is configured", async () => {
       const res = await app.request("/test", {
         method: "GET",
         headers: {
@@ -162,7 +182,7 @@ describe("CORS Middleware", () => {
       });
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://app.example.com");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
     });
   });
 
