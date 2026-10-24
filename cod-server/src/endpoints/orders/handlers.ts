@@ -17,6 +17,7 @@ import { logActivity, ACTIONS } from "@/lib/activity";
 import { getDeliveryCompanyById } from "@/endpoints/delivery-companies/queries";
 import { NotFoundError, ValidationError, BusinessLogicError } from "@/lib/errors/classes";
 import { ERROR_CODES } from "../../../../cod-shared/errors/codes";
+import { findActiveBlacklistEntry } from "../../../../cod-shared/queries/blacklist";
 
 async function logAutoConfirmerAssignment(
   db: ReturnType<typeof getDb>,
@@ -225,12 +226,35 @@ export async function createOrder(c: Context<AppContext>) {
     }));
 
     const actor = c.get("user");
-    // Create order — passes actor so stock movements are attributed correctly
+    // Create order — passes actor so stock movements are attributed correctly.
+    // The shared query is also where a blacklisted phone gets kept out of the
+    // confirmation queue and counted on the ban.
     await queries.createOrder(db, orderData, productsData, actor ? { id: actor.id, name: actor.name ?? "Unknown" } : null);
     await logActivity(db, actor, ACTIONS.ORDER_CREATED, {
       type: "order", id: orderId, label: orderNumber,
     }, { orderType: validated.orderType, price: validated.price, deliveryFee });
     await logAutoConfirmerAssignment(db, actor, orderId, orderNumber);
+
+    // Reported back so the operator hears it at the moment of entry rather than
+    // when they open the list: "you just created an order for a banned number".
+    // Fail-open — the order exists already; a lost warning beats a lost order.
+    let blacklistHit: Awaited<ReturnType<typeof findActiveBlacklistEntry>> = null;
+    try {
+      blacklistHit = await findActiveBlacklistEntry(db, { phone: validated.phone });
+      if (blacklistHit) {
+        await logActivity(db, actor, ACTIONS.BLACKLIST_HIT, {
+          type: "order", id: orderId, label: orderNumber,
+        }, {
+          blacklistId: blacklistHit.id,
+          kind: blacklistHit.kind,
+          value: blacklistHit.value,
+          reason: blacklistHit.reason,
+          via: "dashboard",
+        });
+      }
+    } catch (err) {
+      console.error("[blacklist] dashboard order lookup failed:", err);
+    }
 
     return c.json(
       {
@@ -249,6 +273,15 @@ export async function createOrder(c: Context<AppContext>) {
           deliveryType: validated.deliveryType,
           orderType: validated.orderType,
           status: "new",
+          /** Present only when the phone is banned — the form warns on the spot. */
+          blacklist: blacklistHit
+            ? {
+                id: blacklistHit.id,
+                kind: blacklistHit.kind,
+                reason: blacklistHit.reason,
+                since: blacklistHit.createdAt,
+              }
+            : null,
         },
         message: "Order created successfully",
       },

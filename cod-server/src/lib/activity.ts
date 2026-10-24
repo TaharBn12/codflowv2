@@ -29,6 +29,19 @@ export const ACTIONS = {
   ORDER_CONTACT_ATTEMPT:   "order.contact_attempt",
   ORDER_NOTE_ADDED:        "order.note_added",
   ORDER_CONFIRMER_ASSIGNED: "order.confirmer_assigned",
+  /** Bulk cancel from the orders list (one row per batch, counts in metadata). */
+  ORDER_CANCELLED_BULK:    "order.cancelled_bulk",
+  /** Bulk permanent delete from the orders list. */
+  ORDER_DELETED_BULK:      "order.deleted_bulk",
+  /** Spreadsheet import — one row per batch, per-row failures in metadata. */
+  ORDERS_IMPORTED:         "order.imported",
+
+  // Customer blacklist (banned phones / IPs)
+  BLACKLIST_ENTRY_ADDED:   "blacklist.entry_added",
+  BLACKLIST_ENTRY_LIFTED:  "blacklist.entry_lifted",
+  BLACKLIST_ENTRY_DELETED: "blacklist.entry_deleted",
+  /** An order was placed by a banned phone/IP — the ban earned its keep. */
+  BLACKLIST_HIT:           "blacklist.hit",
 
   // Customers
   CUSTOMER_CREATED:        "customer.created",

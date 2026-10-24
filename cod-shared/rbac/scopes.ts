@@ -31,6 +31,12 @@ export const SCOPES = {
   /** Assign orders to drivers */
   ORDERS_ASSIGN: "orders:assign",
   
+  // Customer blacklist
+  /** View banned phones/IPs and check a customer against the list */
+  BLACKLIST_READ: "blacklist:read",
+  /** Ban a phone/IP, lift a ban, edit its reason */
+  BLACKLIST_MANAGE: "blacklist:manage",
+
   // Customers
   /** View customers list and customer profiles */
   CUSTOMERS_READ: "customers:read",
@@ -203,6 +209,10 @@ export const SCOPE_CATEGORIES = {
       SCOPES.ORDERS_DELETE,
       SCOPES.ORDERS_ASSIGN,
     ],
+  },
+  blacklist: {
+    label: "Customer Blacklist",
+    scopes: [SCOPES.BLACKLIST_READ, SCOPES.BLACKLIST_MANAGE],
   },
   customers: {
     label: "Customers",

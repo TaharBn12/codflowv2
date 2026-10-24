@@ -152,6 +152,7 @@
   "scope_categories": {
     "dashboard": "لوحة التحكم",
     "orders": "الطلبات",
+    "blacklist": "القائمة السوداء للعملاء",
     "customers": "العملاء",
     "customerGroups": "مجموعات العملاء",
     "customerTags": "وسوم العملاء",

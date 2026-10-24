@@ -152,6 +152,7 @@
   "scope_categories": {
     "dashboard": "Tableau de bord",
     "orders": "Commandes",
+    "blacklist": "Liste noire des clients",
     "customers": "Clients",
     "customerGroups": "Groupes de clients",
     "customerTags": "Tags clients",

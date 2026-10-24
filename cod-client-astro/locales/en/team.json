@@ -152,6 +152,7 @@
   "scope_categories": {
     "dashboard": "Dashboard",
     "orders": "Orders",
+    "blacklist": "Customer Blacklist",
     "customers": "Customers",
     "customerGroups": "Customer Groups",
     "customerTags": "Customer Tags",
