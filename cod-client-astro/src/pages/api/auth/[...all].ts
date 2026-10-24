@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { createAuth, type AuthEnv } from "@/lib/auth/server";
+import { withAuthResponseHeaders } from "@/lib/security-headers";
 
 export const prerender = false;
 
@@ -20,13 +21,13 @@ const ALL: APIRoute = async (ctx) => {
       const result = await authEnv.DB.prepare("SELECT scope FROM user_scopes WHERE user_id = ?")
         .bind(body.user.id).all<{ scope: string }>();
       const scopes = body.user.role === "admin" ? ["*"] : result.results.map((row) => row.scope);
-      return new Response(JSON.stringify({ ...body, scopes }), {
+      return withAuthResponseHeaders(new Response(JSON.stringify({ ...body, scopes }), {
         status: response.status,
         headers: response.headers,
-      });
+      }));
     }
   }
-  return response;
+  return withAuthResponseHeaders(response);
 };
 
 export const GET = ALL;

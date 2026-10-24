@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { withSecurityHeaders } from "@/lib/security-headers";
 
 /**
  * Email-link landing: /reset-password/<token> → /reset-password?token=<token>.
@@ -13,5 +14,5 @@ export const prerender = false;
 
 export const GET: APIRoute = ({ params, redirect }) => {
   const token = params.token ?? "";
-  return redirect(`/reset-password?token=${encodeURIComponent(token)}`, 302);
+  return withSecurityHeaders(redirect(`/reset-password?token=${encodeURIComponent(token)}`, 302));
 };

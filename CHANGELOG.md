@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- dependencies: `npm audit` is now clean (0 advisories). A root `overrides`
+  block pins patched transitive versions — `proxy-addr` 2.0.8 (critical IP
+  spoofing), `@modelcontextprotocol/sdk` 1.32.2, `body-parser` 2.4.0,
+  `brace-expansion` 5.0.12, `deepmerge-ts` 8.0.2, `happy-dom` 21.0.4,
+  `http-cache-semantics` 4.3.0, `source-map-js` 1.2.2, `svgo` 4.1.0,
+  `sharp` 0.35.5, `undici` per major (5/6/7/8), `esbuild` 0.25.x and `vite`
+  8.3.5 — and bumps the direct deps `zod` 4.6.7, `vitest` 5.0.5 and
+  `astro` 7.4.1. CI gains an `npm audit --audit-level=high` job
+- server: new `securityHeadersMiddleware` sends `nosniff`, `frame-ancestors
+  'none'` / `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, a
+  permissions policy, HSTS over HTTPS outside development, and a
+  `default-src 'none'` CSP on JSON responses
+- server: CORS now fails closed — an origin that is not in `ALLOWED_ORIGINS`
+  gets no `Access-Control-Allow-Origin` (previously it received the first
+  configured origin), a production deployment without `ALLOWED_ORIGINS` no
+  longer echoes the caller, and every response carries `Vary: Origin`
+- dashboard: `public/_headers` ships a full CSP plus HSTS/nosniff/frame
+  protections for prerendered pages, and the Worker-owned routes
+  (`/api/auth/*`, `/mcp/oauth/login`, `/reset-password/*`) apply the same set
+  in code
+- storefront: `theme01/public/_headers` ships nosniff, SAMEORIGIN, referrer,
+  HSTS and permissions headers (no CSP — merchant-installed tags would break)
+- docs: `docs/SECURITY-HARDENING.md` records every enforced control and the
+  accepted residual risks
+
 ### Added
 
 - dashboard: the wilaya heatmap now draws a real map of Algeria — the schematic
