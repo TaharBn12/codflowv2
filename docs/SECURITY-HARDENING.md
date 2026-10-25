@@ -51,13 +51,24 @@ them; they are protected by the frame and sniffing headers instead.
 
 `cod-server/src/middleware/cors.ts` fails closed:
 
-- A request from an origin that is not listed in `ALLOWED_ORIGINS` receives
-  **no** `Access-Control-Allow-Origin` header, so the browser refuses to expose
-  the response to the calling script.
-- `*` is honoured only when it is explicitly configured **and** the environment
-  is not `production`; a production deployment with no `ALLOWED_ORIGINS` emits
-  no CORS headers at all rather than echoing the caller.
+- An explicit `ALLOWED_ORIGINS` list is absolute **in every environment**: a
+  listed origin is echoed, anything else receives **no**
+  `Access-Control-Allow-Origin` header, so the browser refuses to expose the
+  response to the calling script. A dev box that wants "any origin" says so
+  with `*` — a real list is never loosened by a stale `ENVIRONMENT` value.
+- `*` (or no configuration) echoes the caller **only outside production**; in
+  production it emits no CORS headers at all rather than echoing the caller.
 - Every response carries `Vary: Origin`.
+
+### Deployment environment
+
+`scripts/cloudflare-deploy.mjs` rewrites the top-level `ENVIRONMENT` var to
+`production` when it generates `cod-server/wrangler.toml`. The template keeps
+`development` so `wrangler dev` behaves like a dev box, but a deployment that
+inherited that value would silently disable every production-only branch
+(strict CORS, HSTS). The live Worker answers `GET /` with
+`"environment":"production"` — that is the cheapest way to confirm the
+hardening is actually active.
 
 ## 4. Authentication and authorization
 

@@ -5,8 +5,39 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { corsMiddleware } from "./cors";
+import { corsMiddleware, resolveAllowedOrigin } from "./cors";
 import type { AppContext } from "@/types/app";
+
+describe("resolveAllowedOrigin", () => {
+  it("echoes the caller in development when the config is a wildcard", () => {
+    expect(resolveAllowedOrigin("http://localhost:5173", "development", "*")).toBe(
+      "http://localhost:5173",
+    );
+  });
+
+  it("echoes the caller in development when nothing is configured", () => {
+    expect(resolveAllowedOrigin("http://localhost:3000", "development", undefined)).toBe(
+      "http://localhost:3000",
+    );
+  });
+
+  it("fails closed in production even when the config is a wildcard", () => {
+    expect(resolveAllowedOrigin("https://evil.example.com", "production", "*")).toBeNull();
+    expect(resolveAllowedOrigin("https://evil.example.com", "production", undefined)).toBeNull();
+  });
+
+  it("treats an explicit allow-list as absolute in every environment", () => {
+    const list = "https://app.example.com,https://store.example.com";
+    expect(resolveAllowedOrigin("https://app.example.com", "production", list)).toBe(
+      "https://app.example.com",
+    );
+    expect(resolveAllowedOrigin("https://evil.example.com", "production", list)).toBeNull();
+    // A deployment that still reports "development" must not echo strangers
+    // once a real allow-list is configured.
+    expect(resolveAllowedOrigin("https://evil.example.com", "development", list)).toBeNull();
+    expect(resolveAllowedOrigin(undefined, "production", list)).toBeNull();
+  });
+});
 
 describe("CORS Middleware", () => {
   let app: Hono<AppContext>;
@@ -143,7 +174,7 @@ describe("CORS Middleware", () => {
       });
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://app.example.com");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
     });
 
     it("should handle OPTIONS preflight for whitelisted origin", async () => {

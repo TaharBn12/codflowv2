@@ -331,6 +331,10 @@ function addTomlCustomDomain(text, url, additionalUrls = []) {
 function genServerToml(tpl, v) {
   let t = tpl;
   t = replaceTomlVar(t, "name", v.serverWorker);
+  // The template keeps ENVIRONMENT = "development" so `wrangler dev` behaves
+  // like a dev box. A deployment must flip it: production is what enables the
+  // CORS allow-list, HSTS, and every other fail-closed branch in the Worker.
+  t = replaceTomlVar(t, "ENVIRONMENT", "production");
   t = t.split('database_name = "codflow-os-db"').join(`database_name = "${v.dbName}"`);
   t = t.split("00000000-0000-0000-0000-000000000000").join(v.dbId);
   t = t.split('bucket_name = "codflow-images"').join(`bucket_name = "${v.bucket}"`);

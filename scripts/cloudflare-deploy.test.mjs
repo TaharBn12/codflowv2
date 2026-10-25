@@ -84,3 +84,28 @@ test("remote D1 migrations run before the first cod-server deploy", async () => 
   assert.ok(migrate < seed);
   assert.equal(main.split('"db:migrate:remote"').length - 1, 1);
 });
+
+test("genServerToml flips ENVIRONMENT to production for a deployment", async () => {
+  const { genServerToml } = await import("./cloudflare-deploy.mjs");
+  const { readFileSync } = await import("node:fs");
+  const tpl = readFileSync(new URL("../cod-server/wrangler.toml.example", import.meta.url), "utf8");
+  const out = genServerToml(tpl, {
+    serverWorker: "codflowv2-server",
+    dbName: "codflowv2-db",
+    dbId: "11111111-1111-1111-1111-111111111111",
+    bucket: "codflowv2-images",
+    kvRate: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    kvOAuth: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    serverUrl: "https://api.example.com",
+    betterAuthUrl: "https://dashboard.example.com/api/auth",
+    mediaDomain: "media.example.com",
+    allowedOrigins: "https://dashboard.example.com,https://store.example.com",
+  });
+  // The template ships development defaults for `wrangler dev`; a deployment
+  // must never keep them, or the Worker's production-only hardening (CORS
+  // allow-list, HSTS) silently stays off.
+  assert.match(tpl, /^ENVIRONMENT = "development"$/m);
+  assert.match(out, /^ENVIRONMENT = "production"$/m);
+  assert.doesNotMatch(out, /^ENVIRONMENT = "development"$/m);
+  assert.match(out, /^ALLOWED_ORIGINS = "https:\/\/dashboard\.example\.com,https:\/\/store\.example\.com"$/m);
+});
