@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs: `docs/SECURITY-HARDENING.md` records every enforced control and the
   accepted residual risks
 
+### Fixed
+
+- deploy: the generated `cod-server/wrangler.toml` now sets
+  `ENVIRONMENT = "production"`. Every deployment so far kept the template's
+  `development` default, which switched off the production-only hardening
+  (strict CORS allow-list, HSTS) on the live API
+- server: CORS treats an explicit `ALLOWED_ORIGINS` list as absolute in every
+  environment, so a stale `ENVIRONMENT` value can no longer turn the API into
+  an origin echo
+
 ### Added
 
 - dashboard: the wilaya heatmap now draws a real map of Algeria — the schematic

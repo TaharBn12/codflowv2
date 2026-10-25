@@ -21,7 +21,13 @@ const EXPOSE_HEADERS = "Content-Type, X-API-Key, X-Store-API-Key";
  * Resolve the `Access-Control-Allow-Origin` value for a request.
  *
  * Returns `null` when the response must not be exposed cross-origin.
- * A configured `*` is honoured only in non-production environments.
+ *
+ * Rules, in order:
+ * 1. An explicit allow-list (`ALLOWED_ORIGINS` with real origins) is absolute:
+ *    a listed origin is echoed, anything else gets no CORS header — in every
+ *    environment. A dev box that wants "any origin" says so with `*`.
+ * 2. `*` (or no configuration at all) means "echo the caller", which is only
+ *    acceptable outside production. In production it fails closed.
  */
 export function resolveAllowedOrigin(
   requestOrigin: string | undefined,
@@ -34,23 +40,15 @@ export function resolveAllowedOrigin(
     .filter(Boolean);
 
   const isProduction = environment === "production";
-  const wildcardAllowed = !isProduction || configured.includes("*");
+  const allowsAnyOrigin = configured.length === 0 || configured.includes("*");
 
-  if (!isProduction) {
-    // Development: echo the caller so any localhost port works.
-    if (requestOrigin) return requestOrigin;
-    return wildcardAllowed ? "*" : (configured[0] ?? null);
-  }
-
-  if (requestOrigin) {
-    if (wildcardAllowed && configured.includes("*")) return requestOrigin;
+  if (!allowsAnyOrigin) {
+    if (!requestOrigin) return null;
     return configured.includes(requestOrigin) ? requestOrigin : null;
   }
 
-  // No Origin header: not a browser cross-origin request. Only advertise the
-  // configured set when it is explicit (never the wildcard in production).
-  if (wildcardAllowed && configured.includes("*")) return "*";
-  return configured[0] ?? null;
+  if (isProduction) return null;
+  return requestOrigin ?? "*";
 }
 
 export async function corsMiddleware(c: Context<AppContext>, next: Next) {
